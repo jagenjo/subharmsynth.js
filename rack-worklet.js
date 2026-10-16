@@ -2,14 +2,15 @@
 // The rack's AudioWorkletProcessor. It hosts one DSP instance per synth module (their classes are
 // registered in globalThis.WR_DSP by the synths/*-worklet.js files, loaded into the same
 // AudioWorkletGlobalScope before this one), copies the patch cables between them every sample,
-// and runs the shared devices: keys outputs, dual LFO, the compressor on the master bus and the scope.
+// and runs the shared devices: audio input jacks, keys outputs, dual LFO, the compressor on the master
+// bus and the scope. Its single input is the audio interface input (microphone / line), stereo.
 //
 // Jack ids: the rack's own jacks are plain ("lfo1", "kb_gate1"), a module's are prefixed with
 // the module id ("subharm.vco1", "dfam2.vca"). Each input takes one cable, with one sample of delay.
 
-const RACK_OUT_IDS = ["lfo1","lfo2","comp_gr","kb_gate1","kb_key1","kb_gate2","kb_key2","kb_trig"];
+const RACK_OUT_IDS = ["lfo1","lfo2","comp_gr","kb_gate1","kb_key1","kb_gate2","kb_key2","kb_trig","in_l","in_r"];
 const RACK_IN_IDS = ["lfo1_rate","lfo2_rate","lfo1_sync","lfo2_sync","comp_sc","scope_in"];
-const O_LFO = [0, 1], O_COMP_GR = 2, O_KB_GATE = [3, 5], O_KB_KEY = [4, 6], O_KB_TRIG = 7;
+const O_LFO = [0, 1], O_COMP_GR = 2, O_KB_GATE = [3, 5], O_KB_KEY = [4, 6], O_KB_TRIG = 7, O_IN_L = 8, O_IN_R = 9;
 const I_LFO_RATE = [0, 1], I_LFO_SYNC = [2, 3], I_COMP_SC = 4, I_SCOPE = 5;
 const MIDI_OUT = "kb_midi";
 const MIDI_MESSAGES = { midi: 1, bend: 1, midiClock: 1, midiStart: 1, midiStop: 1, midiContinue: 1 };
@@ -219,6 +220,10 @@ class RackProcessor extends AudioWorkletProcessor {
 	process(inputs, outputs) {
 		const out = outputs[0];
 		const L = out[0], R = out[1];
+		// audio interface input (empty arrays while nothing is connected), +-5V on IN L / IN R
+		const inp = inputs && inputs[0];
+		const IL = inp && inp.length ? inp[0] : null;
+		const IR = inp && inp.length ? (inp[1] || inp[0]) : null;
 		const s = this.s;
 		if (!s || !L) return true;
 
@@ -241,6 +246,10 @@ class RackProcessor extends AudioWorkletProcessor {
 			// ---- patch cables (one sample of delay) ----
 			for (let c = 0; c < nc; c++)
 				dstArr[c][dstIdx[c]] = srcArr[c][srcIdx[c]];
+
+			// ---- audio input jacks ----
+			outs[O_IN_L] = IL ? IL[j] * 5 : 0;
+			outs[O_IN_R] = IR ? IR[j] * 5 : 0;
 
 			// ---- keys device outputs ----
 			outs[O_KB_GATE[0]] = this.kbGate[0] ? GATE_V : 0;

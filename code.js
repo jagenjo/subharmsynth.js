@@ -1152,7 +1152,7 @@ try { collapsed = JSON.parse( localStorage.getItem("SUBHARM_collapsed") || "{}" 
 function deviceH( id, h ) { return collapsed[id] ? DEVICE_COLLAPSED_H : h; }
 
 // devices sharing a row fold and unfold together
-var DEVICE_ROWS = [["keys"], ["lfo", "comp"], ["reverb", "delay"]];
+var DEVICE_ROWS = [["io"], ["keys"], ["lfo", "comp"], ["reverb", "delay"]];
 
 function toggleCollapsed( id )
 {
@@ -1235,6 +1235,11 @@ function drawCollapsedBar( id, x, y, w, name, jack_rows )
 // draws a device, or its collapsed bar. draw(x, y, w, h) draws the expanded device
 function drawDevice( id, x, y, w, h, name, jack_rows, draw )
 {
+	if(show_rear)
+	{
+		drawRearDevice( id, x, y, w, h, name );
+		return;
+	}
 	if(collapsed[id])
 	{
 		drawCollapsedBar( id, x, y, w, name, jack_rows );
@@ -1348,7 +1353,14 @@ function drawModules( y0 )
 	}
 	var y = y0;
 	mods.forEach(function(m, i){
-		if(collapsed[ m.id ])
+		if(show_rear)
+		{
+			var fit = moduleFit( m.def );
+			beginFrame( 0, y, collapsed[ m.id ] ? 1 : fit.k );
+			drawRearDevice( m.id, 0, 0, collapsed[ m.id ] ? PANEL_W : fit.w, fit.h, m.def.title );
+			endFrame();
+		}
+		else if(collapsed[ m.id ])
 		{
 			beginFrame( 0, y, 1 );
 			id_prefix = m.id + ".";
@@ -1443,6 +1455,306 @@ function drawDelayDevice( x, y, w, h )
 }
 
 
+
+// ---------------------------------------------------------------------------
+// audio I/O device, the thin row at the top: output and input devices, input gain, the audio
+// input as IN L / IN R jacks, master volume with level meters. Settings are per browser (rack.io)
+
+var IO_H = 70;
+
+// one line green LCD
+function drawLcd( x, y, w, h, text, align )
+{
+	ctx.fillStyle = "#050505";
+	ctx.beginPath(); ctx.roundRect( x - 3, y - 3, w + 6, h + 6, 5 ); ctx.fill();
+	ctx.fillStyle = "#16240f";
+	ctx.beginPath(); ctx.roundRect( x, y, w, h, 3 ); ctx.fill();
+	ctx.font = "bold 13px 'Courier New', monospace";
+	ctx.textAlign = align || "left";
+	ctx.textBaseline = "middle";
+	ctx.fillStyle = "#b6f06a";
+	var max = Math.floor( (w - 16) / 8 );
+	if(text.length > max)
+		text = text.substr( 0, max - 1 ) + "\u2026";
+	ctx.fillText( text, align == "center" ? x + w * 0.5 : x + 8, y + h * 0.5 + 1 );
+}
+
+function drawIODevice( x, y, w, h )
+{
+	var io = rack.io, dev = rack.io_devices;
+	drawCasing( x, y, w, h );
+	drawScrew( x + w - 36, y + 10 ); drawScrew( x + 36, y + h - 10 ); drawScrew( x + w - 36, y + h - 10 );
+	var report = function(p){ p.catch(function(err){ setStatus( "Audio I/O: " + err.message ); }); };
+
+	// output device (browsers with AudioContext.setSinkId)
+	var lx = x + 60, lw = 230, ly = y + 30;
+	drawSection( "OUTPUT", lx, lx + lw, y + 14 );
+	var out = !rack.canSelectOutput() ? "DEFAULT (BROWSER)" : rack.deviceLabel( dev.outputs, io.output_id );
+	drawLcd( lx, ly, lw, 24, out );
+	if(button( "io_out_prev", lx + lw + 10, ly + 1, 28, 22, "\u25c0" ).clicked)
+		act(function(){ outputChange( -1 ); });
+	if(button( "io_out_next", lx + lw + 42, ly + 1, 28, 22, "\u25b6" ).clicked)
+		act(function(){ outputChange( 1 ); });
+
+	// input device: microphone or line in, off until enabled
+	var ix = lx + lw + 100;
+	drawSection( "INPUT", ix, ix + lw, y + 14 );
+	drawLcd( ix, ly, lw, 24, rack.input ? rack.deviceLabel( dev.inputs, io.input_id ) : "INPUT OFF" );
+	if(button( "io_in_prev", ix + lw + 10, ly + 1, 28, 22, "\u25c0" ).clicked)
+		act(function(){ report( rack.cycleInput( -1 ) ); });
+	if(button( "io_in_next", ix + lw + 42, ly + 1, 28, 22, "\u25b6" ).clicked)
+		act(function(){ report( rack.cycleInput( 1 ) ); });
+	if(button( "io_in_on", ix + lw + 78, ly + 1, 48, 22, "ON", !!rack.input ).clicked)
+		act(function(){
+			if(rack.input)
+				rack.setInput( null );
+			else
+				report( rack.setInput( io.input_id ).then(function(){ setStatus( "Audio input on: patch IN L / IN R into the synths" ); }) );
+		});
+	var gx = ix + lw + 170;
+	io.input_gain = knob( "io_gain", gx, y + 44, 15, io.input_gain, 0, 1, {
+		label: "GAIN", labelSize: 10, def: 0.5, format: function(v){ var g = 4 * v * v; return g > 0 ? (20 * Math.log10( g )).toFixed(1) + " dB" : "-inf dB"; }
+	});
+
+	// IN L / IN R jacks
+	var px = gx + 34, pw = 2 * 58 + 20;
+	ctx.fillStyle = "#1f1f1e";
+	ctx.beginPath(); ctx.roundRect( px, y + 6, pw, h - 12, 6 ); ctx.fill();
+	WR.IO_JACKS[0].forEach(function(j, c){
+		drawJack( j[2], px + 39 + c * 58, y + 46, j[0], j[1] );
+	});
+
+	// name, master volume and meters on the right
+	var mx = x + w - 22 - 250;
+	ctx.textAlign = "right";
+	ctx.textBaseline = "middle";
+	ctx.font = "bold 20px " + FONT;
+	ctx.fillStyle = TEXT_COLOR;
+	ctx.fillText( "AUDIO I/O", mx - 40, y + h * 0.5 + 1 );
+	io.master = knob( "io_master", mx, y + 42, 18, io.master, 0, 1, {
+		label: "MASTER", labelSize: 10, def: 0.8,
+		format: function(v){ var g = v * v * 1.25; return g > 0 ? (20 * Math.log10( g )).toFixed(1) + " dB" : "-inf dB"; }
+	});
+	var meter = rack.updateMeter();
+	var bx = mx + 40, bw = x + w - 22 - 24 - bx;
+	["L", "R"].forEach(function(name, c){
+		var by = y + 24 + c * 16;
+		drawLabel( name, bx - 8, by + 4, 10 );
+		ctx.fillStyle = "#050505";
+		ctx.fillRect( bx, by, bw, 9 );
+		// -48..+3 dB, green / yellow above -12 / red above -3
+		var db = meter[c] > 0 ? 20 * Math.log10( meter[c] ) : -100;
+		var n = clamp( (db + 48) / 51, 0, 1 );
+		var segs = 34;
+		for(var i = 0; i < segs; ++i)
+		{
+			var t = (i + 0.5) / segs, sdb = -48 + t * 51;
+			var lit = t <= n;
+			ctx.fillStyle = sdb > -3 ? (lit ? "#ff3b2f" : "#3a1512") : (sdb > -12 ? (lit ? "#ffb02f" : "#3a2a10") : (lit ? "#3bd16f" : "#10301a"));
+			ctx.fillRect( bx + 1 + i * (bw - 2) / segs, by + 1, (bw - 2) / segs - 1, 7 );
+		}
+	});
+	drawLabel( "-48", bx + 6, y + 60, 8, false, DIM_COLOR );
+	drawLabel( "-12", bx + bw * 36 / 51, y + 60, 8, false, DIM_COLOR );
+	drawLabel( "0", bx + bw * 48 / 51, y + 60, 8, false, DIM_COLOR );
+}
+
+function outputChange( dir )
+{
+	if(!rack.canSelectOutput())
+	{
+		setStatus( "This browser can't choose the output device (Chrome and Edge can): it plays on the system default" );
+		return;
+	}
+	rack.refreshDevices().then(function(){
+		if(rack.io_devices.outputs.length < 2)
+			setStatus( "No other output devices (turn the audio input ON once so the browser lists them by name)" );
+		return rack.cycleOutput( dir );
+	}).catch(function(err){ setStatus( "Audio output: " + err.message ); });
+}
+
+// ---------------------------------------------------------------------------
+// rear view (Tab): every device turned around, with its audio sockets and the cables of the
+// fixed audio path: each synth -> compressor inputs -> delay -> reverb -> audio I/O main in.
+// The front CV / gate cables are not shown here
+
+var show_rear = false;
+var rear_jacks = {}; // socket id -> { x, y, r, label, device }
+
+// [socket, label, "in" | "out"] on the back of a device
+function rearSockets( id )
+{
+	if(rack.settings.modules.some(function(m){ return m.id == id; }))
+		return [["out", "AUDIO OUT", "out"]];
+	switch(id)
+	{
+		case "io": return [["main_l", "MAIN IN L", "in"], ["main_r", "MAIN IN R", "in"], ["input_l", "INPUT L", "out"], ["input_r", "INPUT R", "out"]];
+		case "comp":
+			var list = [];
+			for(var k = 1; k <= Math.max( 2, rack.settings.modules.length ); ++k)
+				list.push([ "in" + k, "INPUT " + k, "in" ]);
+			list.push([ "out", "OUTPUT", "out" ]);
+			return list;
+		case "delay": return [["in", "INPUT", "in"], ["out_l", "OUT L", "out"], ["out_r", "OUT R", "out"]];
+		case "reverb": return [["in_l", "IN L", "in"], ["in_r", "IN R", "in"], ["out_l", "OUT L", "out"], ["out_r", "OUT R", "out"]];
+	}
+	return [];
+}
+
+// what the rear sticker says about the device's audio
+function rearNote( id )
+{
+	var fx = rack.settings.fx;
+	switch(id)
+	{
+		case "io": return "INPUT L / R GO TO IN L / IN R ON THE FRONT";
+		case "keys": return "NO AUDIO: NOTES AND CV ON THE FRONT";
+		case "lfo": return "NO AUDIO: CV ON THE FRONT";
+		case "comp": return rack.settings.comp.on ? "INPUTS SUMMED, COMPRESSED" : "BYPASSED (OFF)";
+		case "delay": return fx.delay_on ? "INSERT: DRY + ECHOES" : "BYPASSED (OFF): DRY THROUGH";
+		case "reverb": return fx.reverb_on ? "DRY + REVERB SEND" : "BYPASSED (OFF): DRY THROUGH";
+	}
+	return "MONO AUDIO OUT, POST VOLUME";
+}
+
+var REAR_L = "#d8463a", REAR_R = "#e8e4dc", REAR_MONO = "#9a9a94";
+
+function rearCables()
+{
+	var c = [];
+	rack.settings.modules.forEach(function(m, k){
+		c.push([ "rear:" + m.id + ":out", "rear:comp:in" + (k + 1), CABLE_COLORS[ (k + 2) % CABLE_COLORS.length ] ]);
+	});
+	c.push([ "rear:comp:out", "rear:delay:in", REAR_MONO ]);
+	c.push([ "rear:delay:out_l", "rear:reverb:in_l", REAR_L ]);
+	c.push([ "rear:delay:out_r", "rear:reverb:in_r", REAR_R ]);
+	c.push([ "rear:reverb:out_l", "rear:io:main_l", REAR_L ]);
+	c.push([ "rear:reverb:out_r", "rear:io:main_r", REAR_R ]);
+	return c;
+}
+
+// 1/4" socket on the back
+function drawRearSocket( id, x, y, label, dir, device, mini )
+{
+	var r = mini ? 6.5 : 15;
+	rear_jacks[id] = { x: rackX( x ), y: rackY( y ), r: (r + 3) * frame.k, label: label, device: device };
+	if(!mini)
+		drawLabel( label, x, y - 27, 10, dir == "out" );
+	var g = ctx.createLinearGradient( x - r, y - r, x + r, y + r );
+	g.addColorStop( 0, "#d4d4ce" );
+	g.addColorStop( 1, "#6d6d68" );
+	ctx.fillStyle = g;
+	ctx.beginPath();
+	for(var i = 0; i < 6; ++i)
+	{
+		var a = Math.PI / 6 + i * Math.PI / 3;
+		ctx.lineTo( x + Math.cos(a) * r, y + Math.sin(a) * r );
+	}
+	ctx.closePath();
+	ctx.fill();
+	ctx.fillStyle = "#2a2a28";
+	ctx.beginPath(); ctx.arc( x, y, r * 0.62, 0, Math.PI * 2 ); ctx.fill();
+	ctx.fillStyle = "#000";
+	ctx.beginPath(); ctx.arc( x, y, r * 0.42, 0, Math.PI * 2 ); ctx.fill();
+}
+
+function drawRearDevice( id, x, y, w, h, name )
+{
+	var sockets = rearSockets( id );
+	if(collapsed[id])
+	{
+		drawCasing( x, y, w, DEVICE_COLLAPSED_H );
+		var cy = y + DEVICE_COLLAPSED_H * 0.5;
+		ctx.fillStyle = "#2b2c30";
+		ctx.fillRect( x + 22, y + 2, w - 44, DEVICE_COLLAPSED_H - 4 );
+		collapseButton( id, x + 36, cy );
+		ctx.textAlign = "left";
+		ctx.textBaseline = "middle";
+		ctx.font = "bold 14px " + FONT;
+		ctx.fillStyle = TEXT_COLOR;
+		ctx.fillText( name + "  (REAR)", x + 52, cy + 1 );
+		sockets.forEach(function(sk, k){
+			drawRearSocket( "rear:" + id + ":" + sk[0], x + w - 22 - 20 - (sockets.length - 1 - k) * 24, cy, sk[1], sk[2], name, true );
+		});
+		return;
+	}
+	drawCasing( x, y, w, h );
+	// back plate: brushed dark metal
+	var g = ctx.createLinearGradient( 0, y, 0, y + h );
+	g.addColorStop( 0, "#37383c" );
+	g.addColorStop( 1, "#222326" );
+	ctx.fillStyle = g;
+	ctx.fillRect( x + 22, y + 2, w - 44, h - 4 );
+	ctx.strokeStyle = "rgba(255,255,255,0.06)";
+	ctx.lineWidth = 1;
+	ctx.strokeRect( x + 26.5, y + 6.5, w - 53, h - 13 );
+	drawScrew( x + w - 36, y + 12 ); drawScrew( x + 36, y + h - 12 ); drawScrew( x + w - 36, y + h - 12 );
+
+	// ventilation slots on the left
+	var vx = x + 64, vrows = Math.min( 8, Math.floor( (h - 30) / 16 ) );
+	var vy = y + (h - vrows * 16) * 0.5 + 3;
+	ctx.fillStyle = "#121214";
+	for(var r = 0; r < vrows; ++r)
+		for(var c = 0; c < Math.min( 10, Math.floor( (w * 0.28) / 26 ) ); ++c)
+		{
+			ctx.beginPath(); ctx.roundRect( vx + c * 26, vy + r * 16, 20, 7, 3.5 ); ctx.fill();
+		}
+
+	// sticker with the device name and what its audio does, clear of the socket plate
+	var spacing = 64, pw = sockets.length * spacing + 16;
+	var px = x + w - 22 - 14 - pw;
+	var sh = Math.min( 56, h - 18 ), sw = 250;
+	var sx = x + Math.max( 64 + Math.min( 10, Math.floor( (w * 0.28) / 26 ) ) * 26 + 30, w * 0.36 ), sy = y + (h - sh) * 0.5;
+	if(sockets.length)
+		sx = Math.min( sx, px - sw - 20 );
+	ctx.fillStyle = "#dcd8cc";
+	ctx.beginPath(); ctx.roundRect( sx, sy, sw, sh, 4 ); ctx.fill();
+	ctx.textAlign = "left";
+	ctx.textBaseline = "middle";
+	ctx.fillStyle = "#1a1a1a";
+	ctx.font = "bold " + (sh > 40 ? 18 : 14) + "px " + FONT;
+	ctx.fillText( name, sx + 10, sy + (sh > 40 ? 16 : sh * 0.32) );
+	ctx.font = "9px " + FONT;
+	ctx.fillStyle = "#3a3a38";
+	ctx.fillText( rearNote( id ), sx + 10, sy + (sh > 40 ? 34 : sh * 0.72) );
+	if(sh > 40)
+		ctx.fillText( "WEBRACK \u00b7 " + id.toUpperCase(), sx + 10, sy + 47 );
+
+	// audio sockets on the right
+	if(sockets.length)
+	{
+		var py = y + Math.max( 6, h * 0.5 - 40 ), ph = Math.min( h - 12, 80 );
+		ctx.fillStyle = "#18181a";
+		ctx.beginPath(); ctx.roundRect( px, py, pw, ph, 6 ); ctx.fill();
+		sockets.forEach(function(sk, k){
+			drawRearSocket( "rear:" + id + ":" + sk[0], px + 8 + spacing * (k + 0.5), py + ph * 0.5 + 12, sk[1], sk[2], name );
+		});
+	}
+	collapseButton( id, x + 36, y + 11 );
+}
+
+function drawRearCables()
+{
+	var cables = rearCables();
+	cables.forEach(function(c){
+		var a = rear_jacks[ c[0] ], b = rear_jacks[ c[1] ];
+		if(a && b)
+			drawCable( a.x, a.y, b.x, b.y, c[2], 0.92, !show_wires );
+	});
+	// hovering a socket says where it goes
+	for(var id in rear_jacks)
+	{
+		var j = rear_jacks[id];
+		if((ui.px - j.x) * (ui.px - j.x) + (ui.py - j.y) * (ui.py - j.y) > j.r * j.r)
+			continue;
+		var other = cables.filter(function(c){ return c[0] == id || c[1] == id; }).map(function(c){
+			var o = rear_jacks[ c[0] == id ? c[1] : c[0] ];
+			return o ? (c[0] == id ? "\u2192 " : "\u2190 ") + o.device + " " + o.label : "";
+		});
+		tooltips.push([ j.device + " " + j.label + (other.length ? "  " + other.join(", ") : "  (not connected)"), j.x, j.y - j.r - 12 ]);
+		ui.hot = id;
+	}
+}
 
 // ---------------------------------------------------------------------------
 // keys device, in a row above the main panel: MIDI input selection, on-screen keyboard,
@@ -1713,17 +2025,27 @@ function draw()
 
 	ui.hot = null;
 	jacks = {}; // filled again by every row as it draws its jacks
+	rear_jacks = {};
 	beginFrame( 0, 0, 1 );
+	drawDevice( "io", 0, 0, PANEL_W, IO_H, "AUDIO I/O", WR.IO_JACKS, drawIODevice );
+	endFrame();
+	var y = deviceH( "io", IO_H ) + KB_GAP;
+	beginFrame( 0, y, 1 );
 	drawDevice( "keys", 0, 0, PANEL_W, KB_H, "KEYS", WR.KB_JACKS, drawKeysDevice );
 	endFrame();
-	var y = deviceH( "keys", KB_H ) + KB_GAP;
+	y += deviceH( "keys", KB_H ) + KB_GAP;
 	y += drawModules( y );
 	view.devices_y = y;
 	beginFrame( 0, y, 1 );
 	drawDevices();
 	endFrame();
-	updateCables();
-	drawCables();
+	if(show_rear)
+		drawRearCables();
+	else
+	{
+		updateCables();
+		drawCables();
+	}
 	drawTooltips();
 	drawScrollbars( w, h );
 	updatePan();
@@ -1875,6 +2197,12 @@ window.addEventListener("keydown", function(e){
 			e.preventDefault();
 		return;
 	}
+	if(e.code == "Tab" && !e.shiftKey)
+	{
+		e.preventDefault();
+		setRear( !show_rear );
+		return;
+	}
 	switch(e.code)
 	{
 		case "Space": act(function(){ rack.transport( "play" ); }); break;
@@ -1919,7 +2247,19 @@ function updateToolbar()
 
 function updateToolbarFrame()
 {
+	rack.updateIO();
 }
+
+// front / rear of the rack (Tab)
+function setRear( rear )
+{
+	show_rear = rear;
+	cable_drag = null;
+	$("rear").textContent = rear ? "Front (Tab)" : "Rear (Tab)";
+	$("rear").classList.toggle( "on", rear );
+	setStatus( rear ? "Rear view: the audio connections between the devices (Tab for the front)" : "Front view" );
+}
+$("rear").addEventListener("click", function(e){ setRear( !show_rear ); e.target.blur(); });
 
 $("power").addEventListener("click", function(){
 	if(!rack.context)
@@ -1932,7 +2272,9 @@ $("power").addEventListener("click", function(){
 function updatePanelHeight()
 {
 	var rows = deviceRowsH();
-	PANEL_H = deviceH( "keys", KB_H ) + KB_GAP + modulesH() + rows[0] + DEVICE_GAP + rows[1];
+	PANEL_H = deviceH( "io", IO_H ) + KB_GAP + deviceH( "keys", KB_H ) + KB_GAP + modulesH() + rows[0] + DEVICE_GAP + rows[1];
+	if(show_rear)
+		PANEL_H += 50; // room for the rear cables hanging below the bottom row
 }
 
 function setLayout( name )

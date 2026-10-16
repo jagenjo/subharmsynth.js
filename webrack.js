@@ -12,7 +12,7 @@ var WR = {
 	order: []
 };
 
-WR.VERSION = "20261016g"; // bump together with the ?v= in index.html so browsers reload the scripts
+WR.VERSION = "20261016h"; // bump together with the ?v= in index.html so browsers reload the scripts
 
 // def: {
 //   title, description,           names for menus and the panel
@@ -46,6 +46,10 @@ WR.LFO_JACKS = [
 WR.COMP_JACKS = [
 	[["SIDECHAIN","in","comp_sc"], ["GR","out","comp_gr"], ["SCOPE","in","scope_in"]]
 ];
+// audio I/O device: the audio interface input as patchable signals (+-5V)
+WR.IO_JACKS = [
+	[["IN L","out","in_l"], ["IN R","out","in_r"]]
+];
 WR.KB_JACKS = [
 	[["GATE 1","out","kb_gate1"], ["KEY 1","out","kb_key1"], ["GATE 2","out","kb_gate2"], ["KEY 2","out","kb_key2"], ["TRIG","out","kb_trig"], ["MIDI","midiout","kb_midi"]]
 ];
@@ -63,6 +67,11 @@ function WRContext()
 	this.midi = { access: null, inputs: [], selected: "all", activity: 0, status: "off" };
 	this.keys = { held: {}, all: [], zones: [[], []] }; // held: note -> zone
 	this.onmidichange = null;
+	// audio I/O: per browser, not part of the patches
+	this.io = WRContext.loadIO();
+	this.io_devices = { outputs: [], inputs: [], status: "" };
+	this.input = null;  // { stream, source } while the audio input is on
+	this.meter = [0, 0]; // master peak level per channel, linear
 	this._sent = null;
 	this._initializing = null;
 }
@@ -130,7 +139,8 @@ WRContext.prototype.init = function()
 	});
 	this._initializing = load.then(function(){ return ctx.audioWorklet.addModule( "rack-worklet.js" + v ); }).then(function(){
 		var node = that.node = new AudioWorkletNode( ctx, "webrack", {
-			numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2]
+			numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2],
+			channelCount: 2, channelCountMode: "explicit", channelInterpretation: "speakers"
 		});
 		node.port.onmessage = function(e) {
 			if(e.data.type == "state")
@@ -141,6 +151,17 @@ WRContext.prototype.init = function()
 		};
 
 		that.buildPostFx( ctx, node );
+		// audio interface input -> gain -> the rack's IN L / IN R jacks
+		that.input_gain = ctx.createGain();
+		that.input_gain.connect( node );
+		that.updateIO();
+		if(that.io.output_id)
+			that.setOutput( that.io.output_id );
+		if(that.io.input_on)
+			that.setInput( that.io.input_id );
+		that.refreshDevices();
+		if(navigator.mediaDevices && navigator.mediaDevices.addEventListener)
+			navigator.mediaDevices.addEventListener( "devicechange", function(){ that.refreshDevices(); } );
 
 		that._sent = null;
 		that.sendScale();
@@ -245,7 +266,7 @@ WRContext.prototype.tempo = function()
 WRContext.jackTypes = function( modules )
 {
 	var types = {};
-	WR.LFO_JACKS.concat( WR.COMP_JACKS, WR.KB_JACKS ).forEach(function(row){
+	WR.LFO_JACKS.concat( WR.COMP_JACKS, WR.KB_JACKS, WR.IO_JACKS ).forEach(function(row){
 		row.forEach(function(j){ types[ j[2] ] = j[1]; });
 	});
 	modules.forEach(function(m){
@@ -305,7 +326,19 @@ WRContext.prototype.buildPostFx = function( ctx, node )
 {
 	var bus = this.bus = ctx.createGain();
 	node.connect( bus );
-	bus.connect( ctx.destination );
+	// master volume, then the speakers; the meters listen after it
+	var master = this.master = ctx.createGain();
+	master.connect( ctx.destination );
+	bus.connect( master );
+	var split = ctx.createChannelSplitter( 2 );
+	master.connect( split );
+	this.analysers = [0, 1].map(function(c){
+		var a = ctx.createAnalyser();
+		a.fftSize = 1024;
+		split.connect( a, c );
+		return a;
+	});
+	this._meter_buf = new Float32Array( 1024 );
 
 	// delay: two delay lines feeding back into themselves (normal) or into each other (ping-pong)
 	var d = this.delay = {
@@ -343,7 +376,7 @@ WRContext.prototype.buildPostFx = function( ctx, node )
 	r.predelay.connect( r.convolver );
 	r.convolver.connect( r.tone );
 	r.tone.connect( r.wet );
-	r.wet.connect( ctx.destination );
+	r.wet.connect( master );
 }
 
 // impulses are loaded the first time their room is selected
@@ -416,6 +449,166 @@ WRContext.prototype.updatePostFx = function()
 	set( r.predelay.delayTime, fx.reverb_predelay );
 	set( r.tone.frequency, fx.reverb_tone );
 	set( r.wet.gain, fx.reverb_on ? mix * mix * 0.8 : 0 );
+}
+
+// ---- audio I/O device: output and input devices, input gain, master volume ----
+
+WRContext.IO_KEY = "SUBHARM_io";
+
+WRContext.loadIO = function()
+{
+	var io = { master: 0.8, input_gain: 0.5, output_id: "", input_id: "", input_on: false };
+	try {
+		var saved = JSON.parse( localStorage.getItem( WRContext.IO_KEY ) || "{}" ) || {};
+		io = WR.mergeValid( io, saved );
+	} catch(err) {}
+	return io;
+}
+
+WRContext.prototype.saveIO = function()
+{
+	try { localStorage.setItem( WRContext.IO_KEY, JSON.stringify( this.io ) ); } catch(err) {}
+}
+
+// gains from the knobs; called every frame, cheap when nothing changed
+WRContext.prototype.updateIO = function()
+{
+	if(!this.master)
+		return;
+	var key = this.io.master + "/" + this.io.input_gain;
+	if(key === this._io_sent)
+		return;
+	this._io_sent = key;
+	var t = this.context.currentTime;
+	this.master.gain.setTargetAtTime( this.io.master * this.io.master * 1.25, t, 0.02 ); // 0.8 = unity
+	this.input_gain.gain.setTargetAtTime( 4 * this.io.input_gain * this.io.input_gain, t, 0.02 ); // 0.5 = unity
+	this.saveIO();
+}
+
+// peak level of the master output since the last call, with a falling hold
+WRContext.prototype.updateMeter = function()
+{
+	if(!this.analysers)
+		return this.meter;
+	var buf = this._meter_buf;
+	for(var c = 0; c < 2; ++c)
+	{
+		this.analysers[c].getFloatTimeDomainData( buf );
+		var peak = 0;
+		for(var i = 0; i < buf.length; ++i)
+		{
+			var v = buf[i] < 0 ? -buf[i] : buf[i];
+			if(v > peak) peak = v;
+		}
+		this.meter[c] = Math.max( peak, this.meter[c] * 0.92 );
+	}
+	return this.meter;
+}
+
+WRContext.prototype.refreshDevices = function()
+{
+	var that = this, d = this.io_devices;
+	if(!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices)
+	{
+		d.status = "no device list in this browser";
+		return Promise.resolve();
+	}
+	return navigator.mediaDevices.enumerateDevices().then(function(list){
+		// "default" / "communications" are aliases of other entries: the default goes first as ""
+		var pick = function(kind) {
+			var r = [{ id: "", label: "DEFAULT" }];
+			list.forEach(function(dev, i){
+				if(dev.kind == kind && dev.deviceId != "default" && dev.deviceId != "communications" && dev.deviceId)
+					r.push({ id: dev.deviceId, label: dev.label || (kind == "audioinput" ? "INPUT " : "OUTPUT ") + r.length });
+			});
+			return r;
+		};
+		d.outputs = pick( "audiooutput" );
+		d.inputs = pick( "audioinput" );
+	}).catch(function(){});
+}
+
+WRContext.prototype.canSelectOutput = function()
+{
+	return !!(this.context ? this.context.setSinkId : (window.AudioContext && AudioContext.prototype.setSinkId));
+}
+
+WRContext.prototype.deviceLabel = function( list, id )
+{
+	var dev = list.find(function(d){ return d.id == id; });
+	return dev ? dev.label.toUpperCase() : (id ? "DISCONNECTED" : "DEFAULT");
+}
+
+WRContext.prototype.setOutput = function( id )
+{
+	var that = this;
+	if(!this.context || !this.context.setSinkId)
+		return Promise.reject( new Error("this browser can't choose the output device") );
+	return this.context.setSinkId( id || "" ).then(function(){
+		that.io.output_id = id || "";
+		that.saveIO();
+	});
+}
+
+WRContext.prototype.cycleOutput = function( dir )
+{
+	var list = this.io_devices.outputs;
+	if(list.length < 2)
+		return Promise.resolve();
+	var i = list.findIndex(function(d){ return d.id == this.io.output_id; }, this);
+	return this.setOutput( list[ (i + dir + list.length) % list.length ].id );
+}
+
+// opens the input device (null / false closes it): microphone or line in, without voice processing
+WRContext.prototype.setInput = function( id )
+{
+	var that = this;
+	if(this.input)
+	{
+		this.input.source.disconnect();
+		this.input.stream.getTracks().forEach(function(t){ t.stop(); });
+		this.input = null;
+	}
+	if(id === null || id === false)
+	{
+		this.io.input_on = false;
+		this.saveIO();
+		return Promise.resolve();
+	}
+	if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia)
+		return Promise.reject( new Error("no audio input in this browser") );
+	var audio = { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 2 };
+	if(id)
+		audio.deviceId = { exact: id };
+	return navigator.mediaDevices.getUserMedia({ audio: audio }).then(function(stream){
+		var source = that.context.createMediaStreamSource( stream );
+		source.connect( that.input_gain );
+		that.input = { stream: stream, source: source };
+		that.io.input_on = true;
+		that.io.input_id = id || "";
+		that.saveIO();
+		return that.refreshDevices(); // device names are only readable once access is granted
+	}, function(err){
+		that.io.input_on = false;
+		that.saveIO();
+		throw err;
+	});
+}
+
+WRContext.prototype.cycleInput = function( dir )
+{
+	var list = this.io_devices.inputs;
+	if(list.length < 2)
+		return Promise.resolve();
+	var i = list.findIndex(function(d){ return d.id == this.io.input_id; }, this);
+	var id = list[ (i + dir + list.length) % list.length ].id;
+	if(!this.input)
+	{
+		this.io.input_id = id;
+		this.saveIO();
+		return Promise.resolve();
+	}
+	return this.setInput( id );
 }
 
 // ---- patching ----

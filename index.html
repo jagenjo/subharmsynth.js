@@ -64,6 +64,7 @@
 		<button id="zoom-reset" title="Back to the window width">100%</button>
 		<button id="zoom-in" title="Bigger">+</button>
 	</div>
+	<button id="rear" title="Turn the rack around: the audio connections between the devices (Tab)">Rear (Tab)</button>
 	<button id="layout" title="Switch between the hardware panel layout and the classic layout">Layout</button>
 	<div class="group">
 		Scale
@@ -71,14 +72,14 @@
 		<datalist id="scale-list"></datalist>
 		<button id="scale-clear" title="Remove the custom scale">&times;</button>
 	</div>
-	<span id="help" title="Drag knobs vertically (Shift = fine), double-click resets. Drag from a jack to patch, double-click or right-click a jack to unplug. The mouse wheel off a knob scrolls the rack (Shift + wheel: sideways). Keys: Space play / stop every synth, R reset, N next, T trigger (when QWERTY is on in the keys device, T plays F#).">? help</span>
+	<span id="help" title="Drag knobs vertically (Shift = fine), double-click resets. Drag from a jack to patch, double-click or right-click a jack to unplug. The mouse wheel off a knob scrolls the rack (Shift + wheel: sideways). Tab turns the rack around (rear view with the audio connections). Keys: Space play / stop every synth, R reset, N next, T trigger (when QWERTY is on in the keys device, T plays F#).">? help</span>
 	<span id="status"></span>
 </header>
 <canvas id="panel"></canvas>
-<script src="webrack.js?v=20261016g"></script>
+<script src="webrack.js?v=20261016h"></script>
 <!-- synths: each registers itself in the rack (panel here, DSP in its -worklet.js) -->
-<script src="synths/subharm.js?v=20261016g"></script>
-<script src="synths/dfam.js?v=20261016g"></script>
-<script src="code.js?v=20261016g"></script>
+<script src="synths/subharm.js?v=20261016h"></script>
+<script src="synths/dfam.js?v=20261016h"></script>
+<script src="code.js?v=20261016h"></script>
 </body>
 </html>

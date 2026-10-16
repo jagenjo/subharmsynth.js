@@ -25,10 +25,11 @@ Needs a browser with AudioWorklet support, served over `https://` or `localhost`
 
 The page is a rack. From the top:
 
-1. The **KEYS** device.
-2. The synths, one row each.
-3. A row with the **LFO** and the **compressor**.
-4. A row with the **reverb** and the **delay**.
+1. The **AUDIO I/O** device.
+2. The **KEYS** device.
+3. The synths, one row each.
+4. A row with the **LFO** and the **compressor**.
+5. A row with the **reverb** and the **delay**.
 
 One patch bay spans all of them: any output can be cabled to any input of any device.
 
@@ -40,6 +41,10 @@ One patch bay spans all of them: any output can be cabled to any input of any de
   - Zoomed past the width, the rack also scrolls sideways.
   - The mouse wheel scrolls when it's not over a knob; Shift + wheel scrolls sideways. You can also drag the scrollbars, or grab the rack by the wood sides of any row (or the empty space around it) and drag.
   - Dragging a cable near the edge of the window scrolls toward it.
+- **Rear view:** **Tab** (or *Rear* in the toolbar) turns the rack around, as in Propellerhead Reason.
+  - The back of every device shows its audio sockets, and cables show the audio path: each synth's AUDIO OUT → the compressor's inputs (one per synth, summed) → delay → reverb → AUDIO I/O main in.
+  - Each device's label says what it does with the audio, e.g. whether the delay is bypassed. Hovering a socket says where it is connected.
+  - The routing is fixed: the rear shows it, but the cables there can't be moved. The front's CV cables are hidden while the rear is shown.
 - **Space** starts every synth when none is running, otherwise stops them all. **R**, **N** and **T** reset, step (NEXT / ADVANCE) and trigger every synth.
 - **Adding another synth:** register it from a pair of files in `synths/`:
   - The main thread file calls `WR.registerSynth(type, { title, worklet, jacks, defaults, size, draw, … })`. The fields are documented in `webrack.js`.
@@ -83,6 +88,18 @@ A replica of the Moog DFAM ("Drummer From Another Mother"):
 - **32-point patch bay** with the hardware's layout. Outputs have inverted labels. Inputs accept one cable each; outputs can feed several. Audio-rate patching works, e.g. VCO 2 into VCO 1 for FM.
 
 Patch bay signal levels: audio ±5 V, envelopes 0 to 5 V, SEQ outputs 1 V/oct, clock/trigger outputs 5 ms pulses at 5 V. Pitch and cutoff inputs track 1 V/oct.
+
+## Audio I/O device
+
+The thin row at the top. Its settings are remembered by the browser, not saved in patches.
+
+- **OUTPUT** ◀ / ▶ chooses the audio output device. This needs `AudioContext.setSinkId` (Chrome, Edge); other browsers play on the system default.
+- **INPUT** ◀ / ▶ chooses the input device (microphone or line in); **ON** opens it. The browser asks for permission the first time.
+  - Echo cancellation, noise suppression and auto gain are turned off.
+  - Device names appear once access has been granted.
+- **GAIN** sets the input level: unity at the middle, up to +12 dB.
+- **IN L / IN R** jacks carry the input as ±5 V signals, so it can be patched anywhere. For example: DFAM EXT AUDIO to filter the microphone, the scope, the compressor's sidechain, or a pitch / cutoff input for audio-rate modulation.
+- **MASTER** is the volume of everything (after the reverb): 0 dB at the default position, up to +2 dB. The L / R meters show the peak level after it.
 
 ## Keys device and MIDI
 
