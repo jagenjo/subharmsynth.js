@@ -2,16 +2,25 @@
 // The rack's AudioWorkletProcessor. It hosts one DSP instance per synth module (their classes are
 // registered in globalThis.WR_DSP by the synths/*-worklet.js files, loaded into the same
 // AudioWorkletGlobalScope before this one), copies the patch cables between them every sample,
-// and runs the shared devices: audio input jacks, keys outputs, dual LFO, the compressor on the master
-// bus and the scope. Its single input is the audio interface input (microphone / line), stereo.
+// and runs the shared devices: audio input jacks, keys outputs, dual LFO, the stereo compressor and
+// the scope. The delay and reverb are native WebAudio nodes outside: their rear sockets are sent out
+// and come back through the processor's extra outputs / inputs (one render quantum later).
+//   inputs:  0 audio interface (microphone / line), 1 delay return, 2 reverb return (all stereo)
+//   outputs: 0 main (speakers), 1 delay send, 2 reverb send (all stereo)
 //
 // Jack ids: the rack's own jacks are plain ("lfo1", "kb_gate1"), a module's are prefixed with
-// the module id ("subharm.vco1", "dfam2.vca"). Each input takes one cable, with one sample of delay.
+// the module id ("subharm.vco1", "dfam2.vca"). Cables are copied with one sample of delay. CV inputs
+// take one cable; audio inputs (rear sockets) sum all the cables plugged in.
 
-const RACK_OUT_IDS = ["lfo1","lfo2","comp_gr","kb_gate1","kb_key1","kb_gate2","kb_key2","kb_trig","in_l","in_r"];
-const RACK_IN_IDS = ["lfo1_rate","lfo2_rate","lfo1_sync","lfo2_sync","comp_sc","scope_in"];
+const RACK_OUT_IDS = ["lfo1","lfo2","comp_gr","kb_gate1","kb_key1","kb_gate2","kb_key2","kb_trig","in_l","in_r",
+	// rear audio sockets (line level)
+	"io_input_l","io_input_r","comp_out_l","comp_out_r","delay_out_l","delay_out_r","reverb_out_l","reverb_out_r"];
+const RACK_IN_IDS = ["lfo1_rate","lfo2_rate","lfo1_sync","lfo2_sync","comp_sc","scope_in",
+	"io_main_l","io_main_r","comp_in_l","comp_in_r","delay_in_l","delay_in_r","reverb_in_l","reverb_in_r"];
 const O_LFO = [0, 1], O_COMP_GR = 2, O_KB_GATE = [3, 5], O_KB_KEY = [4, 6], O_KB_TRIG = 7, O_IN_L = 8, O_IN_R = 9;
+const O_IO_IN = [10, 11], O_COMP = [12, 13], O_DELAY = [14, 15], O_REVERB = [16, 17];
 const I_LFO_RATE = [0, 1], I_LFO_SYNC = [2, 3], I_COMP_SC = 4, I_SCOPE = 5;
+const I_MAIN = [6, 7], I_COMP = [8, 9], I_DELAY = [10, 11], I_REVERB = [12, 13];
 const MIDI_OUT = "kb_midi";
 const MIDI_MESSAGES = { midi: 1, bend: 1, midiClock: 1, midiStart: 1, midiStop: 1, midiContinue: 1 };
 const LFO_SHAPES = { sine: 0, tri: 1, saw: 2, ramp: 3, square: 4, sh: 5 };
@@ -51,6 +60,9 @@ class RackProcessor extends AudioWorkletProcessor {
 		this.srcArr = []; this.srcIdx = new Int32Array(MAX_CABLES);
 		this.dstArr = []; this.dstIdx = new Int32Array(MAX_CABLES);
 		this.numCables = 0;
+		// distinct cabled inputs, zeroed before the cables add into them
+		this.zeroArr = []; this.zeroIdx = new Int32Array(MAX_CABLES);
+		this.numZero = 0;
 
 		this.kbGate = [false, false];
 		this.kbKey = [0, 0];
@@ -142,9 +154,10 @@ class RackProcessor extends AudioWorkletProcessor {
 		const nodes = [this].concat(this.modules.map(m => m.dsp));
 		for (const n of nodes) { n.patched.fill(0); n.ins.fill(0); }
 		const midi = {};
-		let c = 0;
+		let c = 0, z = 0;
 		this.srcArr.length = 0;
 		this.dstArr.length = 0;
+		this.zeroArr.length = 0;
 		for (const p of patches) {
 			if (p[0] === MIDI_OUT) { // MIDI cable into a module's MIDI IN
 				const dot = p[1].indexOf(".");
@@ -156,10 +169,14 @@ class RackProcessor extends AudioWorkletProcessor {
 			if (!src || !dst || c >= MAX_CABLES) continue;
 			this.srcArr[c] = src.node.outs; this.srcIdx[c] = src.index;
 			this.dstArr[c] = dst.node.ins; this.dstIdx[c] = dst.index;
+			if (!dst.node.patched[dst.index]) {
+				this.zeroArr[z] = dst.node.ins; this.zeroIdx[z] = dst.index; z++;
+			}
 			dst.node.patched[dst.index] = 1;
 			c++;
 		}
 		this.numCables = c;
+		this.numZero = z;
 		for (const mod of this.modules) mod.dsp.setMidiConnected(!!midi[mod.id]);
 	}
 
@@ -220,10 +237,13 @@ class RackProcessor extends AudioWorkletProcessor {
 	process(inputs, outputs) {
 		const out = outputs[0];
 		const L = out[0], R = out[1];
-		// audio interface input (empty arrays while nothing is connected), +-5V on IN L / IN R
-		const inp = inputs && inputs[0];
-		const IL = inp && inp.length ? inp[0] : null;
-		const IR = inp && inp.length ? (inp[1] || inp[0]) : null;
+		// stereo input / output pairs (empty arrays while nothing is connected)
+		const pair = (list, k) => {
+			const b = list && list[k];
+			return b && b.length ? [b[0], b[1] || b[0]] : null;
+		};
+		const io = pair(inputs, 0), delayRet = pair(inputs, 1), reverbRet = pair(inputs, 2);
+		const delaySend = pair(outputs, 1), reverbSend = pair(outputs, 2);
 		const s = this.s;
 		if (!s || !L) return true;
 
@@ -241,15 +261,25 @@ class RackProcessor extends AudioWorkletProcessor {
 		const compSlope = 1 - 1 / Math.max(comp.ratio, 1);
 		const compMakeup = Math.exp(comp.makeup * DB_TO_LN);
 		const nc = this.numCables, srcArr = this.srcArr, srcIdx = this.srcIdx, dstArr = this.dstArr, dstIdx = this.dstIdx;
+		const nz = this.numZero, zeroArr = this.zeroArr, zeroIdx = this.zeroIdx;
 
 		for (let j = 0; j < n; j++) {
-			// ---- patch cables (one sample of delay) ----
-			for (let c = 0; c < nc; c++)
-				dstArr[c][dstIdx[c]] = srcArr[c][srcIdx[c]];
+			// ---- signals coming in from outside: audio interface, delay and reverb returns ----
+			const inL = io ? io[0][j] : 0, inR = io ? io[1][j] : 0;
+			outs[O_IN_L] = inL * 5;
+			outs[O_IN_R] = inR * 5;
+			outs[O_IO_IN[0]] = inL;
+			outs[O_IO_IN[1]] = inR;
+			outs[O_DELAY[0]] = delayRet ? delayRet[0][j] : 0;
+			outs[O_DELAY[1]] = delayRet ? delayRet[1][j] : 0;
+			outs[O_REVERB[0]] = reverbRet ? reverbRet[0][j] : 0;
+			outs[O_REVERB[1]] = reverbRet ? reverbRet[1][j] : 0;
 
-			// ---- audio input jacks ----
-			outs[O_IN_L] = IL ? IL[j] * 5 : 0;
-			outs[O_IN_R] = IR ? IR[j] * 5 : 0;
+			// ---- patch cables (one sample of delay; several cables into an audio input add up) ----
+			for (let c = 0; c < nz; c++)
+				zeroArr[c][zeroIdx[c]] = 0;
+			for (let c = 0; c < nc; c++)
+				dstArr[c][dstIdx[c]] += srcArr[c][srcIdx[c]];
 
 			// ---- keys device outputs ----
 			outs[O_KB_GATE[0]] = this.kbGate[0] ? GATE_V : 0;
@@ -287,30 +317,50 @@ class RackProcessor extends AudioWorkletProcessor {
 				outs[O_LFO[i]] = v * lfo.level * 5;
 			}
 
-			// ---- the synths, summed on the master bus ----
-			let master = 0;
-			for (let m = 0; m < nm; m++) master += mods[m].tick();
+			// ---- the modules: synths write their AUDIO OUT, the mixer mixes ----
+			for (let m = 0; m < nm; m++) mods[m].tick();
 
-			// ---- compressor on the master bus (sidechain jack replaces the detector input) ----
+			// ---- stereo compressor, linked (IN R normalled to IN L; the SIDECHAIN jack replaces the detector) ----
+			let cl = ins[I_COMP[0]];
+			let cr = patched[I_COMP[1]] ? ins[I_COMP[1]] : cl;
 			if (comp.on) {
-				const det = patched[I_COMP_SC] ? ins[I_COMP_SC] / 5 : master;
+				let det;
+				if (patched[I_COMP_SC]) det = ins[I_COMP_SC] / 5;
+				else det = Math.max(cl < 0 ? -cl : cl, cr < 0 ? -cr : cr);
 				const a = det < 0 ? -det : det;
 				this.compEnv += (a > this.compEnv ? compAtk : compRel) * (a - this.compEnv);
 				const over = 20 * Math.log10(this.compEnv + 1e-9) - comp.threshold;
 				let gr = 0; // gain reduction in dB, 6dB soft knee
 				if (over > 3) gr = over * compSlope;
 				else if (over > -3) gr = compSlope * (over + 3) * (over + 3) / 12;
-				master *= (1 - comp.mix) + comp.mix * Math.exp(-gr * DB_TO_LN) * compMakeup;
+				const g = (1 - comp.mix) + comp.mix * Math.exp(-gr * DB_TO_LN) * compMakeup;
+				cl *= g;
+				cr *= g;
 				outs[O_COMP_GR] = rackClamp(gr / 4, 0, 10);
 				if (gr > this.compGrPeak) this.compGrPeak = gr;
 			}
 			else
 				outs[O_COMP_GR] = 0;
-			const y = rackTanh(master); // soft limiter on the output
-			// scope: the patched SCOPE input (+-5V full scale) or the master output
-			this.scopeFeed(patched[I_SCOPE] ? ins[I_SCOPE] / 5 : y, s.scope.time);
-			L[j] = y;
-			if (R) R[j] = y;
+			outs[O_COMP[0]] = cl;
+			outs[O_COMP[1]] = cr;
+
+			// ---- out to the delay and the reverb (IN R normalled to IN L) ----
+			if (delaySend) {
+				delaySend[0][j] = ins[I_DELAY[0]];
+				delaySend[1][j] = patched[I_DELAY[1]] ? ins[I_DELAY[1]] : ins[I_DELAY[0]];
+			}
+			if (reverbSend) {
+				reverbSend[0][j] = ins[I_REVERB[0]];
+				reverbSend[1][j] = patched[I_REVERB[1]] ? ins[I_REVERB[1]] : ins[I_REVERB[0]];
+			}
+
+			// ---- main out to the speakers, soft limited (MAIN IN R normalled to L) ----
+			const yl = rackTanh(ins[I_MAIN[0]]);
+			const yr = patched[I_MAIN[1]] ? rackTanh(ins[I_MAIN[1]]) : yl;
+			// scope: the patched SCOPE input (+-5V full scale) or the main output
+			this.scopeFeed(patched[I_SCOPE] ? ins[I_SCOPE] / 5 : (yl + yr) * 0.5, s.scope.time);
+			L[j] = yl;
+			if (R) R[j] = yr;
 		}
 		for (let m = 0; m < nm; m++) mods[m].endBlock(n);
 

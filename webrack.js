@@ -12,7 +12,7 @@ var WR = {
 	order: []
 };
 
-WR.VERSION = "20261016h"; // bump together with the ?v= in index.html so browsers reload the scripts
+WR.VERSION = "20261016i"; // bump together with the ?v= in index.html so browsers reload the scripts
 
 // def: {
 //   title, description,           names for menus and the panel
@@ -46,6 +46,21 @@ WR.LFO_JACKS = [
 WR.COMP_JACKS = [
 	[["SIDECHAIN","in","comp_sc"], ["GR","out","comp_gr"], ["SCOPE","in","scope_in"]]
 ];
+// audio sockets on the back of the shared devices (line level, "ain" / "aout"): patched like the
+// front jacks, but only with each other. An audio input sums every cable plugged into it
+WR.REAR_JACKS = {
+	io: [["MAIN IN L","ain","io_main_l"], ["MAIN IN R","ain","io_main_r"], ["INPUT L","aout","io_input_l"], ["INPUT R","aout","io_input_r"]],
+	comp: [["IN L","ain","comp_in_l"], ["IN R","ain","comp_in_r"], ["OUT L","aout","comp_out_l"], ["OUT R","aout","comp_out_r"]],
+	delay: [["IN L","ain","delay_in_l"], ["IN R","ain","delay_in_r"], ["OUT L","aout","delay_out_l"], ["OUT R","aout","delay_out_r"]],
+	reverb: [["IN L","ain","reverb_in_l"], ["IN R","ain","reverb_in_r"], ["OUT L","aout","reverb_out_l"], ["OUT R","aout","reverb_out_r"]]
+};
+// the default audio path after the synths: compressor -> delay -> reverb -> speakers (L red, R white)
+WR.AUDIO_CHAIN = [
+	["comp_out_l", "delay_in_l", 1], ["comp_out_r", "delay_in_r", 5],
+	["delay_out_l", "reverb_in_l", 1], ["delay_out_r", "reverb_in_r", 5],
+	["reverb_out_l", "io_main_l", 1], ["reverb_out_r", "io_main_r", 5]
+];
+
 // audio I/O device: the audio interface input as patchable signals (+-5V)
 WR.IO_JACKS = [
 	[["IN L","out","in_l"], ["IN R","out","in_r"]]
@@ -89,7 +104,8 @@ WRContext.rackDefaults = function()
 		reverb: 0.15,       // reverb MIX
 		// post FX devices: delay (off by default) and reverb settings
 		fx: { reverb_on: true, reverb_room: "HALL B", reverb_predelay: 0.02, reverb_tone: 12000,
-			delay_on: false, delay_sync: true, delay_div: 3, delay_time: 0.3, delay_feedback: 0.4, delay_tone: 5000, delay_mix: 0.3, delay_pingpong: true },
+			delay_on: false, delay_sync: true, delay_div: 3, delay_time: 0.3, delay_feedback: 0.4, delay_tone: 5000, delay_mix: 0.3, delay_pingpong: true,
+			reverb_dry: true, delay_dry: true }, // DRY off: 100% wet, for an aux send
 		scale_file: null,
 		lfo: [
 			{ rate: 0.5, shape: "sine", level: 1 },  // rate in Hz, level scales the +-5V output
@@ -104,14 +120,14 @@ WRContext.rackDefaults = function()
 WRContext.defaultSettings = function()
 {
 	var s = WRContext.rackDefaults();
-	s.version = 3;
+	s.version = 4;
 	s.modules = [];
-	s.patches = []; // [output id, input id, color index]
+	s.patches = WR.AUDIO_CHAIN.map(function(c){ return c.slice(); }); // [output id, input id, color index]
 	WRContext.addModuleTo( s, "subharm" );
 	return s;
 }
 
-// appends a new module of `type` to the settings; returns it
+// appends a new module of `type` to the settings, cabled in; returns it
 WRContext.addModuleTo = function( s, type )
 {
 	var def = WR.types[ type ];
@@ -122,7 +138,55 @@ WRContext.addModuleTo = function( s, type )
 	s.modules.push( m );
 	if(def.midi_in) // new synths with a MIDI IN get the keys' MIDI cable
 		s.patches.push([ "kb_midi", WR.jackId( id, def.midi_in ), 5 ]);
+	WRContext.routeAudio( s, m );
 	return m;
+}
+
+WR.isMixerInput = function( s, id )
+{
+	return s.modules.some(function(m){ return m.type == "mixer" && id.indexOf( m.id + ".in" ) == 0; });
+}
+
+// cables a new module's audio in: a synth goes to a free mixer channel, or where the other synths
+// go, or the compressor. A new mixer takes over the synths that weren't on a mixer yet
+WRContext.routeAudio = function( s, m )
+{
+	var def = WR.types[ m.type ];
+	var has = function(dst){ return s.patches.some(function(p){ return p[1] == dst; }); };
+	var synthAudio = function(id){ return /\.audio$/.test( id ); };
+	if(def.mixer)
+	{
+		var loose = s.patches.filter(function(p){ return synthAudio( p[0] ) && !WR.isMixerInput( s, p[1] ); });
+		if(!loose.length)
+			return;
+		var dest = loose[0][1];
+		s.patches = s.patches.filter(function(p){ return loose.indexOf( p ) == -1; });
+		loose.slice( 0, def.channels ).forEach(function(p, k){
+			s.patches.push([ p[0], WR.jackId( m.id, "in" + (k + 1) ), p[2] ]);
+		});
+		var types = WRContext.jackTypes( s.modules );
+		var right = /_l$/.test( dest ) && types[ dest.replace(/_l$/, "_r") ] ? dest.replace(/_l$/, "_r") : dest;
+		s.patches.push([ WR.jackId( m.id, "main_l" ), dest, 1 ]);
+		s.patches.push([ WR.jackId( m.id, "main_r" ), right, 5 ]);
+		return;
+	}
+	if(!def.audio_out)
+		return;
+	var src = WR.jackId( m.id, def.audio_out );
+	var color = 2 + (s.modules.length % 5);
+	var mixers = s.modules.filter(function(o){ return WR.types[ o.type ].mixer; });
+	for(var i = 0; i < mixers.length; ++i)
+		for(var k = 1; k <= WR.types[ mixers[i].type ].channels; ++k)
+		{
+			var dst = WR.jackId( mixers[i].id, "in" + k );
+			if(!has( dst ))
+			{
+				s.patches.push([ src, dst, color ]);
+				return;
+			}
+		}
+	var other = s.patches.find(function(p){ return synthAudio( p[0] ) && p[0] != src; });
+	s.patches.push([ src, other ? other[1] : "comp_in_l", color ]);
 }
 
 WRContext.prototype.init = function()
@@ -139,7 +203,7 @@ WRContext.prototype.init = function()
 	});
 	this._initializing = load.then(function(){ return ctx.audioWorklet.addModule( "rack-worklet.js" + v ); }).then(function(){
 		var node = that.node = new AudioWorkletNode( ctx, "webrack", {
-			numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2],
+			numberOfInputs: 3, numberOfOutputs: 3, outputChannelCount: [2, 2, 2],
 			channelCount: 2, channelCountMode: "explicit", channelInterpretation: "speakers"
 		});
 		node.port.onmessage = function(e) {
@@ -153,7 +217,7 @@ WRContext.prototype.init = function()
 		that.buildPostFx( ctx, node );
 		// audio interface input -> gain -> the rack's IN L / IN R jacks
 		that.input_gain = ctx.createGain();
-		that.input_gain.connect( node );
+		that.input_gain.connect( node, 0, 0 );
 		that.updateIO();
 		if(that.io.output_id)
 			that.setOutput( that.io.output_id );
@@ -269,8 +333,11 @@ WRContext.jackTypes = function( modules )
 	WR.LFO_JACKS.concat( WR.COMP_JACKS, WR.KB_JACKS, WR.IO_JACKS ).forEach(function(row){
 		row.forEach(function(j){ types[ j[2] ] = j[1]; });
 	});
+	for(var dev in WR.REAR_JACKS)
+		WR.REAR_JACKS[dev].forEach(function(j){ types[ j[2] ] = j[1]; });
 	modules.forEach(function(m){
-		WR.types[ m.type ].jacks.forEach(function(row){
+		var def = WR.types[ m.type ];
+		def.jacks.concat([ def.rear_jacks || [] ]).forEach(function(row){
 			row.forEach(function(j){ types[ WR.jackId( m.id, j[2] ) ] = j[1]; });
 		});
 	});
@@ -322,14 +389,18 @@ WR.makePlate = function( ctx, seconds )
 }
 WR.DELAY_DIVS = [["1/16", 0.25], ["1/8T", 1/3], ["1/8", 0.5], ["1/8D", 0.75], ["1/4T", 2/3], ["1/4", 1], ["1/4D", 1.5], ["1/2", 2], ["1/1", 4]];
 
+// Native nodes around the rack processor. Its output 0 goes to the speakers; outputs 1 and 2 are the
+// signals patched into the delay and reverb sockets, which come back on its inputs 1 and 2:
+//   output 0 -> master volume -> speakers (+ meters)
+//   output 1 -> delay: dry + two delay lines (normal or ping-pong, lowpass in the feedback) -> input 1
+//   output 2 -> reverb: dry + pre-delay -> convolver -> tone -> mix -> input 2
+// The returns go through a DelayNode: a loop through the processor needs one (it adds a render quantum)
 WRContext.prototype.buildPostFx = function( ctx, node )
 {
-	var bus = this.bus = ctx.createGain();
-	node.connect( bus );
 	// master volume, then the speakers; the meters listen after it
 	var master = this.master = ctx.createGain();
+	node.connect( master, 0 );
 	master.connect( ctx.destination );
-	bus.connect( master );
 	var split = ctx.createChannelSplitter( 2 );
 	master.connect( split );
 	this.analysers = [0, 1].map(function(c){
@@ -340,19 +411,31 @@ WRContext.prototype.buildPostFx = function( ctx, node )
 	});
 	this._meter_buf = new Float32Array( 1024 );
 
-	// delay: two delay lines feeding back into themselves (normal) or into each other (ping-pong)
+	var returnTo = function( input ) {
+		var bus = ctx.createGain(), loop = ctx.createDelay( 0.1 );
+		loop.delayTime.value = 0;
+		bus.connect( loop );
+		loop.connect( node, 0, input );
+		return bus;
+	};
+
+	// delay
 	var d = this.delay = {
-		inL: ctx.createGain(), inR: ctx.createGain(),
+		inL: ctx.createGain(), inR: ctx.createGain(), inPP: ctx.createGain(), dry: ctx.createGain(),
 		lineL: ctx.createDelay( 5 ), lineR: ctx.createDelay( 5 ),
 		toneL: ctx.createBiquadFilter(), toneR: ctx.createBiquadFilter(),
 		selfL: ctx.createGain(), selfR: ctx.createGain(), crossLR: ctx.createGain(), crossRL: ctx.createGain(),
-		merger: ctx.createChannelMerger( 2 ), wet: ctx.createGain()
+		merger: ctx.createChannelMerger( 2 ), wet: ctx.createGain(), ret: returnTo( 1 )
 	};
+	var dsplit = ctx.createChannelSplitter( 2 );
+	node.connect( dsplit, 1 );
+	dsplit.connect( d.inL, 0 ); dsplit.connect( d.inR, 1 );
 	var mono = ctx.createGain();
 	mono.channelCount = 1;
-	mono.channelCountMode = "explicit"; // downmix to mono before the delay lines
-	node.connect( mono );
-	mono.connect( d.inL ); mono.connect( d.inR );
+	mono.channelCountMode = "explicit"; // ping-pong starts from the mono sum on the left
+	node.connect( mono, 1 );
+	mono.connect( d.inPP );
+	d.inPP.connect( d.lineL );
 	d.inL.connect( d.lineL ); d.inR.connect( d.lineR );
 	d.lineL.connect( d.toneL ); d.lineR.connect( d.toneR );
 	d.toneL.connect( d.selfL ); d.selfL.connect( d.lineL );
@@ -361,22 +444,26 @@ WRContext.prototype.buildPostFx = function( ctx, node )
 	d.toneR.connect( d.crossRL ); d.crossRL.connect( d.lineL );
 	d.toneL.connect( d.merger, 0, 0 ); d.toneR.connect( d.merger, 0, 1 );
 	d.merger.connect( d.wet );
-	d.wet.connect( bus );
+	d.wet.connect( d.ret );
+	node.connect( d.dry, 1 );
+	d.dry.connect( d.ret );
 	[d.toneL, d.toneR].forEach(function(f){ f.type = "lowpass"; f.Q.value = 0.5; });
-	[d.wet, d.inL, d.inR, d.selfL, d.selfR, d.crossLR, d.crossRL].forEach(function(g){ g.gain.value = 0; });
+	[d.wet, d.inL, d.inR, d.inPP, d.selfL, d.selfR, d.crossLR, d.crossRL].forEach(function(g){ g.gain.value = 0; });
 
-	// reverb send
+	// reverb
 	var r = this.reverb = {
-		predelay: ctx.createDelay( 1 ), convolver: ctx.createConvolver(),
-		tone: ctx.createBiquadFilter(), wet: ctx.createGain(), buffers: {}, loading: {}, room: null
+		predelay: ctx.createDelay( 1 ), convolver: ctx.createConvolver(), dry: ctx.createGain(),
+		tone: ctx.createBiquadFilter(), wet: ctx.createGain(), ret: returnTo( 2 ), buffers: {}, loading: {}, room: null
 	};
 	r.tone.type = "lowpass";
 	r.wet.gain.value = 0;
-	bus.connect( r.predelay );
+	node.connect( r.predelay, 2 );
 	r.predelay.connect( r.convolver );
 	r.convolver.connect( r.tone );
 	r.tone.connect( r.wet );
-	r.wet.connect( master );
+	r.wet.connect( r.ret );
+	node.connect( r.dry, 2 );
+	r.dry.connect( r.ret );
 }
 
 // impulses are loaded the first time their room is selected
@@ -417,7 +504,7 @@ WRContext.prototype.delayTime = function()
 
 WRContext.prototype.updatePostFx = function()
 {
-	if(!this.bus)
+	if(!this.master)
 		return;
 	var fx = this.settings.fx;
 	var t = this.context.currentTime;
@@ -430,8 +517,10 @@ WRContext.prototype.updatePostFx = function()
 	set( d.toneL.frequency, fx.delay_tone );
 	set( d.toneR.frequency, fx.delay_tone );
 	var on = fx.delay_on ? 1 : 0, fb = fx.delay_feedback;
-	set( d.inL.gain, on );
-	set( d.inR.gain, fx.delay_pingpong ? 0 : on ); // ping-pong starts on the left only
+	set( d.inL.gain, fx.delay_pingpong ? 0 : on );
+	set( d.inR.gain, fx.delay_pingpong ? 0 : on );
+	set( d.inPP.gain, fx.delay_pingpong ? on : 0 ); // ping-pong starts on the left only
+	set( d.dry.gain, on && !fx.delay_dry ? 0 : 1 ); // bypassed (off) = dry through
 	set( d.selfL.gain, fx.delay_pingpong ? 0 : fb );
 	set( d.selfR.gain, fx.delay_pingpong ? 0 : fb );
 	set( d.crossLR.gain, fx.delay_pingpong ? fb : 0 );
@@ -449,6 +538,7 @@ WRContext.prototype.updatePostFx = function()
 	set( r.predelay.delayTime, fx.reverb_predelay );
 	set( r.tone.frequency, fx.reverb_tone );
 	set( r.wet.gain, fx.reverb_on ? mix * mix * 0.8 : 0 );
+	set( r.dry.gain, fx.reverb_on && !fx.reverb_dry ? 0 : 1 );
 }
 
 // ---- audio I/O device: output and input devices, input gain, master volume ----
@@ -619,9 +709,10 @@ WRContext.prototype.cycleInput = function( dir )
 WRContext.prototype.connect = function( out_id, in_id, color )
 {
 	var patches = this.settings.patches;
+	var audio = WRContext.jackTypes( this.settings.modules )[ in_id ] == "ain";
 	for(var i = patches.length - 1; i >= 0; --i)
-		if(patches[i][1] == in_id)
-			patches.splice(i,1); // an input takes a single cable
+		if(patches[i][1] == in_id && (!audio || patches[i][0] == out_id))
+			patches.splice(i,1); // a CV input takes a single cable, an audio input adds them up
 	patches.push([ out_id, in_id, color || 0 ]);
 }
 
@@ -683,8 +774,9 @@ WRContext.prototype.setSettings = function( data )
 	data = data || {};
 	if(!(data.version >= 3))
 		data = WR.migrateV2( data );
+	var add_audio = !(data.version >= 4); // from before the rear sockets: cable the old fixed audio path
 	var s = WR.mergeValid( WRContext.rackDefaults(), data );
-	s.version = 3;
+	s.version = 4;
 	s.scale_file = typeof data.scale_file == "string" ? data.scale_file : null;
 	if(data.fx && typeof data.fx.reverb_room == "number") // saves from when there were two rooms
 		s.fx.reverb_room = data.fx.reverb_room == 0 ? "HALL A" : "HALL B";
@@ -725,8 +817,16 @@ WRContext.prototype.setSettings = function( data )
 	var jack_ids = WRContext.jackTypes( s.modules );
 	s.patches = (Array.isArray(data.patches) ? data.patches : []).filter(function(p){
 		return Array.isArray(p) && ((jack_ids[ p[0] ] == "out" && jack_ids[ p[1] ] == "in") ||
+			(jack_ids[ p[0] ] == "aout" && jack_ids[ p[1] ] == "ain") ||
 			(jack_ids[ p[0] ] == "midiout" && jack_ids[ p[1] ] == "midiin"));
 	}).map(function(p){ return [ p[0], p[1], (p[2] | 0) ]; });
+	if(add_audio)
+	{
+		s.patches = s.patches.concat( WR.AUDIO_CHAIN.map(function(c){ return c.slice(); }) );
+		var all = s.modules;
+		s.modules = [];
+		all.forEach(function(m){ s.modules.push( m ); WRContext.routeAudio( s, m ); });
+	}
 	this.settings = s;
 	this.module_state = {};
 	this.allNotesOff();
@@ -779,7 +879,7 @@ WRContext.prototype.deleteUserPatch = function( name )
 
 WRContext.prototype.exportPatch = function( name )
 {
-	return JSON.stringify({ format: WRContext.PATCH_FORMAT, version: 3, name: name || "", settings: this.settings }, null, "\t");
+	return JSON.stringify({ format: WRContext.PATCH_FORMAT, version: 4, name: name || "", settings: this.settings }, null, "\t");
 }
 
 // accepts an exported file (also the older subharm-patch files) or a bare settings object; returns the patch name

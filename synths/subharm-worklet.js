@@ -17,11 +17,12 @@
 const C4 = 261.6255653005986;
 
 // must match the jack ids in synths/subharm.js
-const OUT_IDS = ["vco1","vco1_sub1","vco1_sub2","vco2","vco2_sub1","vco2_sub2","vca","vca_eg","vcf_eg","seq1","seq1_clk","seq2","seq2_clk","clock_out","trigger_out"];
+// (the last one, "audio", is the AUDIO OUT socket on the back: line level, not +-5V)
+const OUT_IDS = ["vco1","vco1_sub1","vco1_sub2","vco2","vco2_sub1","vco2_sub2","vca","vca_eg","vcf_eg","seq1","seq1_clk","seq2","seq2_clk","clock_out","trigger_out","audio"];
 const IN_IDS = ["vco1_in","vco1_sub_in","vco1_pwm","vca_in","vco2_in","vco2_sub_in","vco2_pwm","cutoff_in","play_in","reset_in","trigger_in","rhythm1_in","rhythm2_in","rhythm3_in","rhythm4_in","clock_in"];
 
 const O_VCO = [0, 3]; // +1 = sub 1, +2 = sub 2
-const O_VCA = 6, O_VCA_EG = 7, O_VCF_EG = 8, O_SEQ = [9, 11], O_SEQ_CLK = [10, 12], O_CLOCK = 13, O_TRIG = 14;
+const O_VCA = 6, O_VCA_EG = 7, O_VCF_EG = 8, O_SEQ = [9, 11], O_SEQ_CLK = [10, 12], O_CLOCK = 13, O_TRIG = 14, O_AUDIO = 15;
 const I_VCO_PITCH = [0, 4], I_VCO_SUB = [1, 5], I_VCO_PWM = [2, 6];
 const I_VCA = 3, I_CUTOFF = 7, I_PLAY = 8, I_RESET = 9, I_TRIG = 10, I_RHYTHM = 11, I_CLOCK = 15;
 const PULSE_OUTS = [O_SEQ_CLK[0], O_SEQ_CLK[1], O_CLOCK, O_TRIG];
@@ -338,7 +339,7 @@ class SubharmDSP {
 		this.twoPiOver2sr = 2 * Math.PI / (2 * sr);
 	}
 
-	// one sample; returns the synth's contribution to the master bus
+	// one sample; the result also goes to the AUDIO OUT socket on the back
 	tick() {
 		const s = this.s;
 		const ins = this.ins, outs = this.outs, patched = this.patched, pulses = this.pulses;
@@ -474,7 +475,9 @@ class SubharmDSP {
 			if (pulses[idx] > 0) { outs[idx] = GATE_V; pulses[idx]--; }
 			else outs[idx] = 0;
 		}
-		return vcaOut * sm.vol * 2;
+		const audio = vcaOut * sm.vol * 2;
+		outs[O_AUDIO] = audio;
+		return audio;
 	}
 
 	endBlock(n) {

@@ -679,6 +679,8 @@ WR.registerSynth( "subharm", {
 	worklet: "synths/subharm-worklet.js",
 	jacks: JACKS,
 	midi_in: "midi_in",
+	rear_jacks: [["AUDIO OUT", "aout", "audio"]], // line level, on the back
+	audio_out: "audio",
 	defaults: defaults,
 	validate: validate,
 	randomize: randomize,

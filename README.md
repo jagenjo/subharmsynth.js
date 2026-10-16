@@ -16,6 +16,7 @@ Needs a browser with AudioWorklet support, served over `https://` or `localhost`
 | `code.js` | the rack UI: canvas widgets (knobs, buttons, switches, jacks), cables, shared devices, scrolling and zoom, toolbar, keyboard shortcuts |
 | `synths/subharm.js`, `synths/subharm-worklet.js` | the Subharmonicon: panel, jacks and settings; DSP |
 | `synths/dfam.js`, `synths/dfam-worklet.js` | the DFAM: panel, jacks and settings; DSP |
+| `synths/mixer.js`, `synths/mixer-worklet.js` | the 6 channel mixer: panel, jacks and settings; DSP |
 | `data/patches.json` | factory patches |
 | `old/` | the original version of this replica, as in the first commit |
 | `data/impulses/` | reverb impulse responses from Voxengo's free "IM Reverbs" pack, redistributed unaltered under its `license.txt` (© Aleksey Vaneev) |
@@ -27,13 +28,16 @@ The page is a rack. From the top:
 
 1. The **AUDIO I/O** device.
 2. The **KEYS** device.
-3. The synths, one row each.
+3. The synths and mixers, one row each.
 4. A row with the **LFO** and the **compressor**.
 5. A row with the **reverb** and the **delay**.
 
-One patch bay spans all of them: any output can be cabled to any input of any device.
+One patch bay spans all of them: any output can be cabled to any input of any device. The front carries CV, gates and audio at ±5 V; the back carries the line-level audio between devices (see *Rear view*).
 
-- **Add synth** (toolbar) inserts a new Subharm or DFAM at the bottom of the rack. A synth with a MIDI IN gets the keys' MIDI cable. You can have several of the same kind (`dfam`, `dfam2`, …).
+- **Add device** (toolbar) inserts a new Subharm, DFAM or mixer at the bottom of the rack. You can have several of the same kind (`dfam`, `dfam2`, …).
+  - A synth with a MIDI IN gets the keys' MIDI cable.
+  - A new synth's audio goes to the first free mixer channel; with no mixer, to wherever the other synths go (or the compressor).
+  - A new mixer takes over the synths that weren't on a mixer: they move onto its channels, and its MAIN L / R go where they went.
 - Each synth has three buttons on its right wood cheek: **move up**, **move down** and **remove**. Removing asks first and unplugs that synth's cables.
 - The chevron on the top left folds a synth into a slim bar like the other devices. Its jacks stay on the bar, so cables stay connected.
 - **Scale:** the rack fills the window width; more devices make it taller and it scrolls vertically.
@@ -41,15 +45,39 @@ One patch bay spans all of them: any output can be cabled to any input of any de
   - Zoomed past the width, the rack also scrolls sideways.
   - The mouse wheel scrolls when it's not over a knob; Shift + wheel scrolls sideways. You can also drag the scrollbars, or grab the rack by the wood sides of any row (or the empty space around it) and drag.
   - Dragging a cable near the edge of the window scrolls toward it.
-- **Rear view:** **Tab** (or *Rear* in the toolbar) turns the rack around, as in Propellerhead Reason.
-  - The back of every device shows its audio sockets, and cables show the audio path: each synth's AUDIO OUT → the compressor's inputs (one per synth, summed) → delay → reverb → AUDIO I/O main in.
-  - Each device's label says what it does with the audio, e.g. whether the delay is bypassed. Hovering a socket says where it is connected.
-  - The routing is fixed: the rear shows it, but the cables there can't be moved. The front's CV cables are hidden while the rear is shown.
+- **Rear view:** **Tab** (or *Rear* in the toolbar) turns the rack around, as in Propellerhead Reason. The back of every device has its audio sockets, patched with cables like the front.
+  - Sockets:
+    - each synth's AUDIO OUT (mono, after its volume)
+    - the mixer's inputs and outputs
+    - COMPRESSOR IN / OUT L / R
+    - DELAY and REVERB IN / OUT L / R
+    - AUDIO I/O MAIN IN L / R (to the speakers) and INPUT L / R (the audio interface)
+  - The default path is synths → compressor → delay → reverb → MAIN IN. Patches from before the rear sockets load with that path cabled.
+  - An audio input adds up every cable plugged into it. Dragging from an input takes its newest cable. An unpatched IN R (compressor, delay, reverb, MAIN, mixer aux return) takes the IN L signal.
+  - Nothing reaches the speakers unless something is patched into MAIN IN.
+  - The delay and reverb run outside the audio processor, so their returns come back one render quantum (128 samples) later. You won't hear that on an effect.
+  - Each device's label says what it does with the audio, e.g. "100% WET (DRY OFF)". Hovering a socket lists its connections.
+  - The front's CV cables are hidden while the rear is shown, and the rear cables while the front is.
 - **Space** starts every synth when none is running, otherwise stops them all. **R**, **N** and **T** reset, step (NEXT / ADVANCE) and trigger every synth.
 - **Adding another synth:** register it from a pair of files in `synths/`:
   - The main thread file calls `WR.registerSynth(type, { title, worklet, jacks, defaults, size, draw, … })`. The fields are documented in `webrack.js`.
   - The worklet file sets `globalThis.WR_DSP[type]` to a class with `outs` / `ins` / `patched` arrays, plus `setSettings`, `message`, `beginBlock`, `tick` and `state`.
   - Add both files to `index.html`.
+
+## Mixer
+
+A 6 channel line mixer in the same panel style as the synths. Insert it from *Add device*.
+
+- **Channel strips:**
+  - The channel's source name, read from its rear cable.
+  - AUX send knob (post fader).
+  - PAN (a balance, so a centred channel keeps full level on both sides).
+  - MUTE and SOLO.
+  - A fader (0 dB at three quarters, up to +7.5 dB) with a level meter.
+- **MASTER:** AUX SEND and AUX RETURN levels, the main fader, and L / R meters. An LED lights while any channel is soloed.
+- **Front:** LEVEL CV 1–6 inputs act as a VCA on each channel (5 V = the fader's level), and a MIX output carries the mono mix at ±5 V, e.g. for the scope.
+- **Back:** IN 1–6, AUX SEND, AUX RET L / R, MAIN L / R.
+- **Reverb on an aux:** patch AUX SEND → REVERB IN L, REVERB OUT L / R → AUX RET L / R, and turn the reverb's **DRY** button off so it returns only the effect. The delay has the same DRY button. The *Mixer & Aux Reverb* factory patch is set up this way.
 
 ## DFAM
 
@@ -121,7 +149,7 @@ As on the hardware, MIDI reaches the synth only through its MIDI IN jack, so the
 
 - **Scala scales.** Type a scale name in the toolbar to add a fifth quantize mode, SCALA. It uses the selected `.scl` file, rooted at C.
 - **Patches**: a patch is the whole rack, meaning its synths, all their settings, the shared devices and the cables.
-  - The toolbar menu has 15 factory patches (in `data/patches.json`), grouped as SUBHARM, DFAM and RACK (both synths patched together), plus your own.
+  - The toolbar menu has 16 factory patches (in `data/patches.json`), grouped as SUBHARM, DFAM and RACK (several devices patched together), plus your own.
   - *Save as…* stores the rack under a name in the browser.
   - *Export* / *Import* write and read `.json` files, so patches can be shared or added to the repo.
   - Patches saved before the rack existed load as a rack with one Subharm.

@@ -12,11 +12,12 @@
 const C4 = 261.6255653005986;
 
 // must match the jack ids in synths/dfam.js
-const OUT_IDS = ["vca","vca_eg","vcf_eg","vco_eg","vco1","vco2","trigger_out","velocity_out","pitch_out"];
+// (the last one, "audio", is the AUDIO OUT socket on the back: line level, not +-5V)
+const OUT_IDS = ["vca","vca_eg","vcf_eg","vco_eg","vco1","vco2","trigger_out","velocity_out","pitch_out","audio"];
 const IN_IDS = ["trigger_in","vca_cv","velocity_in","vca_decay_in","ext_audio","vcf_decay_in","noise_level_in","vco_decay_in",
 	"vcf_mod","vco1_cv","fm_amt_in","vco2_cv","tempo_in","run_stop","adv_clock"];
 
-const O_VCA = 0, O_VCA_EG = 1, O_VCF_EG = 2, O_VCO_EG = 3, O_VCO1 = 4, O_VCO2 = 5, O_TRIG = 6, O_VEL = 7, O_PITCH = 8;
+const O_VCA = 0, O_VCA_EG = 1, O_VCF_EG = 2, O_VCO_EG = 3, O_VCO1 = 4, O_VCO2 = 5, O_TRIG = 6, O_VEL = 7, O_PITCH = 8, O_AUDIO = 9;
 const I_TRIG = 0, I_VCA_CV = 1, I_VEL = 2, I_VCA_DECAY = 3, I_EXT = 4, I_VCF_DECAY = 5, I_NOISE = 6, I_VCO_DECAY = 7,
 	I_VCF_MOD = 8, I_VCO1 = 9, I_FM = 10, I_VCO2 = 11, I_TEMPO = 12, I_RUN = 13, I_ADV = 14;
 
@@ -252,7 +253,9 @@ class DfamDSP {
 		outs[O_PITCH] = seqCv;
 		if (this.trigPulse > 0) { outs[O_TRIG] = GATE_V; this.trigPulse--; }
 		else outs[O_TRIG] = 0;
-		return vcaOut * sm[7] * 2;
+		const audio = vcaOut * sm[7] * 2;
+		outs[O_AUDIO] = audio;
+		return audio;
 	}
 
 	endBlock(n) {

@@ -272,6 +272,8 @@ WR.registerSynth( "dfam", {
 	worklet: "synths/dfam-worklet.js",
 	jacks: JACKS,
 	midi_in: null,
+	rear_jacks: [["AUDIO OUT", "aout", "audio"]], // line level, on the back
+	audio_out: "audio",
 	defaults: defaults,
 	validate: validate,
 	randomize: randomize,
