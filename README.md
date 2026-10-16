@@ -38,7 +38,7 @@ One patch bay spans all of them: any output can be cabled to any input of any de
 - **Scale:** the rack fills the window width; more devices make it taller and it scrolls vertically.
   - Zoom **−** / **+** (toolbar) change the scale; the percentage button goes back to 100%. The zoom is remembered in the browser.
   - Zoomed past the width, the rack also scrolls sideways.
-  - The mouse wheel scrolls when it's not over a knob; Shift + wheel scrolls sideways. You can also drag the scrollbars.
+  - The mouse wheel scrolls when it's not over a knob; Shift + wheel scrolls sideways. You can also drag the scrollbars, or grab the rack by the wood sides of any row (or the empty space around it) and drag.
   - Dragging a cable near the edge of the window scrolls toward it.
 - **Space** starts every synth when none is running, otherwise stops them all. **R**, **N** and **T** reset, step (NEXT / ADVANCE) and trigger every synth.
 - **Adding another synth:** register it from a pair of files in `synths/`:

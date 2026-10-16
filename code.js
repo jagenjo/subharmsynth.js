@@ -1718,6 +1718,7 @@ function draw()
 	endFrame();
 	var y = deviceH( "keys", KB_H ) + KB_GAP;
 	y += drawModules( y );
+	view.devices_y = y;
 	beginFrame( 0, y, 1 );
 	drawDevices();
 	endFrame();
@@ -1725,13 +1726,38 @@ function draw()
 	drawCables();
 	drawTooltips();
 	drawScrollbars( w, h );
+	updatePan();
 	// wheel steps no knob took scroll the rack (shift + wheel sideways)
 	if(ui.wheel && ui.shift && view.max_sx)
 		setScroll( view.sx + ui.wheel * 90, view.sy );
 	else if(ui.wheel || ui.wheel_x)
 		setScroll( view.sx + ui.wheel_x * 90, view.sy + ui.wheel * 90 );
 
-	canvas.style.cursor = cable_drag ? "grabbing" : (ui.hot || jackAt( ui.x, ui.y ) ? "pointer" : "default");
+	var grab = ui.active === "pan" ? "grabbing" : (ui.active === null && onRackSide( ui.px, ui.py ) && (view.max_sx || view.max_sy) ? "grab" : null);
+	canvas.style.cursor = cable_drag ? "grabbing" : (grab || (ui.hot || jackAt( ui.x, ui.y ) ? "pointer" : "default"));
+}
+
+// the wood cheeks on the sides of every row (and the middle ones of the two device rows), or
+// outside the rack: dragging there scrolls the rack
+function onRackSide( x, y )
+{
+	var cheek = 22;
+	if(x < cheek || x > PANEL_W - cheek || y < 0 || y > PANEL_H)
+		return true;
+	var half = (PANEL_W - DEVICE_GAP) * 0.5;
+	return y >= view.devices_y && x > half - cheek && x < half + DEVICE_GAP + cheek;
+}
+
+// after the widgets had their chance: a press nothing took, on the sides, grabs the rack
+function updatePan()
+{
+	if(ui.pressed && ui.active === null && !cable_drag && !jackAt( ui.px, ui.py ) && onRackSide( ui.px, ui.py ))
+	{
+		ui.active = "pan";
+		view.pan = { cx: ui.cx, cy: ui.cy, sx: view.sx, sy: view.sy };
+	}
+	if(ui.active === "pan" && ui.down && view.pan)
+		setScroll( view.pan.sx - (ui.cx - view.pan.cx), view.pan.sy - (ui.cy - view.pan.cy) );
 }
 
 function drawScrollbars( w, h )
