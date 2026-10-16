@@ -13,7 +13,7 @@ var WR = {
 	order: []
 };
 
-WR.VERSION = "20261016u"; // bump together with the ?v= in index.html so browsers reload the scripts
+WR.VERSION = "20261016v"; // bump together with the ?v= in index.html so browsers reload the scripts
 
 // def: {
 //   title, description,           names for menus and the panel
@@ -101,6 +101,56 @@ WRContext.OLD_STORAGE_KEY = "SUBHARM_state_v2";
 WRContext.PATCH_FORMAT = "webrack-patch";
 WRContext.OLD_PATCH_FORMAT = "subharm-patch";
 
+// ---- the song: the bottom bar's multitrack sequencer, saved with the patch ----
+// notes: [start, length (beats), MIDI note, velocity 0..1]; each track plays on its MIDI channel
+WR.SONG_GRIDS = [1, 2, 4, 8]; // grid divisions of a beat: 1/4, 1/8, 1/16, 1/32 notes
+
+WR.defaultSong = function()
+{
+	return { bpm: 120, bars: 4, loop: true, grid: 4, clock: false, sel: 0,
+		tracks: [{ name: "TRACK 1", channel: 1, mute: false, solo: false, notes: [] }] };
+}
+
+// a short arpeggio for new racks, so PLAY has something to play
+WR.demoSong = function()
+{
+	var song = WR.defaultSong(), notes = song.tracks[0].notes;
+	var arp = [48, 51, 55, 58, 60, 58, 55, 51], roots = [0, 0, -4, -2];
+	for(var bar = 0; bar < 4; ++bar)
+		for(var i = 0; i < 8; ++i)
+			notes.push([ bar * 4 + i * 0.5, 0.45, arp[i] + roots[bar], i % 4 == 0 ? 1 : 0.7 ]);
+	return song;
+}
+
+WR.validateSong = function( data )
+{
+	var def = WR.defaultSong();
+	var s = WR.mergeValid({ bpm: def.bpm, bars: def.bars, loop: def.loop, grid: def.grid, clock: def.clock, sel: def.sel },
+		data && typeof data == "object" ? data : {} );
+	s.bpm = Math.min( 300, Math.max( 20, s.bpm ) );
+	s.bars = Math.min( 64, Math.max( 1, Math.round( s.bars ) ) );
+	if(WR.SONG_GRIDS.indexOf( s.grid ) == -1)
+		s.grid = 4;
+	var tracks = data && Array.isArray(data.tracks) ? data.tracks : def.tracks;
+	s.tracks = tracks.slice( 0, 16 ).filter(function(t){ return t && typeof t == "object"; }).map(function(t, i){
+		return {
+			name: typeof t.name == "string" && t.name.trim() ? t.name.trim().substr( 0, 24 ).toUpperCase() : "TRACK " + (i + 1),
+			channel: Math.min( 16, Math.max( 1, Math.round( +t.channel || 1 ) ) ),
+			mute: !!t.mute, solo: !!t.solo,
+			notes: (Array.isArray(t.notes) ? t.notes : []).filter(function(n){
+				return Array.isArray(n) && n.length >= 3 && n.slice( 0, 3 ).every(function(v){ return typeof v == "number" && isFinite(v); });
+			}).map(function(n){
+				return [ Math.max( 0, n[0] ), Math.max( 1 / 64, n[1] ), Math.min( 127, Math.max( 0, Math.round( n[2] ) ) ),
+					typeof n[3] == "number" && isFinite(n[3]) ? Math.min( 1, Math.max( 0, n[3] ) ) : 1 ];
+			})
+		};
+	});
+	if(!s.tracks.length)
+		s.tracks = def.tracks;
+	s.sel = Math.min( s.tracks.length - 1, Math.max( 0, Math.round( s.sel ) ) );
+	return s;
+}
+
 // the rack's own settings (everything but the modules and the cables)
 WRContext.rackDefaults = function()
 {
@@ -122,6 +172,7 @@ WRContext.defaultSettings = function()
 	s.patches = WR.AUDIO_CHAIN.map(function(c){ return c.slice(); });
 	WRContext.addModuleTo( s, "subharm" );
 	s.modules.unshift( s.modules.pop() );
+	s.song = WR.demoSong();
 	return s;
 }
 
@@ -793,6 +844,7 @@ WRContext.prototype.setSettings = function( data )
 	s.kb.split_note = Math.min( 96, Math.max( 24, Math.round( s.kb.split_note ) ) );
 	s.kb.octave = Math.min( 2, Math.max( -2, Math.round( s.kb.octave ) ) );
 	s.kb.channel = Math.min( 16, Math.max( 1, Math.round( s.kb.channel ) ) );
+	s.song = WR.validateSong( data.song );
 
 	// modules: known types only, unique ids, settings validated by their synth
 	s.modules = [];

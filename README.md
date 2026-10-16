@@ -13,6 +13,7 @@ Needs a browser with AudioWorklet support, served over `https://` or `localhost`
 | `index.html` | page and toolbar |
 | `webrack.js` | the rack controller: synth registry, settings and patches, audio graph, post FX, Scala parser, Web MIDI, keys |
 | `rack-worklet.js` | the audio processor: hosts the synths' DSP, routes the cables, runs the keys outputs, LFOs, compressor and scope |
+| `sequencer.js` | the song sequencer in the bottom bar: tracks, piano roll, transport, recording, scheduling |
 | `code.js` | the rack UI: canvas widgets (knobs, buttons, switches, jacks), cables, shared devices, scrolling and zoom, toolbar, keyboard shortcuts |
 | `devices/subharm.js`, `devices/subharm-worklet.js` | the Subharmonicon: panel, jacks and settings; DSP |
 | `devices/dram.js`, `devices/dram-worklet.js` | the DRAM |
@@ -191,6 +192,22 @@ The thin row at the top. Its settings are remembered by the browser, not saved i
 - **IN L / IN R** jacks carry the input as ±5 V signals, so it can be patched anywhere. For example: DRAM EXT AUDIO to filter the microphone, the scope, the compressor's sidechain, or a pitch / cutoff input for audio-rate modulation.
 - **MASTER** is the volume of everything (after the reverb): 0 dB at the default position, up to +3.9 dB. The L / R meters show the peak level after it.
 
+## Song sequencer
+
+The bar at the bottom of the page: **▲ SEQUENCER** raises it into a multitrack sequencer. Drag its top edge to resize it.
+
+- **Transport:** ▶ PLAY / ■ STOP, **● REC**, **LOOP**, the position (bar.beat), **BPM** (− / +, Shift for steps of 1), **BARS** (the loop length, 1–64), **GRID** (1/4 to 1/32) and **SYNC**.
+  - SYNC sends MIDI clock and start / stop with the song, so the synths' own sequencers follow it.
+- **Tracks** (up to 16), on the left: each plays on its own MIDI **CH**annel (click to change, Shift for the previous), with **M**ute, **S**olo and **×** to delete. Double-click a name to rename it.
+  - **+ TRACK** adds one on the next free channel; **CLEAR** empties the selected track.
+  - Set the synths' **CH** switches on the back (Tab) to choose which synth plays which track. A synth on OMNI plays them all.
+- **Piano roll** of the selected track, with the other tracks' notes faint behind it.
+  - Click to add a note on the grid (drag to set its length). Drag a note to move it, drag its end to change its length, right-click (or Delete) to remove it.
+  - The keys on the left play the note. The mouse wheel scrolls the notes.
+- **Recording:** with REC on while playing, notes from the on-screen keys, the QWERTY keys and a MIDI device go into the selected track, snapped to the grid.
+- **Timing:** notes are scheduled ahead into the audio engine with their sample position, so they don't depend on the page's frame rate.
+- **Saved with the patch.** A new rack starts with a short arpeggio on channel 1.
+
 ## MIDI on the back
 
 MIDI sockets are on the back of the devices (Tab): the keys' **MIDI OUT**, and a **MIDI IN** on the Subharm, Brother-32 and Maze.
@@ -207,7 +224,7 @@ The **KEYS** row above the synth is where notes come in:
 - **MIDI IN**: *ENABLE* asks the browser for MIDI access; ◀ / ▶ pick one input or all of them. The LCD shows the device and the notes being held.
 - **Keyboard**: a 3-octave on-screen keyboard (drag across it to glide), *OCT −* / *OCT +*, and *QWERTY*, which turns the computer keyboard into a piano: `A S D F G H J K L ; '` are white keys, `W E T Y U O P` black keys, `Z` / `X` shift the octave. While QWERTY is on, `T` plays F# instead of triggering.
 - **Split**: *SPLIT* divides the keyboard at the marker above the keys (drag it). The lower zone drives KEY 1 / GATE 1, the upper zone KEY 2 / GATE 2. Without split both pairs carry all notes.
-- **Outputs**: GATE 1 / 2 (5 V while a key of that zone is held), KEY 1 / 2 (1 V/oct, C4 = 0 V, last-note priority), TRIG (a 5 ms pulse on every key press, whatever the split) and MIDI. All notes from every source (MIDI device, on-screen keys, QWERTY) go to the MIDI output.
+- **Outputs**: GATE 1 / 2 (5 V while a key of that zone is held), KEY 1 / 2 (1 V/oct, C4 = 0 V, last-note priority), TRIG (a 5 ms pulse on every key press, whatever the split), and MIDI OUT on the back. All notes from every source (MIDI device, on-screen keys, QWERTY, the song) go to MIDI OUT.
 
 As on the hardware, MIDI reaches the synth only through its MIDI IN jack, so the MIDI output is cabled to it by default (patches from before the keys device get that cable automatically). Unplug it to use the keyboard only as CV, e.g. KEY 1 → VCO 1 and GATE 1 → TRIGGER. What the synth does with MIDI:
 
