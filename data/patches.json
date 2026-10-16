@@ -1,0 +1,126 @@
+[
+	{
+		"name": "Init",
+		"settings": {}
+	},
+	{
+		"name": "Polyrhythm Plucks",
+		"settings": {
+			"vco": [
+				{ "freq": 261.63, "wave": "saw", "sub1": 2, "sub2": 4, "level": 0.7, "sub1_level": 0.45, "sub2_level": 0.3 },
+				{ "freq": 392.0, "wave": "square", "sub1": 3, "sub2": 6, "level": 0.4, "sub1_level": 0.35, "sub2_level": 0.25 }
+			],
+			"seq": [[0, 0.3333, 0.5833, 0.9167], [0, -0.4167, 0.1667, 0.5833]],
+			"quantize": "8-JI",
+			"tempo": 480,
+			"rhythm": [3, 4, 5, 7],
+			"rhythm_seq1": [true, false, true, false],
+			"rhythm_seq2": [false, true, false, true],
+			"cutoff": 500, "resonance": 0.45, "vcf_eg_amt": 0.6,
+			"vcf_attack": 0.002, "vcf_decay": 0.18,
+			"vca_attack": 0.002, "vca_decay": 0.35,
+			"reverb": 0.3
+		}
+	},
+	{
+		"name": "Subharmonic Drone",
+		"settings": {
+			"vco": [
+				{ "freq": 65.41, "wave": "saw", "sub1": 3, "sub2": 5, "level": 0.6, "sub1_level": 0.6, "sub2_level": 0.5 },
+				{ "freq": 98.0, "wave": "saw", "sub1": 4, "sub2": 7, "level": 0.5, "sub1_level": 0.45, "sub2_level": 0.4 }
+			],
+			"seq": [[0, 0.3333, -0.3333, 0.6667], [0, 0, 0, 0]],
+			"seq_assign": [{ "osc": false, "sub1": true, "sub2": false }, { "osc": true, "sub1": false, "sub2": false }],
+			"quantize": "12-JI",
+			"tempo": 40,
+			"rhythm": [1, 2, 3, 4],
+			"rhythm_seq1": [true, false, false, false],
+			"rhythm_seq2": [false, false, true, false],
+			"cutoff": 380, "resonance": 0.55, "vcf_eg_amt": 0.35,
+			"vcf_attack": 1.5, "vcf_decay": 4,
+			"vca_attack": 0.5, "vca_decay": 4,
+			"vca_eg": false,
+			"reverb": 0.4
+		}
+	},
+	{
+		"name": "Undertone Arp",
+		"settings": {
+			"vco": [
+				{ "freq": 523.25, "wave": "saw", "sub1": 2, "sub2": 3, "level": 0.2, "sub1_level": 0.7, "sub2_level": 0.6 },
+				{ "freq": 783.99, "wave": "square", "sub1": 4, "sub2": 6, "level": 0.15, "sub1_level": 0.3, "sub2_level": 0.25 }
+			],
+			"seq": [[0, 0.3333, 0.6667, 1], [0, 0.4167, -0.25, 0.1667]],
+			"seq_assign": [{ "osc": false, "sub1": true, "sub2": true }, { "osc": true, "sub1": false, "sub2": false }],
+			"quantize": "12-JI",
+			"tempo": 360,
+			"rhythm": [1, 2, 3, 5],
+			"rhythm_seq1": [true, false, false, false],
+			"rhythm_seq2": [false, false, true, false],
+			"cutoff": 1500, "resonance": 0.25, "vcf_eg_amt": 0.35,
+			"vcf_attack": 0.003, "vcf_decay": 0.3,
+			"vca_attack": 0.003, "vca_decay": 0.5,
+			"reverb": 0.25
+		}
+	},
+	{
+		"name": "Kick & Zap",
+		"settings": {
+			"vco": [
+				{ "freq": 32.7, "wave": "saw", "sub1": 2, "sub2": 4, "level": 0.9, "sub1_level": 0.5, "sub2_level": 0 },
+				{ "freq": 196.0, "wave": "square", "sub1": 4, "sub2": 5, "level": 0, "sub1_level": 0, "sub2_level": 0 }
+			],
+			"seq_assign": [{ "osc": false, "sub1": false, "sub2": false }, { "osc": false, "sub1": false, "sub2": false }],
+			"quantize": "OFF",
+			"tempo": 480,
+			"rhythm": [2, 3, 4, 8],
+			"rhythm_seq1": [true, false, false, false],
+			"rhythm_seq2": [false, true, false, false],
+			"cutoff": 2500, "resonance": 0.2, "vcf_eg_amt": 0.3,
+			"vcf_attack": 0.001, "vcf_decay": 0.12,
+			"vca_attack": 0.001, "vca_decay": 0.3,
+			"reverb": 0.1,
+			"patches": [["vcf_eg", "vco1_in", 1]]
+		}
+	},
+	{
+		"name": "PWM Strings",
+		"settings": {
+			"vco": [
+				{ "freq": 130.81, "wave": "square", "sub1": 2, "sub2": 3, "level": 0.6, "sub1_level": 0.4, "sub2_level": 0.3 },
+				{ "freq": 196.0, "wave": "square", "sub1": 2, "sub2": 4, "level": 0.55, "sub1_level": 0.35, "sub2_level": 0.25 }
+			],
+			"seq": [[0, 0.25, 0.5833, 0.4167], [0, 0.3333, -0.25, 0.1667]],
+			"quantize": "12-ET",
+			"tempo": 60,
+			"rhythm": [2, 3, 4, 5],
+			"rhythm_seq1": [true, false, false, false],
+			"rhythm_seq2": [false, true, false, false],
+			"cutoff": 700, "resonance": 0.2, "vcf_eg_amt": 0.4,
+			"vcf_attack": 0.8, "vcf_decay": 2.5,
+			"vca_attack": 0.6, "vca_decay": 2.5,
+			"reverb": 0.45,
+			"patches": [["vcf_eg", "vco1_pwm", 1], ["vca_eg", "vco2_pwm", 2]]
+		}
+	},
+	{
+		"name": "Rubber Clock",
+		"settings": {
+			"vco": [
+				{ "freq": 196.0, "wave": "saw", "sub1": 3, "sub2": 2, "level": 0.7, "sub1_level": 0.5, "sub2_level": 0.4 },
+				{ "freq": 65.41, "wave": "square", "sub1": 12, "sub2": 16, "level": 0, "sub1_level": 0, "sub2_level": 0 }
+			],
+			"seq": [[0, 0.25, 0.4167, -0.1667], [0, -0.3333, 0.3333, -0.6667]],
+			"seq_assign": [{ "osc": true, "sub1": false, "sub2": false }, { "osc": false, "sub1": false, "sub2": true }],
+			"quantize": "8-ET",
+			"rhythm": [1, 2, 3, 4],
+			"rhythm_seq1": [true, false, true, false],
+			"rhythm_seq2": [false, true, false, true],
+			"cutoff": 1200, "resonance": 0.3, "vcf_eg_amt": 0.5,
+			"vcf_attack": 0.002, "vcf_decay": 0.2,
+			"vca_attack": 0.002, "vca_decay": 0.4,
+			"reverb": 0.2,
+			"patches": [["vco2_sub2", "clock_in", 3], ["seq1", "rhythm2_in", 0]]
+		}
+	}
+]

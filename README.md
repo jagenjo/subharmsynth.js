@@ -14,6 +14,7 @@ Needs a browser with AudioWorklet support, served over `https://` or `localhost`
 | `code.js` | the panel: canvas drawing, knobs, buttons, patch bay cables, keyboard shortcuts |
 | `harm.js` | controller: settings, jack table, audio graph, Scala parser, Web MIDI |
 | `harm-worklet.js` | the DSP engine |
+| `data/patches.json` | factory patches |
 | `data/scales/` | Scala `.scl` scales, plus `index.json` used by the scale picker |
 
 ## What it emulates
@@ -41,7 +42,8 @@ Click *Enable* in the toolbar.
 ## Beyond the hardware
 
 - **Scala scales.** Type a scale name in the toolbar to add a fifth quantize mode, SCALA. It uses the selected `.scl` file, rooted at C.
-- **Reverb send**, plus **Save / Load / Init** of the whole panel and its cables in the browser's local storage.
+- **Patches**: a toolbar menu with 7 factory patches (in `data/patches.json`) and your own. *Save as…* stores the whole panel and its cables under a name in the browser. *Export* / *Import* write and read `.json` patch files, so patches can be shared or added to the repo. A patch only needs the fields that differ from Init; anything missing or invalid falls back to the Init value.
+- **Reverb send.**
 
 ## Controls
 

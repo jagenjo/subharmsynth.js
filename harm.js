@@ -71,6 +71,8 @@ Harm.JACKS = [
 	[["MIDI IN","midi","midi_in"], ["CLOCK","in","clock_in"], ["CLOCK","out","clock_out"], ["TRIGGER","out","trigger_out"]]
 ];
 
+Harm.QUANTIZE_MODES = ["OFF","12-ET","8-ET","12-JI","8-JI","SCL"];
+
 Harm.prototype.init = function()
 {
 	if(this._initializing)
@@ -168,40 +170,116 @@ Harm.prototype.disconnect = function( jack_id )
 	this.settings.patches = this.settings.patches.filter(function(p){ return p[0] != jack_id && p[1] != jack_id; });
 }
 
-// ---- save / load ----
+// ---- patches (presets) ----
 
-Harm.prototype.save = function()
-{
-	try {
-		localStorage.setItem( Harm.STORAGE_KEY, JSON.stringify( this.settings ) );
-		return true;
-	} catch(err) { return false; }
-}
+Harm.USER_PATCHES_KEY = "SUBHARM_patches";
+Harm.PATCH_FORMAT = "subharm-patch";
 
-Harm.prototype.load = function()
+// copies `data` over `def`, keeping only fields with the right type so a
+// malformed or older patch file can never put garbage into the engine
+Harm.mergeValid = function( def, data )
 {
-	var data = null;
-	try { data = localStorage.getItem( Harm.STORAGE_KEY ); } catch(err) {}
-	if(!data)
-		return false;
-	this.setSettings( JSON.parse( data ) );
-	return true;
+	if(Array.isArray(def))
+	{
+		if(!Array.isArray(data) || data.length != def.length)
+			return def;
+		return def.map(function(d, i){ return Harm.mergeValid( d, data[i] ); });
+	}
+	if(def && typeof def == "object")
+	{
+		if(!data || typeof data != "object" || Array.isArray(data))
+			return def;
+		var r = {};
+		for(var k in def)
+			r[k] = Harm.mergeValid( def[k], data[k] );
+		return r;
+	}
+	if(typeof def == "number")
+		return (typeof data == "number" && isFinite(data)) ? data : def;
+	return typeof data == typeof def ? data : def;
 }
 
 Harm.prototype.setSettings = function( data )
 {
-	// fill missing fields from the defaults so older saves keep working
-	var s = Object.assign( Harm.defaultSettings(), data );
-	s.vco = [0,1].map(function(i){ return Object.assign( Harm.defaultSettings().vco[i], (data.vco || [])[i] ); });
+	data = data || {};
+	var s = Harm.mergeValid( Harm.defaultSettings(), data );
+	if(Harm.QUANTIZE_MODES.indexOf( s.quantize ) == -1)
+		s.quantize = "12-ET";
+	if([1,2,5].indexOf( s.seq_oct ) == -1)
+		s.seq_oct = 1;
+	s.scale_file = typeof data.scale_file == "string" ? data.scale_file : null;
+	var jack_ids = {};
+	Harm.JACKS.forEach(function(row){ row.forEach(function(j){ jack_ids[ j[2] ] = j[1]; }); });
+	s.patches = (Array.isArray(data.patches) ? data.patches : []).filter(function(p){
+		return Array.isArray(p) && jack_ids[ p[0] ] == "out" && jack_ids[ p[1] ] == "in";
+	}).map(function(p){ return [ p[0], p[1], (p[2] | 0) ]; });
 	this.settings = s;
+
 	if(!s.scale_file)
 		this.clearScale();
 	else if(!this.custom_scale || this.custom_scale.file != s.scale_file)
 	{
 		var quantize = s.quantize;
 		var that = this;
-		this.loadScale( s.scale_file ).then(function(){ that.settings.quantize = quantize; }, function(){});
+		this.loadScale( s.scale_file ).then(function(){ that.settings.quantize = quantize; }, function(){
+			that.clearScale();
+		});
 	}
+}
+
+Harm.prototype.getUserPatches = function()
+{
+	var patches = {};
+	try {
+		patches = JSON.parse( localStorage.getItem( Harm.USER_PATCHES_KEY ) || "{}" ) || {};
+		// the old single save slot becomes a named patch
+		var old = localStorage.getItem( Harm.STORAGE_KEY );
+		if(old)
+		{
+			if(!patches["Saved patch"])
+				patches["Saved patch"] = JSON.parse( old );
+			localStorage.setItem( Harm.USER_PATCHES_KEY, JSON.stringify( patches ) );
+			localStorage.removeItem( Harm.STORAGE_KEY );
+		}
+	} catch(err) {}
+	return patches;
+}
+
+Harm.prototype.saveUserPatch = function( name )
+{
+	try {
+		var patches = this.getUserPatches();
+		patches[ name ] = JSON.parse( JSON.stringify( this.settings ) );
+		localStorage.setItem( Harm.USER_PATCHES_KEY, JSON.stringify( patches ) );
+		return true;
+	} catch(err) { return false; }
+}
+
+Harm.prototype.deleteUserPatch = function( name )
+{
+	try {
+		var patches = this.getUserPatches();
+		delete patches[ name ];
+		localStorage.setItem( Harm.USER_PATCHES_KEY, JSON.stringify( patches ) );
+	} catch(err) {}
+}
+
+Harm.prototype.exportPatch = function( name )
+{
+	return JSON.stringify({ format: Harm.PATCH_FORMAT, version: 2, name: name || "", settings: this.settings }, null, "\t");
+}
+
+// accepts an exported file or a bare settings object; returns the patch name
+Harm.prototype.importPatch = function( text )
+{
+	var data = JSON.parse( text );
+	if(!data || typeof data != "object")
+		throw new Error("not a patch file");
+	var settings = data.format == Harm.PATCH_FORMAT ? data.settings : data;
+	if(!settings || typeof settings != "object" || !Array.isArray(settings.vco))
+		throw new Error("not a patch file");
+	this.setSettings( settings );
+	return typeof data.name == "string" ? data.name : "";
 }
 
 // ---- Scala scales (extension, not on the hardware) ----

@@ -456,7 +456,7 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
 				else outs[idx] = 0;
 			}
 
-			const y = fastTanh(vcaOut * sm.vol * 0.8);
+			const y = fastTanh(vcaOut * sm.vol * 2); // soft limiter on the output
 			L[j] = y;
 			if (R) R[j] = y;
 		}

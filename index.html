@@ -19,6 +19,7 @@
 	button.on { background: #6b231c; border-color: #a33a2e; }
 	input[type=range] { padding: 0; width: 90px; accent-color: #c9483a; }
 	#scale { width: 210px; }
+	#patch-select { max-width: 190px; }
 	#status { color: #8c8a84; flex: 1; min-width: 160px; text-align: right; }
 	#help { color: #8c8a84; font-size: 12px; }
 	canvas { flex: 1; display: block; width: 100%; min-height: 0; touch-action: none; }
@@ -29,9 +30,15 @@
 	<span class="title">SUBHARM</span>
 	<div class="group">
 		<button id="power" title="Start / suspend the audio engine">Audio off</button>
-		<button id="save" title="Save the panel and patch cables in this browser">Save</button>
-		<button id="load">Load</button>
-		<button id="init" title="Reset every control to the init patch">Init</button>
+	</div>
+	<div class="group">
+		Patch
+		<select id="patch-select" title="Load a factory patch or one of your saved patches"></select>
+		<button id="patch-save" title="Save the panel and cables as a named patch in this browser">Save as&hellip;</button>
+		<button id="patch-delete" title="Delete the selected saved patch" hidden>Delete</button>
+		<button id="patch-export" title="Download the current patch as a .json file">Export</button>
+		<button id="patch-import" title="Load a patch from a .json file">Import</button>
+		<input id="patch-file" type="file" accept=".json,application/json" hidden />
 	</div>
 	<label class="group">Reverb <input id="reverb" type="range" min="0" max="1" step="0.01" /></label>
 	<button id="piano" title="Play notes from the computer keyboard: A-' white keys, W E T Y U O P black keys, Z / X octave down / up">Keys</button>

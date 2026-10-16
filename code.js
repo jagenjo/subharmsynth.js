@@ -964,18 +964,126 @@ $("piano").addEventListener("click", function(){
 	ensureAudio();
 	setPiano( !piano.enabled );
 });
-$("save").addEventListener("click", function(){
-	setStatus( synth.save() ? "Patch saved in this browser" : "Could not save (storage blocked)" );
-});
-$("load").addEventListener("click", function(){
-	setStatus( synth.load() ? "Patch loaded" : "No saved patch yet" );
+// patches: factory ones from data/patches.json plus the user's, saved in this browser
+var factory_patches = [];
+
+function refreshPatchList( selected )
+{
+	var sel = $("patch-select");
+	var esc = function(t){ return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;"); };
+	var html = '<option value="" disabled>Choose a patch\u2026</option><optgroup label="Factory">';
+	factory_patches.forEach(function(p, i){ html += '<option value="f:' + i + '">' + esc(p.name) + '</option>'; });
+	html += '</optgroup>';
+	var user = Object.keys( synth.getUserPatches() ).sort();
+	if(user.length)
+	{
+		html += '<optgroup label="My patches">';
+		user.forEach(function(name){ html += '<option value="u:' + esc(name) + '">' + esc(name) + '</option>'; });
+		html += '</optgroup>';
+	}
+	sel.innerHTML = html;
+	sel.value = selected || "";
+	if(sel.value != (selected || ""))
+		sel.value = "";
+	$("patch-delete").hidden = sel.value.substr(0, 2) != "u:";
+}
+
+function currentPatchName()
+{
+	var v = $("patch-select").value;
+	if(v.substr(0, 2) == "u:")
+		return v.substr(2);
+	if(v.substr(0, 2) == "f:" && factory_patches[ v.substr(2) ])
+		return factory_patches[ v.substr(2) ].name;
+	return "";
+}
+
+function afterPatchLoad( name )
+{
+	pianoAllOff();
 	syncScaleInput();
+	setStatus( "Loaded patch: " + name );
+}
+
+fetch("data/patches.json")
+	.then(function(r){ return r.json(); })
+	.then(function(list){ factory_patches = list; refreshPatchList(); })
+	.catch(function(){ refreshPatchList(); });
+
+$("patch-select").addEventListener("change", function(e){
+	var v = e.target.value;
+	if(v.substr(0, 2) == "f:")
+	{
+		var p = factory_patches[ v.substr(2) ];
+		synth.setSettings( p.settings );
+		afterPatchLoad( p.name );
+	}
+	else if(v.substr(0, 2) == "u:")
+	{
+		var name = v.substr(2);
+		synth.setSettings( synth.getUserPatches()[ name ] );
+		afterPatchLoad( name );
+	}
+	$("patch-delete").hidden = v.substr(0, 2) != "u:";
+	e.target.blur();
 });
-$("init").addEventListener("click", function(){
-	synth.setSettings( Harm.defaultSettings() );
-	syncScaleInput();
-	setStatus( "Panel reset to the init patch" );
+
+$("patch-save").addEventListener("click", function(){
+	var name = window.prompt( "Save patch as:", $("patch-select").value.substr(0, 2) == "u:" ? currentPatchName() : "" );
+	if(name === null)
+		return;
+	name = name.trim();
+	if(!name)
+		return;
+	if(synth.getUserPatches()[ name ] && !window.confirm( "Replace the saved patch \"" + name + "\"?" ))
+		return;
+	if(synth.saveUserPatch( name ))
+	{
+		refreshPatchList( "u:" + name );
+		setStatus( "Saved patch: " + name );
+	}
+	else
+		setStatus( "Could not save (browser storage blocked or full)" );
 });
+
+$("patch-delete").addEventListener("click", function(){
+	var name = currentPatchName();
+	if(!name || !window.confirm( "Delete the saved patch \"" + name + "\"?" ))
+		return;
+	synth.deleteUserPatch( name );
+	refreshPatchList();
+	setStatus( "Deleted patch: " + name );
+});
+
+$("patch-export").addEventListener("click", function(){
+	var name = currentPatchName() || "subharm-patch";
+	var blob = new Blob([ synth.exportPatch( name ) ], { type: "application/json" });
+	var a = document.createElement("a");
+	a.href = URL.createObjectURL( blob );
+	a.download = name.replace(/[^\w\- ]+/g, "_") + ".json";
+	document.body.appendChild( a );
+	a.click();
+	a.remove();
+	setTimeout(function(){ URL.revokeObjectURL( a.href ); }, 1000);
+});
+
+$("patch-import").addEventListener("click", function(){
+	$("patch-file").click();
+});
+$("patch-file").addEventListener("change", function(e){
+	var file = e.target.files[0];
+	e.target.value = "";
+	if(!file)
+		return;
+	file.text().then(function(text){
+		var name = synth.importPatch( text ) || file.name.replace(/\.json$/i, "");
+		refreshPatchList();
+		afterPatchLoad( name + " (from file, use Save as\u2026 to keep it)" );
+	}).catch(function(err){
+		setStatus( "Could not import " + file.name + ": " + err.message );
+	});
+});
+
 $("reverb").addEventListener("input", function(e){
 	synth.settings.reverb = parseFloat( e.target.value );
 });
