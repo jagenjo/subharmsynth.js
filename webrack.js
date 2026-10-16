@@ -13,7 +13,7 @@ var WR = {
 	order: []
 };
 
-WR.VERSION = "20261016q"; // bump together with the ?v= in index.html so browsers reload the scripts
+WR.VERSION = "20261016r"; // bump together with the ?v= in index.html so browsers reload the scripts
 
 // def: {
 //   title, description,           names for menus and the panel
@@ -285,14 +285,46 @@ WRContext.prototype.removeModule = function( id )
 	delete this.module_state[ id ];
 }
 
+// the rows of the rack: [{ mods: [module] or [left, right], half }]. Half width devices share a row
+// when they are next to each other in the list
+WR.rows = function( modules )
+{
+	var rows = [];
+	modules.forEach(function(m){
+		var half = !!WR.types[ m.type ].half;
+		var last = rows[ rows.length - 1 ];
+		if(half && last && last.half && last.mods.length == 1)
+			last.mods.push( m );
+		else
+			rows.push({ mods: [m], half: half });
+	});
+	return rows;
+}
+
+// one place up (dir -1) or down (1). A full width device jumps over a whole row: past both devices
+// of a half width pair, which stays together
 WRContext.prototype.moveModule = function( id, dir )
 {
 	var list = this.settings.modules;
 	var i = list.findIndex(function(m){ return m.id == id; });
-	var j = i + dir;
-	if(i < 0 || j < 0 || j >= list.length)
+	if(i < 0)
 		return;
 	var m = list[i];
+	if(!WR.types[ m.type ].half)
+	{
+		var rows = WR.rows( list );
+		var r = rows.findIndex(function(row){ return row.mods[0] === m; });
+		var other = rows[ r + dir ];
+		if(!other)
+			return;
+		rows[ r + dir ] = rows[r];
+		rows[r] = other;
+		this.settings.modules = [].concat.apply( [], rows.map(function(row){ return row.mods; }) );
+		return;
+	}
+	var j = i + dir;
+	if(j < 0 || j >= list.length)
+		return;
 	list[i] = list[j];
 	list[j] = m;
 }

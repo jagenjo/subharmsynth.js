@@ -46,7 +46,7 @@ One patch bay spans all of them: any output can be cabled to any input of any de
   - A synth with a MIDI IN (Subharm, Brother-32, Maze) gets the keys' MIDI through **MASTER MIDI**, a tiny switch under its MIDI IN jack, instead of a long cable across the rack. While it is on, the jack shows a plug with no wire. Switching it on unplugs a MIDI IN cable; patching a cable into MIDI IN switches it off. It is saved with the patch; older patches keep their MIDI cables.
   - A new synth's audio goes to the first free mixer channel; with no mixer, to wherever the other synths go (or the compressor).
   - A new mixer takes over the synths that weren't on a mixer: they move onto its channels, and its MAIN L / R go where they went.
-- Each synth has three buttons on its right wood cheek: **move up**, **move down** and **remove**. Removing asks first and unplugs that synth's cables.
+- Each synth has three buttons on its right wood cheek: **move up**, **move down** and **remove**. A full-width device moves past a whole row: a pair of half-width devices stays together. Removing asks first and unplugs that synth's cables.
 - The chevron on the top left folds a synth into a slim bar like the other devices. Its jacks stay on the bar, so cables stay connected.
 - **Scale:** the rack fills the window width; more devices make it taller and it scrolls vertically.
   - Zoom **−** / **+** (toolbar) change the scale; the percentage button goes back to 100%. The zoom is remembered in the browser.

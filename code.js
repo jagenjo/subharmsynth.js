@@ -1225,15 +1225,7 @@ function moduleRowH( m )
 // [{ mods: [module] or [left, right], half, h }] in rack order. mods: settings.modules (default) or rack.modules()
 function rackRows( mods )
 {
-	var rows = [];
-	(mods || rack.settings.modules).forEach(function(m){
-		var half = !!WR.types[ m.type ].half;
-		var last = rows[ rows.length - 1 ];
-		if(half && last && last.half && last.mods.length == 1)
-			last.mods.push( m );
-		else
-			rows.push({ mods: [m], half: half });
-	});
+	var rows = WR.rows( mods || rack.settings.modules );
 	rows.forEach(function(r){ r.h = Math.max.apply( null, r.mods.map( moduleRowH ) ); });
 	return rows;
 }
