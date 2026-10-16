@@ -15,7 +15,7 @@ const C4 = 261.6255653005986;
 
 // must match the jack ids in harm.js
 const OUT_IDS = ["vco1","vco1_sub1","vco1_sub2","vco2","vco2_sub1","vco2_sub2","vca","vca_eg","vcf_eg","seq1","seq1_clk","seq2","seq2_clk","clock_out","trigger_out",
-	"lfo1","lfo2","comp_gr"];
+	"lfo1","lfo2","comp_gr","kb_gate1","kb_key1","kb_gate2","kb_key2"];
 const IN_IDS = ["vco1_in","vco1_sub_in","vco1_pwm","vca_in","vco2_in","vco2_sub_in","vco2_pwm","cutoff_in","play_in","reset_in","trigger_in","rhythm1_in","rhythm2_in","rhythm3_in","rhythm4_in","clock_in",
 	"lfo1_rate","lfo2_rate","lfo1_sync","lfo2_sync","comp_sc"];
 
@@ -25,7 +25,9 @@ const I_VCO_PITCH = [0, 4], I_VCO_SUB = [1, 5], I_VCO_PWM = [2, 6];
 const I_VCA = 3, I_CUTOFF = 7, I_PLAY = 8, I_RESET = 9, I_TRIG = 10, I_RHYTHM = 11, I_CLOCK = 15;
 // extra devices: dual LFO and compressor
 const O_LFO = [15, 16], O_COMP_GR = 17;
+const O_KB_GATE = [18, 20], O_KB_KEY = [19, 21]; // keys device
 const I_LFO_RATE = [16, 17], I_LFO_SYNC = [18, 19], I_COMP_SC = 20;
+const MIDI_MESSAGES = { midi: 1, bend: 1, midiClock: 1, midiStart: 1, midiStop: 1, midiContinue: 1 };
 const LFO_SHAPES = { sine: 0, tri: 1, saw: 2, ramp: 3, square: 4, sh: 5 };
 const PULSE_OUTS = [O_SEQ_CLK[0], O_SEQ_CLK[1], O_CLOCK, O_TRIG];
 
@@ -139,6 +141,10 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
 		this.midiClockCount = 0;
 		this.lastMidiClock = -1e12;
 
+		this.kbGate = [false, false];
+		this.kbKey = [0, 0];
+		this.midiConnected = true; // keys device MIDI out cabled to the synth's MIDI IN
+
 		this.lfoPhase = [0, 0];
 		this.lfoHold = [Math.random() * 2 - 1, Math.random() * 2 - 1];
 		this.lfoValue = [0, 0];
@@ -156,7 +162,14 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
 	}
 
 	onMessage(m) {
+		// MIDI only reaches the synth through the MIDI cable
+		if (!this.midiConnected && MIDI_MESSAGES[m.type])
+			return;
 		switch (m.type) {
+			case "kb":
+				if (m.key !== undefined) this.kbKey[m.zone] = m.key;
+				this.kbGate[m.zone] = !!m.gate;
+				break;
 			case "settings": this.setSettings(m.settings); break;
 			case "scale": this.customScale = m.scale; this.controlDirty = true; break;
 			case "play": this.setPlaying(m.value === undefined ? !this.playing : !!m.value); break;
@@ -190,6 +203,15 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
 			n++;
 		}
 		this.numPatches = n;
+		const connected = (s.patches || []).some(p => p[0] === "kb_midi" && p[1] === "midi_in");
+		if (!connected && this.midiConnected) {
+			// unplugging the MIDI cable releases held notes and the transposition
+			this.holdMidi = false;
+			this.midiPitch = 0;
+			this.bend = 0;
+			this.lastMidiClock = -1e12;
+		}
+		this.midiConnected = connected;
 		this.controlDirty = true;
 	}
 
@@ -548,6 +570,10 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
 			outs[O_VCA] = vcaOut * 5;
 			outs[O_VCA_EG] = this.vcaEg.level * 5;
 			outs[O_VCF_EG] = this.vcfEg.level * 5;
+			outs[O_KB_GATE[0]] = this.kbGate[0] ? GATE_V : 0;
+			outs[O_KB_GATE[1]] = this.kbGate[1] ? GATE_V : 0;
+			outs[O_KB_KEY[0]] = this.kbKey[0];
+			outs[O_KB_KEY[1]] = this.kbKey[1];
 			outs[O_SEQ[0]] = s.seq[0][this.step[0]] * s.seq_oct;
 			outs[O_SEQ[1]] = s.seq[1][this.step[1]] * s.seq_oct;
 			for (let q = 0; q < 4; q++) {

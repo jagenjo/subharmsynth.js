@@ -31,9 +31,16 @@ Needs a browser with AudioWorklet support, served over `https://` or `localhost`
 
 Patch bay signal levels: audio ±5 V, envelopes 0 to 5 V, SEQ outputs 1 V/oct, clock/trigger outputs 5 ms pulses at 5 V. Pitch and cutoff inputs track 1 V/oct.
 
-## MIDI
+## Keys device and MIDI
 
-Click *Enable* in the toolbar.
+The **KEYS** row above the synth is where notes come in:
+
+- **MIDI IN**: *ENABLE* asks the browser for MIDI access; ◀ / ▶ pick one input or all of them. The LCD shows the device and the notes being held.
+- **Keyboard**: a 3-octave on-screen keyboard (drag across it to glide), *OCT −* / *OCT +*, and *QWERTY*, which turns the computer keyboard into a piano: `A S D F G H J K L ; '` are white keys, `W E T Y U O P` black keys, `Z` / `X` shift the octave. While QWERTY is on, `T` plays F# instead of triggering.
+- **Split**: *SPLIT* divides the keyboard at the marker above the keys (drag it). The lower zone drives KEY 1 / GATE 1, the upper zone KEY 2 / GATE 2. Without split both pairs carry all notes.
+- **Outputs**: GATE 1 / 2 (5 V while a key of that zone is held), KEY 1 / 2 (1 V/oct, C4 = 0 V, last-note priority) and MIDI. All notes from every source (MIDI device, on-screen keys, QWERTY) go to the MIDI output.
+
+As on the hardware, MIDI reaches the synth only through its MIDI IN jack, so the MIDI output is cabled to it by default (patches from before the keys device get that cable automatically). Unplug it to use the keyboard only as CV, e.g. KEY 1 → VCO 1 and GATE 1 → TRIGGER. What the synth does with MIDI:
 
 - **Notes** transpose both VCOs relative to C4, with last-note priority. They retrigger both envelopes and hold them while the key is down.
 - **Pitch bend**: ±2 semitones.
@@ -48,6 +55,7 @@ Click *Enable* in the toolbar.
 - **Device row** below the synth, in the same style, patchable from and to the main patch bay:
   - **Dual LFO**: per LFO RATE (0.01–100 Hz), SHAPE (sine, triangle, saw, ramp, square, sample & hold), LEVEL (an attenuator, since the Subharmonicon has none), RATE CV inputs (1 V/oct) and SYNC inputs (a gate restarts the cycle). Outputs are ±5 V.
   - **Compressor** on the master output, before the reverb: THRESHOLD, RATIO, ATTACK, RELEASE, MAKEUP, MIX (parallel), ON, a gain reduction meter, a SIDECHAIN input (the detector rectifies, so use envelopes or gates for ducking) and a GR output (gain reduction as CV, 4 dB per volt). A small green CRT oscilloscope under its jacks shows the master output, triggered on rising zero crossings.
+- **Wires** (toolbar) hides the patch cables and leaves only their coloured plugs on the jacks.
 - **Randomize** (toolbar) rolls a new playable sound, keeping volume, compressor, reverb, cables and the loaded scale.
 - **Two panel layouts**, switched with the *Layout* toolbar button: *Hardware* places every control where it is on the real front panel; *Classic* is the original compact layout of this replica, grouped by section.
 
@@ -56,7 +64,6 @@ Click *Enable* in the toolbar.
 - Drag knobs vertically; hold Shift for fine control. The mouse wheel also works, and double-clicking a knob resets it.
 - Drag from a jack to patch. Drag a cable off an input to move or remove it. Double-click or right-click a jack to unplug it.
 - Keys: `Space` play/stop, `R` reset, `N` next step, `T` trigger.
-- **Keys** (toolbar) turns the computer keyboard into a piano: `A S D F G H J K L ; '` are the white keys starting at C4, `W E T Y U O P` the black keys, and `Z` / `X` shift the octave. Notes behave like MIDI notes. While it is on, `T` plays F# instead of triggering.
 
 ## Approximations
 

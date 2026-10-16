@@ -14,7 +14,8 @@ function Harm()
 		clock_source: "internal", freq: [0,0], div: [[1,1],[1,1]], vca_eg: 0, vcf_eg: 0, lfo: [0,0], comp_gr: 0
 	};
 	this.custom_scale = null; // { file, description, degrees, period }
-	this.midi = { access: null, inputs: [], selected: "all", activity: 0, notes: [], status: "off" };
+	this.midi = { access: null, inputs: [], selected: "all", activity: 0, status: "off" };
+	this.keys = { held: {}, all: [], zones: [[], []] }; // held: note -> zone
 	this.onmidichange = null;
 	this._sent = null;
 	this._initializing = null;
@@ -62,7 +63,8 @@ Harm.defaultSettings = function()
 			{ rate: 4, shape: "tri", level: 0.5 }
 		],
 		comp: { on: true, threshold: -12, ratio: 3, attack: 0.005, release: 0.12, makeup: 0, mix: 1 }, // dB / s
-		patches: []          // [output id, input id, color index]
+		kb: { split: false, split_note: 60, octave: 0 }, // keys device; split_note starts the upper zone
+		patches: [["kb_midi", "midi_in", 5]] // [output id, input id, color index]
 	};
 }
 
@@ -75,7 +77,7 @@ Harm.JACKS = [
 	[["PLAY","in","play_in"], ["RESET","in","reset_in"], ["TRIGGER","in","trigger_in"], ["VCF EG","out","vcf_eg"]],
 	[["RHYTHM 1","in","rhythm1_in"], ["RHYTHM 2","in","rhythm2_in"], ["RHYTHM 3","in","rhythm3_in"], ["RHYTHM 4","in","rhythm4_in"]],
 	[["SEQ 1","out","seq1"], ["SEQ 1 CLK","out","seq1_clk"], ["SEQ 2","out","seq2"], ["SEQ 2 CLK","out","seq2_clk"]],
-	[["MIDI IN","midi","midi_in"], ["CLOCK","in","clock_in"], ["CLOCK","out","clock_out"], ["TRIGGER","out","trigger_out"]]
+	[["MIDI IN","midiin","midi_in"], ["CLOCK","in","clock_in"], ["CLOCK","out","clock_out"], ["TRIGGER","out","trigger_out"]]
 ];
 
 Harm.VCO_MIN_FREQ = 261.63; // VCO FREQ knob range is C4..C8
@@ -92,12 +94,15 @@ Harm.LFO_JACKS = [
 Harm.COMP_JACKS = [
 	[["SIDECHAIN","in","comp_sc"], ["GR","out","comp_gr"]]
 ];
+Harm.KB_JACKS = [
+	[["GATE 1","out","kb_gate1"], ["KEY 1","out","kb_key1"], ["GATE 2","out","kb_gate2"], ["KEY 2","out","kb_key2"], ["MIDI","midiout","kb_midi"]]
+];
 Harm.LFO_SHAPES = ["sine","tri","saw","ramp","square","sh"];
 
 Harm.jackTypes = function()
 {
 	var types = {};
-	Harm.JACKS.concat( Harm.LFO_JACKS, Harm.COMP_JACKS ).forEach(function(row){
+	Harm.JACKS.concat( Harm.LFO_JACKS, Harm.COMP_JACKS, Harm.KB_JACKS ).forEach(function(row){
 		row.forEach(function(j){ types[ j[2] ] = j[1]; });
 	});
 	return types;
@@ -246,7 +251,8 @@ Harm.prototype.setSettings = function( data )
 			l.shape = "sine";
 	});
 	s.patches = (Array.isArray(data.patches) ? data.patches : []).filter(function(p){
-		return Array.isArray(p) && jack_ids[ p[0] ] == "out" && jack_ids[ p[1] ] == "in";
+		return Array.isArray(p) && ((jack_ids[ p[0] ] == "out" && jack_ids[ p[1] ] == "in") ||
+			(jack_ids[ p[0] ] == "midiout" && jack_ids[ p[1] ] == "midiin"));
 	}).map(function(p){ return [ p[0], p[1], (p[2] | 0) ]; });
 	// saves from before the hardware-accurate ranges
 	if(data.vca_eg === false && data.eg_hold === undefined)
@@ -255,7 +261,12 @@ Harm.prototype.setSettings = function( data )
 		while(v.freq < Harm.VCO_MIN_FREQ - 0.01)
 			v.freq *= 2;
 	});
+	s.kb.split_note = Math.min( 96, Math.max( 24, Math.round( s.kb.split_note ) ) );
+	s.kb.octave = Math.min( 2, Math.max( -2, Math.round( s.kb.octave ) ) );
+	if(!data.kb && !s.patches.some(function(p){ return p[1] == "midi_in"; }))
+		s.patches.push([ "kb_midi", "midi_in", 5 ]);
 	this.settings = s;
+	this.allNotesOff();
 
 	if(!s.scale_file)
 		this.clearScale();
@@ -500,10 +511,27 @@ Harm.prototype.bindMIDI = function()
 Harm.prototype.selectMIDIInput = function( id )
 {
 	this.midi.selected = id;
-	this.midi.notes.length = 0;
-	this.post({ type: "midi", gate: false });
+	this.allNotesOff();
 	if(this.midi.access)
 		this.bindMIDI();
+}
+
+Harm.prototype.cycleMIDIInput = function( dir )
+{
+	var ids = ["all"].concat( this.midi.inputs.map(function(i){ return i.id; }) );
+	var i = ids.indexOf( this.midi.selected );
+	this.selectMIDIInput( ids[ (i + dir + ids.length) % ids.length ] );
+}
+
+Harm.prototype.midiInputName = function()
+{
+	var midi = this.midi;
+	if(!midi.access)
+		return midi.status == "off" ? "MIDI OFF" : midi.status.toUpperCase();
+	if(midi.selected == "all")
+		return "ALL INPUTS (" + midi.inputs.length + ")";
+	var input = midi.inputs.find(function(i){ return i.id == midi.selected; });
+	return input ? (input.name || input.id).toUpperCase() : "DISCONNECTED";
 }
 
 Harm.prototype.notifyMIDI = function()
@@ -514,10 +542,10 @@ Harm.prototype.notifyMIDI = function()
 
 Harm.prototype.onMIDIMessage = function( data )
 {
-	var midi = this.midi;
 	var st = data[0];
-	midi.activity = performance.now();
+	this.midi.activity = performance.now();
 
+	// realtime messages go straight to the MIDI path (reach the synth only through the MIDI cable)
 	switch(st)
 	{
 		case 0xF8: this.post({ type: "midiClock" }); return;
@@ -529,32 +557,83 @@ Harm.prototype.onMIDIMessage = function( data )
 		return;
 
 	var cmd = st & 0xF0;
-	var note = data[1];
 	if(cmd == 0x90 && data[2] > 0)
-	{
-		// last note priority; the note transposes both VCOs relative to C4
-		midi.notes = midi.notes.filter(function(n){ return n != note; });
-		midi.notes.push( note );
-		this.post({ type: "midi", pitch: (note - 60) / 12, gate: true, retrigger: true });
-	}
+		this.noteOn( data[1] );
 	else if(cmd == 0x80 || cmd == 0x90)
-	{
-		midi.notes = midi.notes.filter(function(n){ return n != note; });
-		if(midi.notes.length)
-			this.post({ type: "midi", pitch: (midi.notes[midi.notes.length-1] - 60) / 12, gate: true, retrigger: false });
-		else
-			this.post({ type: "midi", gate: false });
-	}
+		this.noteOff( data[1] );
 	else if(cmd == 0xE0)
 	{
 		var bend = ((data[2] << 7) | data[1]) - 8192;
 		this.post({ type: "bend", value: (bend / 8192) * (2 / 12) }); // +-2 semitones
 	}
 	else if(cmd == 0xB0 && (data[1] == 123 || data[1] == 120))
-	{
-		midi.notes.length = 0; // all notes off / all sound off
+		this.allNotesOff();
+}
+
+// ---- keys device: every note source (MIDI device, on-screen keys, computer keyboard) ends here ----
+// The full keyboard feeds the MIDI output (last note priority). Each zone of the split keyboard
+// feeds its own KEY (1V/oct, C4 = 0V) and GATE outputs; without split both zones carry all notes.
+
+Harm.prototype.noteZone = function( note )
+{
+	var kb = this.settings.kb;
+	return kb.split && note >= kb.split_note ? 1 : 0;
+}
+
+Harm.prototype.noteOn = function( note )
+{
+	var k = this.keys;
+	if(k.held[ note ] !== undefined)
+		return;
+	var zone = this.noteZone( note );
+	k.held[ note ] = zone;
+	k.all.push( note );
+	this.post({ type: "midi", pitch: (note - 60) / 12, gate: true, retrigger: true });
+	this.pushZone( zone, note );
+	if(!this.settings.kb.split)
+		this.pushZone( 1, note );
+}
+
+Harm.prototype.noteOff = function( note )
+{
+	var k = this.keys;
+	var zone = k.held[ note ];
+	if(zone === undefined)
+		return;
+	delete k.held[ note ];
+	k.all = k.all.filter(function(n){ return n != note; });
+	if(k.all.length)
+		this.post({ type: "midi", pitch: (k.all[k.all.length - 1] - 60) / 12, gate: true, retrigger: false });
+	else
 		this.post({ type: "midi", gate: false });
-	}
+	this.popZone( zone, note );
+	if(k.zones[1].indexOf( note ) != -1)
+		this.popZone( 1, note );
+}
+
+Harm.prototype.pushZone = function( zone, note )
+{
+	var z = this.keys.zones[ zone ];
+	z.push( note );
+	this.post({ type: "kb", zone: zone, key: (note - 60) / 12, gate: true });
+}
+
+Harm.prototype.popZone = function( zone, note )
+{
+	var z = this.keys.zones[ zone ] = this.keys.zones[ zone ].filter(function(n){ return n != note; });
+	if(z.length)
+		this.post({ type: "kb", zone: zone, key: (z[z.length - 1] - 60) / 12, gate: true });
+	else
+		this.post({ type: "kb", zone: zone, gate: false });
+}
+
+Harm.prototype.allNotesOff = function()
+{
+	Object.keys( this.keys.held ).forEach(function(n){ this.noteOff( Number(n) ); }, this);
+	this.keys = { held: {}, all: [], zones: [[], []] };
+	this.post({ type: "midi", gate: false });
+	this.post({ type: "kb", zone: 0, gate: false });
+	this.post({ type: "kb", zone: 1, gate: false });
 }
 
 // ---- helpers ----
