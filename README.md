@@ -48,6 +48,7 @@ Click *Enable* in the toolbar.
 - Drag knobs vertically; hold Shift for fine control. The mouse wheel also works, and double-clicking a knob resets it.
 - Drag from a jack to patch. Drag a cable off an input to move or remove it. Double-click or right-click a jack to unplug it.
 - Keys: `Space` play/stop, `R` reset, `N` next step, `T` trigger.
+- **Keys** (toolbar) turns the computer keyboard into a piano: `A S D F G H J K L ; '` are the white keys starting at C4, `W E T Y U O P` the black keys, and `Z` / `X` shift the octave. Notes behave like MIDI notes. While it is on, `T` plays F# instead of triggering.
 
 ## Approximations
 

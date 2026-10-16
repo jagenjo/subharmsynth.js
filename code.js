@@ -839,12 +839,65 @@ function isTextField( el )
 	return el && el.closest && !!el.closest("input:not([type=range]),select,textarea");
 }
 
+// computer keyboard as a piano (toolbar "Keys" button), by physical key position:
+// home row = white keys starting at C, row above = black keys, Z / X = octave down / up
+var PIANO_KEYS = {
+	KeyA: 0, KeyW: 1, KeyS: 2, KeyE: 3, KeyD: 4, KeyF: 5, KeyT: 6, KeyG: 7, KeyY: 8, KeyH: 9,
+	KeyU: 10, KeyJ: 11, KeyK: 12, KeyO: 13, KeyL: 14, KeyP: 15, Semicolon: 16, Quote: 17
+};
+var piano = { enabled: false, octave: 0, down: {} }; // down: key code -> MIDI note
+
+function pianoNoteOff( code )
+{
+	var note = piano.down[ code ];
+	if(note === undefined)
+		return;
+	delete piano.down[ code ];
+	act(function(){ synth.onMIDIMessage([ 0x80, note, 0 ]); });
+}
+
+function pianoAllOff()
+{
+	Object.keys( piano.down ).forEach( pianoNoteOff );
+}
+
+function setPiano( enabled )
+{
+	pianoAllOff();
+	piano.enabled = enabled;
+	updatePianoButton();
+	setStatus( enabled ? "Keyboard piano on: A-' white keys, W E T Y U O P black keys, Z / X octave" : "Keyboard piano off" );
+}
+
+function updatePianoButton()
+{
+	var btn = $("piano");
+	btn.classList.toggle( "on", piano.enabled );
+	btn.textContent = piano.enabled ? "Keys: C" + (4 + piano.octave) : "Keys";
+}
+
 window.addEventListener("keydown", function(e){
 	if(isTextField( e.target ) || e.ctrlKey || e.metaKey || e.altKey)
 		return;
 	// a focused toolbar button would otherwise swallow Space as a click
 	if(e.target.closest && e.target.closest("button,input"))
 		e.target.blur();
+	if(piano.enabled && (e.code in PIANO_KEYS || e.code == "KeyZ" || e.code == "KeyX"))
+	{
+		e.preventDefault();
+		if(e.repeat || piano.down[ e.code ] !== undefined)
+			return;
+		if(e.code == "KeyZ" || e.code == "KeyX")
+		{
+			piano.octave = clamp( piano.octave + (e.code == "KeyX" ? 1 : -1), -3, 3 );
+			updatePianoButton();
+			return;
+		}
+		var note = 60 + piano.octave * 12 + PIANO_KEYS[ e.code ];
+		piano.down[ e.code ] = note;
+		act(function(){ synth.onMIDIMessage([ 0x90, note, 100 ]); });
+		return;
+	}
 	if(e.repeat)
 	{
 		if(e.code == "Space")
@@ -864,9 +917,13 @@ window.addEventListener("keydown", function(e){
 window.addEventListener("keyup", function(e){
 	if(e.code == "Space" && !isTextField( e.target ))
 		e.preventDefault();
-	if(e.code == "KeyT")
+	if(piano.down[ e.code ] !== undefined)
+		pianoNoteOff( e.code );
+	else if(e.code == "KeyT")
 		act(function(){ synth.trigger(false); });
 });
+// keys released while the window is not focused never send keyup
+window.addEventListener("blur", pianoAllOff);
 
 // ---------------------------------------------------------------------------
 // toolbar
@@ -902,6 +959,10 @@ $("power").addEventListener("click", function(){
 		synth.context.suspend().then( updateToolbar );
 	else
 		synth.context.resume().then( updateToolbar );
+});
+$("piano").addEventListener("click", function(){
+	ensureAudio();
+	setPiano( !piano.enabled );
 });
 $("save").addEventListener("click", function(){
 	setStatus( synth.save() ? "Patch saved in this browser" : "Could not save (storage blocked)" );

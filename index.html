@@ -34,6 +34,7 @@
 		<button id="init" title="Reset every control to the init patch">Init</button>
 	</div>
 	<label class="group">Reverb <input id="reverb" type="range" min="0" max="1" step="0.01" /></label>
+	<button id="piano" title="Play notes from the computer keyboard: A-' white keys, W E T Y U O P black keys, Z / X octave down / up">Keys</button>
 	<div class="group">
 		MIDI
 		<button id="midi-enable" title="Notes transpose both VCOs, clock / start / stop sync the sequencer">Enable</button>
@@ -45,7 +46,7 @@
 		<datalist id="scale-list"></datalist>
 		<button id="scale-clear" title="Remove the custom scale">&times;</button>
 	</div>
-	<span id="help" title="Drag knobs vertically (Shift = fine), double-click resets. Drag from a jack to patch, double-click or right-click a jack to unplug. Keys: Space play, R reset, N next, T trigger.">? help</span>
+	<span id="help" title="Drag knobs vertically (Shift = fine), double-click resets. Drag from a jack to patch, double-click or right-click a jack to unplug. Keys: Space play, R reset, N next, T trigger (when the Keys piano is on, T plays F#).">? help</span>
 	<span id="status"></span>
 </header>
 <canvas id="panel"></canvas>
