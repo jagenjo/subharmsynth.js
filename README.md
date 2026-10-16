@@ -14,9 +14,13 @@ Needs a browser with AudioWorklet support, served over `https://` or `localhost`
 | `webrack.js` | the rack controller: synth registry, settings and patches, audio graph, post FX, Scala parser, Web MIDI, keys |
 | `rack-worklet.js` | the audio processor: hosts the synths' DSP, routes the cables, runs the keys outputs, LFOs, compressor and scope |
 | `code.js` | the rack UI: canvas widgets (knobs, buttons, switches, jacks), cables, shared devices, scrolling and zoom, toolbar, keyboard shortcuts |
-| `synths/subharm.js`, `synths/subharm-worklet.js` | the Subharmonicon: panel, jacks and settings; DSP |
-| `synths/dfam.js`, `synths/dfam-worklet.js` | the DFAM: panel, jacks and settings; DSP |
-| `synths/mixer.js`, `synths/mixer-worklet.js` | the 6 channel mixer: panel, jacks and settings; DSP |
+| `devices/subharm.js`, `devices/subharm-worklet.js` | the Subharmonicon: panel, jacks and settings; DSP |
+| `devices/dfam.js`, `devices/dfam-worklet.js` | the DFAM |
+| `devices/mixer.js`, `devices/mixer-worklet.js` | the 6 channel mixer |
+| `devices/lfo.js`, `devices/lfo-worklet.js` | the dual LFO |
+| `devices/comp.js`, `devices/comp-worklet.js` | the stereo compressor and its scope |
+| `devices/delay.js`, `devices/delay-worklet.js` | the stereo / ping-pong delay |
+| `devices/reverb.js`, `devices/reverb-worklet.js` | the convolution reverb: native nodes, bridged through a send / return slot |
 | `data/patches.json` | factory patches |
 | `old/` | the original version of this replica, as in the first commit |
 | `data/impulses/` | reverb impulse responses from Voxengo's free "IM Reverbs" pack, redistributed unaltered under its `license.txt` (© Aleksey Vaneev) |
@@ -28,13 +32,15 @@ The page is a rack. From the top:
 
 1. The **AUDIO I/O** device.
 2. The **KEYS** device.
-3. The synths and mixers, one row each.
-4. A row with the **LFO** and the **compressor**.
-5. A row with the **reverb** and the **delay**.
+3. The devices, in the order you choose. Synths and mixers take a full row. The half-width devices (dual LFO, compressor, reverb, delay) sit side by side when two are next to each other.
+
+A new rack has a Subharm, an LFO and a compressor, then a reverb and a delay, cabled as the default audio path.
 
 One patch bay spans all of them: any output can be cabled to any input of any device. The front carries CV, gates and audio at ±5 V; the back carries the line-level audio between devices (see *Rear view*).
 
-- **Add device** (toolbar) inserts a new Subharm, DFAM or mixer at the bottom of the rack. You can have several of the same kind (`dfam`, `dfam2`, …).
+- **Add device** (toolbar) inserts a new device at the bottom of the rack. The menu is grouped into synths (Subharm, DFAM), modulation (dual LFO), mixing (mixer, compressor) and effects (reverb, delay).
+  - You can have several of the same kind (`dfam`, `dfam2`, …). Reverbs are limited to 8, one per send / return slot of the audio engine.
+  - A new LFO, compressor, reverb or delay arrives unpatched: patch its audio on the back (Tab).
   - A synth with a MIDI IN gets the keys' MIDI cable.
   - A new synth's audio goes to the first free mixer channel; with no mixer, to wherever the other synths go (or the compressor).
   - A new mixer takes over the synths that weren't on a mixer: they move onto its channels, and its MAIN L / R go where they went.
@@ -55,11 +61,11 @@ One patch bay spans all of them: any output can be cabled to any input of any de
   - The default path is synths → compressor → delay → reverb → MAIN IN. Patches from before the rear sockets load with that path cabled.
   - An audio input adds up every cable plugged into it. Dragging from an input takes its newest cable. An unpatched IN R (compressor, delay, reverb, MAIN, mixer aux return) takes the IN L signal.
   - Nothing reaches the speakers unless something is patched into MAIN IN.
-  - The delay and reverb run outside the audio processor, so their returns come back one render quantum (128 samples) later. You won't hear that on an effect.
+  - The reverbs run in native WebAudio nodes outside the audio processor, so their returns come back one render quantum (128 samples) later. You won't hear that on a reverb. The delay runs inside the processor.
   - Each device's label says what it does with the audio, e.g. "100% WET (DRY OFF)". Hovering a socket lists its connections.
   - The front's CV cables are hidden while the rear is shown, and the rear cables while the front is.
 - **Space** starts every synth when none is running, otherwise stops them all. **R**, **N** and **T** reset, step (NEXT / ADVANCE) and trigger every synth.
-- **Adding another synth:** register it from a pair of files in `synths/`:
+- **Adding another synth:** register it from a pair of files in `devices/`:
   - The main thread file calls `WR.registerSynth(type, { title, worklet, jacks, defaults, size, draw, … })`. The fields are documented in `webrack.js`.
   - The worklet file sets `globalThis.WR_DSP[type]` to a class with `outs` / `ins` / `patched` arrays, plus `setSettings`, `message`, `beginBlock`, `tick` and `state`.
   - Add both files to `index.html`.

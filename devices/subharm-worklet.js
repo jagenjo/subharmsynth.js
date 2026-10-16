@@ -1,4 +1,4 @@
-// synths/subharm-worklet.js
+// devices/subharm-worklet.js
 // Subharmonicon DSP, hosted by the rack processor (rack-worklet.js) in the AudioWorklet.
 // Oscillators, subharmonic dividers, ladder filter, envelopes, master clock,
 // polyrhythm dividers and sequencers are computed sample by sample, so rhythms and
@@ -16,7 +16,7 @@
 
 const C4 = 261.6255653005986;
 
-// must match the jack ids in synths/subharm.js
+// must match the jack ids in devices/subharm.js
 // (the last one, "audio", is the AUDIO OUT socket on the back: line level, not +-5V)
 const OUT_IDS = ["vco1","vco1_sub1","vco1_sub2","vco2","vco2_sub1","vco2_sub2","vca","vca_eg","vcf_eg","seq1","seq1_clk","seq2","seq2_clk","clock_out","trigger_out","audio"];
 const IN_IDS = ["vco1_in","vco1_sub_in","vco1_pwm","vca_in","vco2_in","vco2_sub_in","vco2_pwm","cutoff_in","play_in","reset_in","trigger_in","rhythm1_in","rhythm2_in","rhythm3_in","rhythm4_in","clock_in"];

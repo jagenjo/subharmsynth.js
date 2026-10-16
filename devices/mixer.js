@@ -1,4 +1,4 @@
-// synths/mixer.js
+// devices/mixer.js
 // 6 channel mixer module, in the same panel style as the synths: per channel AUX send, PAN,
 // MUTE / SOLO, a fader and a level meter; MASTER with the AUX SEND / AUX RETURN levels and the
 // main meters. Audio comes in and out on the back (Tab); the front has LEVEL CV inputs per
@@ -202,9 +202,10 @@ function drawPatchBay()
 WR.registerSynth( "mixer", {
 	title: "MIXER",
 	description: "6 channel mixer with aux send and return",
-	worklet: "synths/mixer-worklet.js",
+	worklet: "devices/mixer-worklet.js",
 	jacks: JACKS,
 	rear_jacks: REAR_JACKS,
+	category: "Mixing",
 	midi_in: null,
 	audio_out: null,
 	mixer: true,

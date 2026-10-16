@@ -1,9 +1,10 @@
 // webrack.js
-// The rack: a column of synth modules between the shared devices (keys on top; LFO, compressor,
-// reverb and delay below), with one patch bay across all of them. This is the main thread side:
-// settings, module list, patches (presets), audio graph and post FX, Scala scales, Web MIDI and the keys.
-// The synths register themselves from synths/*.js (panel, jacks, defaults) and synths/*-worklet.js
-// (DSP); all DSP runs in one AudioWorkletProcessor (rack-worklet.js) hosting the modules.
+// The rack: the audio I/O and keys rows on top, then a column of modules (synths, mixers, LFOs,
+// compressors, reverbs, delays) with one patch bay across all of them, front (CV) and back (audio).
+// This is the main thread side: settings, module list, patches (presets), the audio graph with the
+// native nodes of some modules, audio I/O, Scala scales, Web MIDI and the keys. The modules register
+// themselves from devices/*.js (panel, jacks, defaults) and devices/*-worklet.js (DSP); all DSP runs
+// in one AudioWorkletProcessor (rack-worklet.js) hosting them.
 
 var C4_FREQ = 261.6255653005986;
 
@@ -12,10 +13,17 @@ var WR = {
 	order: []
 };
 
-WR.VERSION = "20261016i"; // bump together with the ?v= in index.html so browsers reload the scripts
+WR.VERSION = "20261016j"; // bump together with the ?v= in index.html so browsers reload the scripts
 
 // def: {
 //   title, description,           names for menus and the panel
+//   category                      group in the Add device menu ("Synths" when missing)
+//   half                          half the rack's width: two in a row side by side
+//   max                           how many fit in a rack
+//   rear_jacks                    audio sockets on the back: [label, "ain"|"aout", id]
+//   audio_out                     id of its main audio output socket (routed when it is added)
+//   native { build(ctx), update(graph, s, rack) }  DSP in native nodes, fed by a send / return slot
+//   rear_note(s)                  what the rear label says about its audio
 //   worklet,                      DSP file, registers globalThis.WR_DSP[type]
 //   jacks,                        patch bay rows of [label, "in"|"out"|"midiin", id]
 //   midi_in,                      id of its MIDI IN jack, if it has one
@@ -37,29 +45,18 @@ WR.registerSynth = function( type, def )
 // patch bay ids: the rack's own jacks are plain, a module's are prefixed with its id
 WR.jackId = function( module_id, id ) { return module_id + "." + id; }
 
-// jacks of the shared devices
-WR.LFO_JACKS = [
-	[["RATE 1","in","lfo1_rate"], ["RATE 2","in","lfo2_rate"]],
-	[["SYNC 1","in","lfo1_sync"], ["SYNC 2","in","lfo2_sync"]],
-	[["LFO 1","out","lfo1"], ["LFO 2","out","lfo2"]]
-];
-WR.COMP_JACKS = [
-	[["SIDECHAIN","in","comp_sc"], ["GR","out","comp_gr"], ["SCOPE","in","scope_in"]]
-];
-// audio sockets on the back of the shared devices (line level, "ain" / "aout"): patched like the
+// audio sockets on the back of the audio I/O row (line level, "ain" / "aout"): patched like the
 // front jacks, but only with each other. An audio input sums every cable plugged into it
 WR.REAR_JACKS = {
-	io: [["MAIN IN L","ain","io_main_l"], ["MAIN IN R","ain","io_main_r"], ["INPUT L","aout","io_input_l"], ["INPUT R","aout","io_input_r"]],
-	comp: [["IN L","ain","comp_in_l"], ["IN R","ain","comp_in_r"], ["OUT L","aout","comp_out_l"], ["OUT R","aout","comp_out_r"]],
-	delay: [["IN L","ain","delay_in_l"], ["IN R","ain","delay_in_r"], ["OUT L","aout","delay_out_l"], ["OUT R","aout","delay_out_r"]],
-	reverb: [["IN L","ain","reverb_in_l"], ["IN R","ain","reverb_in_r"], ["OUT L","aout","reverb_out_l"], ["OUT R","aout","reverb_out_r"]]
+	io: [["MAIN IN L","ain","io_main_l"], ["MAIN IN R","ain","io_main_r"], ["INPUT L","aout","io_input_l"], ["INPUT R","aout","io_input_r"]]
 };
 // the default audio path after the synths: compressor -> delay -> reverb -> speakers (L red, R white)
 WR.AUDIO_CHAIN = [
-	["comp_out_l", "delay_in_l", 1], ["comp_out_r", "delay_in_r", 5],
-	["delay_out_l", "reverb_in_l", 1], ["delay_out_r", "reverb_in_r", 5],
-	["reverb_out_l", "io_main_l", 1], ["reverb_out_r", "io_main_r", 5]
+	["comp.out_l", "delay.in_l", 1], ["comp.out_r", "delay.in_r", 5],
+	["delay.out_l", "reverb.in_l", 1], ["delay.out_r", "reverb.in_r", 5],
+	["reverb.out_l", "io_main_l", 1], ["reverb.out_r", "io_main_r", 5]
 ];
+WR.SLOTS = 8; // send / return slots of the rack processor, for the modules with native DSP
 
 // audio I/O device: the audio interface input as patchable signals (+-5V)
 WR.IO_JACKS = [
@@ -68,16 +65,14 @@ WR.IO_JACKS = [
 WR.KB_JACKS = [
 	[["GATE 1","out","kb_gate1"], ["KEY 1","out","kb_key1"], ["GATE 2","out","kb_gate2"], ["KEY 2","out","kb_key2"], ["TRIG","out","kb_trig"], ["MIDI","midiout","kb_midi"]]
 ];
-WR.SCOPE_TIMES = [0.005, 0.02, 0.1, 0.5, 2];
-WR.LFO_SHAPES = ["sine","tri","saw","ramp","square","sh"];
 
 function WRContext()
 {
 	this.context = null;
 	this.node = null;
 	this.settings = WRContext.defaultSettings();
-	this.state = { lfo: [0,0], comp_gr: 0, scope: null };
 	this.module_state = {}; // module id -> state reported by its DSP
+	this.native = {};       // module id -> its native nodes (modules with def.native)
 	this.custom_scale = null; // { file, description, degrees, period }
 	this.midi = { access: null, inputs: [], selected: "all", activity: 0, status: "off" };
 	this.keys = { held: {}, all: [], zones: [[], []] }; // held: note -> zone
@@ -97,33 +92,26 @@ WRContext.OLD_STORAGE_KEY = "SUBHARM_state_v2";
 WRContext.PATCH_FORMAT = "webrack-patch";
 WRContext.OLD_PATCH_FORMAT = "subharm-patch";
 
-// the shared devices' settings (everything but the modules and the cables)
+// the rack's own settings (everything but the modules and the cables)
 WRContext.rackDefaults = function()
 {
 	return {
-		reverb: 0.15,       // reverb MIX
-		// post FX devices: delay (off by default) and reverb settings
-		fx: { reverb_on: true, reverb_room: "HALL B", reverb_predelay: 0.02, reverb_tone: 12000,
-			delay_on: false, delay_sync: true, delay_div: 3, delay_time: 0.3, delay_feedback: 0.4, delay_tone: 5000, delay_mix: 0.3, delay_pingpong: true,
-			reverb_dry: true, delay_dry: true }, // DRY off: 100% wet, for an aux send
 		scale_file: null,
-		lfo: [
-			{ rate: 0.5, shape: "sine", level: 1 },  // rate in Hz, level scales the +-5V output
-			{ rate: 4, shape: "tri", level: 0.5 }
-		],
-		comp: { on: true, threshold: -12, ratio: 3, attack: 0.005, release: 0.12, makeup: 0, mix: 1 }, // dB / s
-		scope: { time: 0.02 }, // oscilloscope window in seconds, one of WR.SCOPE_TIMES
 		kb: { split: false, split_note: 60, octave: 0 } // keys device; split_note starts the upper zone
 	};
 }
 
+// a Subharm, then the LFO and compressor, the reverb and delay, cabled as the default audio path
 WRContext.defaultSettings = function()
 {
 	var s = WRContext.rackDefaults();
-	s.version = 4;
+	s.version = 5;
 	s.modules = [];
-	s.patches = WR.AUDIO_CHAIN.map(function(c){ return c.slice(); }); // [output id, input id, color index]
+	s.patches = []; // [output id, input id, color index]
+	["lfo", "comp", "reverb", "delay"].forEach(function(type){ WRContext.addModuleTo( s, type ); });
+	s.patches = WR.AUDIO_CHAIN.map(function(c){ return c.slice(); });
 	WRContext.addModuleTo( s, "subharm" );
+	s.modules.unshift( s.modules.pop() );
 	return s;
 }
 
@@ -186,7 +174,8 @@ WRContext.routeAudio = function( s, m )
 			}
 		}
 	var other = s.patches.find(function(p){ return synthAudio( p[0] ) && p[0] != src; });
-	s.patches.push([ src, other ? other[1] : "comp_in_l", color ]);
+	var comp = s.modules.find(function(o){ return o.type == "comp"; });
+	s.patches.push([ src, other ? other[1] : (comp ? WR.jackId( comp.id, "in_l" ) : "io_main_l"), color ]);
 }
 
 WRContext.prototype.init = function()
@@ -203,18 +192,16 @@ WRContext.prototype.init = function()
 	});
 	this._initializing = load.then(function(){ return ctx.audioWorklet.addModule( "rack-worklet.js" + v ); }).then(function(){
 		var node = that.node = new AudioWorkletNode( ctx, "webrack", {
-			numberOfInputs: 3, numberOfOutputs: 3, outputChannelCount: [2, 2, 2],
+			numberOfInputs: 1 + WR.SLOTS, numberOfOutputs: 1 + WR.SLOTS,
+			outputChannelCount: new Array( 1 + WR.SLOTS ).fill( 2 ),
 			channelCount: 2, channelCountMode: "explicit", channelInterpretation: "speakers"
 		});
 		node.port.onmessage = function(e) {
 			if(e.data.type == "state")
-			{
-				that.state = e.data.rack;
 				that.module_state = e.data.modules;
-			}
 		};
 
-		that.buildPostFx( ctx, node );
+		that.buildMaster( ctx, node );
 		// audio interface input -> gain -> the rack's IN L / IN R jacks
 		that.input_gain = ctx.createGain();
 		that.input_gain.connect( node, 0, 0 );
@@ -254,8 +241,8 @@ WRContext.prototype.sync = function()
 	if(json === this._sent)
 		return;
 	this._sent = json;
-	this.post({ type: "settings", settings: this.settings });
-	this.updatePostFx();
+	this.post({ type: "settings", settings: this.settings, tempo: this.tempo() });
+	this.updateNative();
 }
 
 // ---- modules ----
@@ -273,8 +260,12 @@ WRContext.prototype.modules = function()
 	});
 }
 
+// null when the rack already has as many as the device allows
 WRContext.prototype.addModule = function( type )
 {
+	var def = WR.types[ type ];
+	if(def.max && this.settings.modules.filter(function(m){ return m.type == type; }).length >= def.max)
+		return null;
 	var m = WRContext.addModuleTo( this.settings, type );
 	this.module_state[ m.id ] = null;
 	return m;
@@ -313,7 +304,7 @@ WRContext.prototype.transport = function( action, value )
 	});
 }
 
-// BPM of the first module with a clock, for the delay's tempo sync
+// BPM of the first module with a clock, for tempo synced delays
 WRContext.prototype.tempo = function()
 {
 	var mods = this.settings.modules;
@@ -330,7 +321,7 @@ WRContext.prototype.tempo = function()
 WRContext.jackTypes = function( modules )
 {
 	var types = {};
-	WR.LFO_JACKS.concat( WR.COMP_JACKS, WR.KB_JACKS, WR.IO_JACKS ).forEach(function(row){
+	WR.KB_JACKS.concat( WR.IO_JACKS ).forEach(function(row){
 		row.forEach(function(j){ types[ j[2] ] = j[1]; });
 	});
 	for(var dev in WR.REAR_JACKS)
@@ -344,60 +335,14 @@ WRContext.jackTypes = function( modules )
 	return types;
 }
 
-// ---- post FX (not on the hardware): delay inserted on the master, reverb as a send ----
-//   rack -> bus -> speakers
-//   rack -> delay (two lines, normal or ping-pong, lowpass in the feedback) -> bus
-//   bus -> pre-delay -> convolver -> tone -> reverb mix -> speakers
+// ---- audio graph ----
+// The rack processor's output 0 goes to the master volume, the speakers and the meters. The modules
+// with native DSP (reverbs) get a send / return slot each, in rack order (as the processor does):
+//   processor output k -> module's nodes -> DelayNode -> processor input k
+// A loop through the processor needs that DelayNode (it adds a render quantum)
 
-// reverb rooms, short to long: [name, impulse file]; a null file is generated in code.
-// data/impulses/ are Voxengo "IM Reverbs" (see data/impulses/license.txt)
-WR.REVERB_ROOMS = [
-	["DRUM ROOM S", "data/impulses/Small Drum Room.wav"],
-	["DRUM ROOM", "data/impulses/Nice Drum Room.wav"],
-	["CAVE", "data/impulses/Small Prehistoric Cave.wav"],
-	["SALON", "data/impulses/French 18th Century Salon.wav"],
-	["PLATE", null],
-	["OPERA HALL", "data/impulses/Scala Milan Opera Hall.wav"],
-	["SILO", "data/impulses/In The Silo.wav"],
-	["HALL A", "data/BIG HALL E002 M2S.wav"],
-	["HALL B", "data/BIG HALL E003 M2S.wav"],
-	["GARAGE", "data/impulses/Parking Garage.wav"],
-	["ECHO HALL", "data/impulses/Large Long Echo Hall.wav"],
-	["CHURCH", "data/impulses/St Nicolaes Church.wav"]
-];
-WR.reverbRoomIndex = function( name ) { return WR.REVERB_ROOMS.findIndex(function(r){ return r[0] == name; }); }
-
-// synthetic plate: dense decorrelated noise per channel, -60dB after `seconds`,
-// getting darker as it decays (one-pole lowpass closing over time)
-WR.makePlate = function( ctx, seconds )
+WRContext.prototype.buildMaster = function( ctx, node )
 {
-	var sr = ctx.sampleRate, n = Math.round( sr * seconds );
-	var buffer = ctx.createBuffer( 2, n, sr );
-	for(var c = 0; c < 2; ++c)
-	{
-		var data = buffer.getChannelData( c ), y = 0;
-		for(var i = 0; i < n; ++i)
-		{
-			var t = i / n;
-			var a = 0.85 - 0.75 * t;  // lowpass coefficient, bright to dark
-			y += a * ((Math.random() * 2 - 1) - y);
-			var env = Math.exp( -6.9 * t ) * Math.min( 1, i / (sr * 0.002) );
-			data[i] = y * env;
-		}
-	}
-	return buffer;
-}
-WR.DELAY_DIVS = [["1/16", 0.25], ["1/8T", 1/3], ["1/8", 0.5], ["1/8D", 0.75], ["1/4T", 2/3], ["1/4", 1], ["1/4D", 1.5], ["1/2", 2], ["1/1", 4]];
-
-// Native nodes around the rack processor. Its output 0 goes to the speakers; outputs 1 and 2 are the
-// signals patched into the delay and reverb sockets, which come back on its inputs 1 and 2:
-//   output 0 -> master volume -> speakers (+ meters)
-//   output 1 -> delay: dry + two delay lines (normal or ping-pong, lowpass in the feedback) -> input 1
-//   output 2 -> reverb: dry + pre-delay -> convolver -> tone -> mix -> input 2
-// The returns go through a DelayNode: a loop through the processor needs one (it adds a render quantum)
-WRContext.prototype.buildPostFx = function( ctx, node )
-{
-	// master volume, then the speakers; the meters listen after it
 	var master = this.master = ctx.createGain();
 	node.connect( master, 0 );
 	master.connect( ctx.destination );
@@ -410,135 +355,60 @@ WRContext.prototype.buildPostFx = function( ctx, node )
 		return a;
 	});
 	this._meter_buf = new Float32Array( 1024 );
-
-	var returnTo = function( input ) {
-		var bus = ctx.createGain(), loop = ctx.createDelay( 0.1 );
-		loop.delayTime.value = 0;
-		bus.connect( loop );
-		loop.connect( node, 0, input );
-		return bus;
-	};
-
-	// delay
-	var d = this.delay = {
-		inL: ctx.createGain(), inR: ctx.createGain(), inPP: ctx.createGain(), dry: ctx.createGain(),
-		lineL: ctx.createDelay( 5 ), lineR: ctx.createDelay( 5 ),
-		toneL: ctx.createBiquadFilter(), toneR: ctx.createBiquadFilter(),
-		selfL: ctx.createGain(), selfR: ctx.createGain(), crossLR: ctx.createGain(), crossRL: ctx.createGain(),
-		merger: ctx.createChannelMerger( 2 ), wet: ctx.createGain(), ret: returnTo( 1 )
-	};
-	var dsplit = ctx.createChannelSplitter( 2 );
-	node.connect( dsplit, 1 );
-	dsplit.connect( d.inL, 0 ); dsplit.connect( d.inR, 1 );
-	var mono = ctx.createGain();
-	mono.channelCount = 1;
-	mono.channelCountMode = "explicit"; // ping-pong starts from the mono sum on the left
-	node.connect( mono, 1 );
-	mono.connect( d.inPP );
-	d.inPP.connect( d.lineL );
-	d.inL.connect( d.lineL ); d.inR.connect( d.lineR );
-	d.lineL.connect( d.toneL ); d.lineR.connect( d.toneR );
-	d.toneL.connect( d.selfL ); d.selfL.connect( d.lineL );
-	d.toneR.connect( d.selfR ); d.selfR.connect( d.lineR );
-	d.toneL.connect( d.crossLR ); d.crossLR.connect( d.lineR );
-	d.toneR.connect( d.crossRL ); d.crossRL.connect( d.lineL );
-	d.toneL.connect( d.merger, 0, 0 ); d.toneR.connect( d.merger, 0, 1 );
-	d.merger.connect( d.wet );
-	d.wet.connect( d.ret );
-	node.connect( d.dry, 1 );
-	d.dry.connect( d.ret );
-	[d.toneL, d.toneR].forEach(function(f){ f.type = "lowpass"; f.Q.value = 0.5; });
-	[d.wet, d.inL, d.inR, d.inPP, d.selfL, d.selfR, d.crossLR, d.crossRL].forEach(function(g){ g.gain.value = 0; });
-
-	// reverb
-	var r = this.reverb = {
-		predelay: ctx.createDelay( 1 ), convolver: ctx.createConvolver(), dry: ctx.createGain(),
-		tone: ctx.createBiquadFilter(), wet: ctx.createGain(), ret: returnTo( 2 ), buffers: {}, loading: {}, room: null
-	};
-	r.tone.type = "lowpass";
-	r.wet.gain.value = 0;
-	node.connect( r.predelay, 2 );
-	r.predelay.connect( r.convolver );
-	r.convolver.connect( r.tone );
-	r.tone.connect( r.wet );
-	r.wet.connect( r.ret );
-	node.connect( r.dry, 2 );
-	r.dry.connect( r.ret );
 }
 
-// impulses are loaded the first time their room is selected
-WRContext.prototype.loadReverbRoom = function( name )
+// builds, moves and updates the native nodes of the modules that have them
+WRContext.prototype.updateNative = function()
 {
-	var r = this.reverb, that = this;
-	var room = WR.REVERB_ROOMS[ WR.reverbRoomIndex( name ) ];
-	if(!room || r.buffers[name] || r.loading[name])
+	if(!this.node || !this.master) // the audio graph is built
 		return;
-	if(!room[1])
-	{
-		r.buffers[name] = WR.makePlate( this.context, 2.6 );
-		return;
-	}
-	r.loading[name] = true;
-	var ctx = this.context;
-	fetch( room[1] )
-		.then(function(res){ if(!res.ok) throw new Error("HTTP " + res.status); return res.arrayBuffer(); })
-		.then(function(b){ return ctx.decodeAudioData(b); })
-		.then(function(buffer){ r.buffers[name] = buffer; that.updatePostFx(); })
-		.catch(function(err){ console.warn("reverb impulse not loaded", room[1], err); })
-		.finally(function(){ delete r.loading[name]; });
+	var that = this, ctx = this.context, slot = 0, seen = {};
+	this.settings.modules.forEach(function(m){
+		var def = WR.types[ m.type ];
+		if(!def.native || slot >= WR.SLOTS)
+			return;
+		var k = 1 + slot++;
+		var g = that.native[ m.id ];
+		if(g && g.type != m.type)
+		{
+			that.dropNative( m.id );
+			g = null;
+		}
+		if(!g)
+		{
+			g = that.native[ m.id ] = def.native.build( ctx );
+			g.type = m.type;
+			g.slot = -1;
+			g.loop = ctx.createDelay( 0.1 );
+			g.loop.delayTime.value = 0;
+			g.output.connect( g.loop );
+		}
+		if(g.slot != k) // new, or the modules were reordered
+		{
+			if(g.slot > 0)
+			{
+				that.node.disconnect( g.input, g.slot );
+				g.loop.disconnect();
+			}
+			that.node.connect( g.input, k );
+			g.loop.connect( that.node, 0, k );
+			g.slot = k;
+		}
+		seen[ m.id ] = true;
+		def.native.update( g, m.settings, that );
+	});
+	for(var id in this.native)
+		if(!seen[id])
+			this.dropNative( id );
 }
 
-// true while the selected room's impulse is still downloading
-WRContext.prototype.reverbLoading = function()
+WRContext.prototype.dropNative = function( id )
 {
-	return !!(this.reverb && this.reverb.loading[ this.settings.fx.reverb_room ]);
-}
-
-WRContext.prototype.delayTime = function()
-{
-	var fx = this.settings.fx;
-	if(fx.delay_sync)
-		return Math.min( 4.9, (60 / this.tempo()) * WR.DELAY_DIVS[ fx.delay_div ][1] );
-	return fx.delay_time;
-}
-
-WRContext.prototype.updatePostFx = function()
-{
-	if(!this.master)
-		return;
-	var fx = this.settings.fx;
-	var t = this.context.currentTime;
-	var set = function(param, v, tc) { param.setTargetAtTime( v, t, tc || 0.03 ); };
-
-	var d = this.delay;
-	var time = this.delayTime();
-	set( d.lineL.delayTime, time, 0.05 );
-	set( d.lineR.delayTime, time, 0.05 );
-	set( d.toneL.frequency, fx.delay_tone );
-	set( d.toneR.frequency, fx.delay_tone );
-	var on = fx.delay_on ? 1 : 0, fb = fx.delay_feedback;
-	set( d.inL.gain, fx.delay_pingpong ? 0 : on );
-	set( d.inR.gain, fx.delay_pingpong ? 0 : on );
-	set( d.inPP.gain, fx.delay_pingpong ? on : 0 ); // ping-pong starts on the left only
-	set( d.dry.gain, on && !fx.delay_dry ? 0 : 1 ); // bypassed (off) = dry through
-	set( d.selfL.gain, fx.delay_pingpong ? 0 : fb );
-	set( d.selfR.gain, fx.delay_pingpong ? 0 : fb );
-	set( d.crossLR.gain, fx.delay_pingpong ? fb : 0 );
-	set( d.crossRL.gain, fx.delay_pingpong ? fb : 0 );
-	set( d.wet.gain, on * fx.delay_mix );
-
-	var r = this.reverb;
-	this.loadReverbRoom( fx.reverb_room );
-	if(r.room != fx.reverb_room && r.buffers[ fx.reverb_room ])
-	{
-		r.convolver.buffer = r.buffers[ fx.reverb_room ];
-		r.room = fx.reverb_room;
-	}
-	var mix = this.settings.reverb;
-	set( r.predelay.delayTime, fx.reverb_predelay );
-	set( r.tone.frequency, fx.reverb_tone );
-	set( r.wet.gain, fx.reverb_on ? mix * mix * 0.8 : 0 );
-	set( r.dry.gain, fx.reverb_on && !fx.reverb_dry ? 0 : 1 );
+	var g = this.native[id];
+	try { this.node.disconnect( g.input ); } catch(err) {}
+	g.loop.disconnect();
+	g.output.disconnect();
+	delete this.native[id];
 }
 
 // ---- audio I/O device: output and input devices, input gain, master volume ----
@@ -769,27 +639,50 @@ WR.migrateV2 = function( data )
 	return r;
 }
 
+// saves from before the LFO, compressor, reverb and delay were modules (version 3 and 4): they had a
+// single one of each, set at the rack level. They become modules "lfo", "comp", "reverb" and "delay"
+// after the synths, and their jacks get those modules' ids
+WR.MIGRATE_V4_JACKS = {
+	lfo1_rate: "lfo.rate1", lfo2_rate: "lfo.rate2", lfo1_sync: "lfo.sync1", lfo2_sync: "lfo.sync2", lfo1: "lfo.lfo1", lfo2: "lfo.lfo2",
+	comp_sc: "comp.sidechain", comp_gr: "comp.gr", scope_in: "comp.scope",
+	comp_in_l: "comp.in_l", comp_in_r: "comp.in_r", comp_out_l: "comp.out_l", comp_out_r: "comp.out_r",
+	delay_in_l: "delay.in_l", delay_in_r: "delay.in_r", delay_out_l: "delay.out_l", delay_out_r: "delay.out_r",
+	reverb_in_l: "reverb.in_l", reverb_in_r: "reverb.in_r", reverb_out_l: "reverb.out_l", reverb_out_r: "reverb.out_r"
+};
+
+WR.migrateV4 = function( data )
+{
+	var fx = data.fx && typeof data.fx == "object" ? data.fx : {};
+	var comp = data.comp && typeof data.comp == "object" ? data.comp : {};
+	var modules = (Array.isArray(data.modules) ? data.modules : []).concat([
+		{ id: "lfo", type: "lfo", settings: { lfo: data.lfo } },
+		{ id: "comp", type: "comp", settings: { on: comp.on, threshold: comp.threshold, ratio: comp.ratio, attack: comp.attack,
+			release: comp.release, makeup: comp.makeup, mix: comp.mix, scope_time: data.scope && data.scope.time } },
+		{ id: "reverb", type: "reverb", settings: { on: fx.reverb_on, mix: data.reverb, room: fx.reverb_room, predelay: fx.reverb_predelay,
+			tone: fx.reverb_tone, dry: fx.reverb_dry } },
+		{ id: "delay", type: "delay", settings: { on: fx.delay_on, sync: fx.delay_sync, div: fx.delay_div, time: fx.delay_time,
+			feedback: fx.delay_feedback, tone: fx.delay_tone, mix: fx.delay_mix, pingpong: fx.delay_pingpong, dry: fx.delay_dry } }
+	]);
+	var patches = (Array.isArray(data.patches) ? data.patches : []).map(function(p){
+		if(!Array.isArray(p))
+			return p;
+		return p.map(function(id, k){ return k < 2 && WR.MIGRATE_V4_JACKS[id] ? WR.MIGRATE_V4_JACKS[id] : id; });
+	});
+	return { version: 5, modules: modules, patches: patches, scale_file: data.scale_file, kb: data.kb,
+		add_audio: !(data.version >= 4) }; // from before the rear sockets: cable the old fixed audio path
+}
+
 WRContext.prototype.setSettings = function( data )
 {
 	data = data || {};
 	if(!(data.version >= 3))
 		data = WR.migrateV2( data );
-	var add_audio = !(data.version >= 4); // from before the rear sockets: cable the old fixed audio path
+	if(!(data.version >= 5))
+		data = WR.migrateV4( data );
+	var add_audio = !!data.add_audio;
 	var s = WR.mergeValid( WRContext.rackDefaults(), data );
-	s.version = 4;
+	s.version = 5;
 	s.scale_file = typeof data.scale_file == "string" ? data.scale_file : null;
-	if(data.fx && typeof data.fx.reverb_room == "number") // saves from when there were two rooms
-		s.fx.reverb_room = data.fx.reverb_room == 0 ? "HALL A" : "HALL B";
-	if(WR.reverbRoomIndex( s.fx.reverb_room ) == -1)
-		s.fx.reverb_room = "HALL B";
-	s.fx.delay_div = Math.min( WR.DELAY_DIVS.length - 1, Math.max( 0, Math.round( s.fx.delay_div ) ) );
-	s.fx.delay_feedback = Math.min( 0.95, Math.max( 0, s.fx.delay_feedback ) );
-	if(WR.SCOPE_TIMES.indexOf( s.scope.time ) == -1)
-		s.scope.time = 0.02;
-	s.lfo.forEach(function(l){
-		if(WR.LFO_SHAPES.indexOf( l.shape ) == -1)
-			l.shape = "sine";
-	});
 	s.kb.split_note = Math.min( 96, Math.max( 24, Math.round( s.kb.split_note ) ) );
 	s.kb.octave = Math.min( 2, Math.max( -2, Math.round( s.kb.octave ) ) );
 
@@ -823,9 +716,7 @@ WRContext.prototype.setSettings = function( data )
 	if(add_audio)
 	{
 		s.patches = s.patches.concat( WR.AUDIO_CHAIN.map(function(c){ return c.slice(); }) );
-		var all = s.modules;
-		s.modules = [];
-		all.forEach(function(m){ s.modules.push( m ); WRContext.routeAudio( s, m ); });
+		s.modules.forEach(function(m){ WRContext.routeAudio( s, m ); });
 	}
 	this.settings = s;
 	this.module_state = {};
@@ -879,7 +770,7 @@ WRContext.prototype.deleteUserPatch = function( name )
 
 WRContext.prototype.exportPatch = function( name )
 {
-	return JSON.stringify({ format: WRContext.PATCH_FORMAT, version: 4, name: name || "", settings: this.settings }, null, "\t");
+	return JSON.stringify({ format: WRContext.PATCH_FORMAT, version: 5, name: name || "", settings: this.settings }, null, "\t");
 }
 
 // accepts an exported file (also the older subharm-patch files) or a bare settings object; returns the patch name
@@ -895,7 +786,7 @@ WRContext.prototype.importPatch = function( text )
 	return typeof data.name == "string" ? data.name : "";
 }
 
-// new random sound on every module and the LFOs; volumes, compressor, reverb, cables and the scale are kept
+// new random sound on every synth and LFO; volumes, effects, cables and the scale are kept
 WRContext.prototype.randomize = function()
 {
 	var that = this;
@@ -903,12 +794,6 @@ WRContext.prototype.randomize = function()
 		var def = WR.types[ m.type ];
 		if(def.randomize)
 			def.randomize( m.settings, that );
-	});
-	var rnd = function(a, b) { return a + Math.random() * (b - a); };
-	this.settings.lfo.forEach(function(l){
-		l.rate = 0.05 * Math.pow( 8 / 0.05, Math.random() );
-		l.shape = WR.LFO_SHAPES[ Math.floor( Math.random() * WR.LFO_SHAPES.length ) ];
-		l.level = rnd( 0.2, 1 );
 	});
 }
 

@@ -1,4 +1,4 @@
-// synths/subharm.js
+// devices/subharm.js
 // Subharmonicon module for the rack: its settings, patch bay and panel, in two layouts
 // ("hardware" mirrors the real front panel, "classic" is the original compact layout of this
 // replica). The panel is drawn with the widgets of code.js; the DSP is in subharm-worklet.js.
@@ -676,8 +676,9 @@ function drawHardwarePanel()
 WR.registerSynth( "subharm", {
 	title: "SUBHARM",
 	description: "Subharmonicon: polyrhythmic subharmonic synthesizer",
-	worklet: "synths/subharm-worklet.js",
+	worklet: "devices/subharm-worklet.js",
 	jacks: JACKS,
+	category: "Synths",
 	midi_in: "midi_in",
 	rear_jacks: [["AUDIO OUT", "aout", "audio"]], // line level, on the back
 	audio_out: "audio",

@@ -958,10 +958,9 @@ function fmtDiv( v ) { return "÷" + v; }
 
 
 // ---------------------------------------------------------------------------
-// extra devices, in a row below the main panel: dual LFO and compressor
+// shared drawing for the devices (the half width ones: LFO, compressor, reverb, delay, ...)
 
-var DEVICE_GAP = 10, DEVICE_H = 200;
-var LFO_SHAPE_LABELS = { sine: "SINE", tri: "TRI", saw: "SAW", ramp: "RAMP", square: "SQUARE", sh: "S&H" };
+var DEVICE_GAP = 10; // between two half width devices in a row
 
 // wood cheeks + black panel, shared by the main panel and the devices
 function drawCasing( x, y, w, h )
@@ -1041,199 +1040,30 @@ function drawLedColumn( x, y, labels, lit, colors )
 	});
 }
 
-function drawLfoDevice( x, y, w, h )
-{
-	var s = rack.settings;
-	var st = rack.state;
-	drawDevicePanel( x, y, w, h, "DUAL LFO", ["LOW FREQUENCY", "OSCILLATORS"] );
-	var px = drawDeviceJacks( x, y, w, h, WR.LFO_JACKS );
-	var sw = (px - 10 - (x + 40)) / 2; // section width
 
-	for(var i = 0; i < 2; ++i)
-	{
-		var lfo = s.lfo[i];
-		var gx = x + 40 + i * sw;
-		drawSection( "LFO " + (i + 1), gx, gx + sw - 16, y + 20 );
 
-		lfo.rate = knob( "lfo" + i + "_rate", gx + 38, y + 92, 28, lfo.rate, 0.01, 100, {
-			label: "RATE", style: "ring", exp: true, def: i ? 4 : 0.5, format: fmtRate
-		});
-		drawLed( gx + 72, y + 48, 3.5, (st.lfo[i] || 0) > 0.05, "#ffb02f" );
-		lfo.level = knob( "lfo" + i + "_level", gx + 118, y + 96, 20, lfo.level, 0, 1, {
-			label: "LEVEL", def: 1, format: function(v){ return fmtPct(v) + "  (\u00b1" + (v * 5).toFixed(1) + " V)"; }
-		});
-		drawLedColumn( gx + sw - 70, y + 40, WR.LFO_SHAPES.map(function(sh){ return LFO_SHAPE_LABELS[sh]; }),
-			function(k){ return lfo.shape == WR.LFO_SHAPES[k]; } );
-		if(button( "lfo" + i + "_shape", gx + sw - 80, y + 136, 58, 22, "SHAPE" ).clicked)
-			lfo.shape = WR.LFO_SHAPES[ (WR.LFO_SHAPES.indexOf( lfo.shape ) + 1) % WR.LFO_SHAPES.length ];
-	}
-}
 
-// small retro CRT oscilloscope: green phosphor trace of the SCOPE input (+-5V full scale) or,
-// with nothing patched, the master output. Clicking the screen cycles the time base.
-function fmtScopeTime( t ) { return t >= 1 ? t + " s" : Math.round( t * 1000 ) + " ms"; }
 
-function drawScope( x, y, w, h, data )
-{
-	var scope = rack.settings.scope;
-	var hover = !cable_drag && (ui.active === null || ui.active === "scope") && hitRect( x, y, w, h );
-	if(hover)
-	{
-		ui.hot = "scope";
-		tip( "CLICK: TIME BASE (" + fmtScopeTime( scope.time ) + ")", x + w * 0.5, y + h + 12 );
-	}
-	if(hover && ui.pressed && ui.active === null)
-	{
-		ui.active = "scope";
-		var times = WR.SCOPE_TIMES;
-		scope.time = times[ (times.indexOf( scope.time ) + 1) % times.length ];
-	}
 
-	// bezel and screen
-	ctx.fillStyle = "#050505";
-	ctx.beginPath(); ctx.roundRect( x - 3, y - 3, w + 6, h + 6, 8 ); ctx.fill();
-	var g = ctx.createRadialGradient( x + w * 0.5, y + h * 0.5, 4, x + w * 0.5, y + h * 0.5, w * 0.7 );
-	g.addColorStop( 0, "#0f2a14" );
-	g.addColorStop( 1, "#04100a" );
-	ctx.fillStyle = g;
-	ctx.beginPath(); ctx.roundRect( x, y, w, h, 6 ); ctx.fill();
-
-	ctx.save();
-	ctx.beginPath(); ctx.roundRect( x, y, w, h, 6 ); ctx.clip();
-
-	// graticule
-	ctx.strokeStyle = "rgba(80,255,120,0.12)";
-	ctx.lineWidth = 0.6;
-	ctx.beginPath();
-	for(var i = 1; i < 8; ++i) { ctx.moveTo( x + w * i / 8, y ); ctx.lineTo( x + w * i / 8, y + h ); }
-	for(var i = 1; i < 6; ++i) { ctx.moveTo( x, y + h * i / 6 ); ctx.lineTo( x + w, y + h * i / 6 ); }
-	ctx.stroke();
-	ctx.strokeStyle = "rgba(80,255,120,0.25)";
-	ctx.beginPath(); ctx.moveTo( x, y + h * 0.5 ); ctx.lineTo( x + w, y + h * 0.5 ); ctx.stroke();
-
-	// trace, drawn twice: a wide soft glow and a thin bright core. Each column holds the min and
-	// max of the samples it covers, so dense audio at long time bases shows as a band
-	var mid = y + h * 0.5, amp = h * 0.45;
-	var n = data && data.min ? data.min.length : 0;
-	var Y = function(v) { return mid - clamp( v, -1.05, 1.05 ) * amp; };
-	var trace = function(){
-		ctx.beginPath();
-		if(!n)
-		{
-			ctx.moveTo( x, mid ); ctx.lineTo( x + w, mid );
-			return;
-		}
-		for(var i = 0; i < n; ++i)
-		{
-			var px = x + (i / (n - 1)) * w;
-			var lo = Y( data.max[i] ), hi = Y( data.min[i] );
-			if(i) ctx.lineTo( px, lo ); else ctx.moveTo( px, lo );
-			if(hi - lo > 1) ctx.lineTo( px, hi );
-		}
-	};
-	ctx.lineJoin = "round";
-	ctx.strokeStyle = "rgba(60,255,110,0.18)";
-	ctx.lineWidth = 4;
-	trace(); ctx.stroke();
-	ctx.strokeStyle = "#7dff9a";
-	ctx.lineWidth = 1.2;
-	trace(); ctx.stroke();
-
-	// scanlines and glass reflection
-	ctx.fillStyle = "rgba(0,0,0,0.18)";
-	for(var yy = y; yy < y + h; yy += 3)
-		ctx.fillRect( x, yy, w, 1 );
-	g = ctx.createLinearGradient( x, y, x, y + h * 0.5 );
-	g.addColorStop( 0, "rgba(255,255,255,0.07)" );
-	g.addColorStop( 1, "rgba(255,255,255,0)" );
-	ctx.fillStyle = g;
-	ctx.fillRect( x, y, w, h * 0.5 );
-	ctx.restore();
-
-	ctx.textAlign = "left";
-	ctx.textBaseline = "middle";
-	ctx.font = "9px " + FONT;
-	ctx.fillStyle = "rgba(125,255,154,0.6)";
-	ctx.fillText( data && data.input ? "IN \u00b15V" : "OUT", x + 5, y + 8 );
-	ctx.textAlign = "right";
-	ctx.fillText( fmtScopeTime( scope.time ) + (scope.time > 0.2 ? " ROLL" : ""), x + w - 5, y + 8 );
-}
-
-function drawCompressor( x, y, w, h )
-{
-	var c = rack.settings.comp;
-	var st = rack.state;
-	drawDevicePanel( x, y, w, h, "COMPRESSOR", ["MASTER BUS", "DYNAMICS PROCESSOR"] );
-	var px = drawDeviceJacks( x, y, w, h, WR.COMP_JACKS );
-	drawScope( px + 12, y + 80, 146, h - 100, st.scope );
-
-	// six knobs in a row, then the gain reduction meter and the ON button
-	var mx = px - 62;
-	var step = (mx - 10 - (x + 40)) / 6;
-	var r = Math.min( 24, step * 0.3 );
-	drawSection( "DYNAMICS", x + 40, mx - 14, y + 20 );
-	var knobs = [
-		["threshold", "THRESHOLD", -48, 0, { def: -12, format: fmtDb }],
-		["ratio", "RATIO", 1, 20, { exp: true, def: 3, format: function(v){ return v.toFixed(1) + " : 1"; } }],
-		["attack", "ATTACK", 0.0005, 0.2, { style: "ring", exp: true, def: 0.005, format: fmtTime }],
-		["release", "RELEASE", 0.01, 2, { style: "ring", exp: true, def: 0.12, format: fmtTime }],
-		["makeup", "MAKEUP", 0, 24, { def: 0, format: fmtDb }],
-		["mix", "MIX", 0, 1, { def: 1, format: function(v){ return Math.round(v * 100) + "% WET"; } }]
-	];
-	knobs.forEach(function(k, i){
-		k[4].label = k[1];
-		c[ k[0] ] = knob( "comp_" + k[0], x + 40 + step * (i + 0.5), y + 96, r, c[ k[0] ], k[2], k[3], k[4] );
-	});
-
-	drawSection( "GR", mx, px - 12, y + 20 );
-	var levels = [20, 15, 10, 6, 3, 1];
-	drawLedColumn( mx + 14, y + 40, levels.map(function(db){ return "-" + db; }),
-		function(k){ return c.on && st.comp_gr >= levels[k]; },
-		function(k){ return k < 2 ? "#ff3b2f" : "#ffb02f"; } );
-	if(button( "comp_on", mx + 2, y + 136, 44, 22, "ON", c.on ).clicked)
-		c.on = !c.on;
-}
-
-// rows below the synths: LFO + compressor, then the post FX
-function deviceRowsH()
-{
-	return [ Math.max( deviceH( "lfo", DEVICE_H ), deviceH( "comp", DEVICE_H ) ),
-	         Math.max( deviceH( "reverb", FX_H ), deviceH( "delay", FX_H ) ) ];
-}
-
-function drawDevices()
-{
-	var rows = deviceRowsH();
-	var w = (PANEL_W - DEVICE_GAP) * 0.5;
-	var y = 0;
-	drawDevice( "lfo", 0, y, w, DEVICE_H, "DUAL LFO", WR.LFO_JACKS, drawLfoDevice );
-	drawDevice( "comp", w + DEVICE_GAP, y, w, DEVICE_H, "COMPRESSOR", WR.COMP_JACKS, drawCompressor );
-	y += rows[0] + DEVICE_GAP;
-	drawDevice( "reverb", 0, y, w, FX_H, "REVERB", null, drawReverbDevice );
-	drawDevice( "delay", w + DEVICE_GAP, y, w, FX_H, "DELAY", null, drawDelayDevice );
-}
 
 // ---------------------------------------------------------------------------
 // collapsible devices: a chevron button on the top left corner folds a device (and the others in its row) into a slim bar.
 // Its jacks stay on the bar as small sockets so cables keep their ends and can still be patched.
 
 var DEVICE_COLLAPSED_H = 26;
-var FX_H = 150;
 var collapsed = {};
 try { collapsed = JSON.parse( localStorage.getItem("SUBHARM_collapsed") || "{}" ) || {}; } catch(err) {}
 
 function deviceH( id, h ) { return collapsed[id] ? DEVICE_COLLAPSED_H : h; }
 
-// devices sharing a row fold and unfold together
-var DEVICE_ROWS = [["io"], ["keys"], ["lfo", "comp"], ["reverb", "delay"]];
-
+// devices sharing a row (two half width ones) fold and unfold together
 function toggleCollapsed( id )
 {
 	var state = !collapsed[id];
-	collapsed[id] = state; // synth modules have a row each
-	DEVICE_ROWS.forEach(function(row){
-		if(row.indexOf( id ) != -1)
-			row.forEach(function(other){ collapsed[other] = state; });
+	collapsed[id] = state;
+	rackRows().forEach(function(row){
+		if(row.mods.some(function(m){ return m.id == id; }))
+			row.mods.forEach(function(m){ collapsed[ m.id ] = state; });
 	});
 	saveCollapsed();
 }
@@ -1323,15 +1153,19 @@ function drawDevice( id, x, y, w, h, name, jack_rows, draw )
 }
 
 // ---------------------------------------------------------------------------
-// synth modules, a row each between the keys and the device rows, scaled to the rack's width
+// modules below the keys: a full width row each, or two half width devices side by side when they
+// are next to each other in the rack. Panels are scaled to fit the rack's width
 
 var EMPTY_RACK_H = 60;
+
+// width a module gets in the rack
+function slotW( def ) { return def.half ? (PANEL_W - DEVICE_GAP) * 0.5 : PANEL_W; }
 
 // panel size in its own coordinates and the scale that fits it in the rack
 function moduleFit( def )
 {
 	var size = def.size( layout );
-	return { w: size[0], h: size[1], k: PANEL_W / size[0] };
+	return { w: size[0], h: size[1], k: slotW( def ) / size[0] };
 }
 
 function moduleRowH( m )
@@ -1342,12 +1176,27 @@ function moduleRowH( m )
 	return fit.h * fit.k;
 }
 
+// [{ mods: [module] or [left, right], half, h }] in rack order. mods: settings.modules (default) or rack.modules()
+function rackRows( mods )
+{
+	var rows = [];
+	(mods || rack.settings.modules).forEach(function(m){
+		var half = !!WR.types[ m.type ].half;
+		var last = rows[ rows.length - 1 ];
+		if(half && last && last.half && last.mods.length == 1)
+			last.mods.push( m );
+		else
+			rows.push({ mods: [m], half: half });
+	});
+	rows.forEach(function(r){ r.h = Math.max.apply( null, r.mods.map( moduleRowH ) ); });
+	return rows;
+}
+
 function modulesH()
 {
-	var mods = rack.settings.modules;
-	if(!mods.length)
+	if(!rack.settings.modules.length)
 		return EMPTY_RACK_H + KB_GAP;
-	return mods.reduce(function(h, m){ return h + moduleRowH( m ) + KB_GAP; }, 0);
+	return rackRows().reduce(function(h, r){ return h + r.h + KB_GAP; }, 0);
 }
 
 // small round button of the rack (move / remove a module). kind: "up", "down", "remove"
@@ -1410,13 +1259,14 @@ function askRemoveModule( m )
 function drawEmptyRack( w )
 {
 	drawCasing( 0, 0, w, EMPTY_RACK_H );
-	drawLabel( "THE RACK HAS NO SYNTHS: INSERT ONE WITH \u201cADD SYNTH\u201d IN THE TOOLBAR", w * 0.5, EMPTY_RACK_H * 0.5, 14, false, DIM_COLOR );
+	drawLabel( "THE RACK IS EMPTY: INSERT DEVICES WITH \u201cADD DEVICE\u201d IN THE TOOLBAR", w * 0.5, EMPTY_RACK_H * 0.5, 14, false, DIM_COLOR );
 }
 
 // draws the modules from y down; returns the height used
 function drawModules( y0 )
 {
 	var mods = rack.modules();
+	view.half_rows = [];
 	if(!mods.length)
 	{
 		beginFrame( 0, y0, 1 );
@@ -1425,112 +1275,46 @@ function drawModules( y0 )
 		return EMPTY_RACK_H + KB_GAP;
 	}
 	var y = y0;
-	mods.forEach(function(m, i){
-		if(show_rear)
-		{
+	rackRows( mods ).forEach(function(row){
+		if(row.half)
+			view.half_rows.push([ y, y + row.h ]);
+		row.mods.forEach(function(m, col){
+			var i = mods.indexOf( m );
+			var x = col ? (PANEL_W + DEVICE_GAP) * 0.5 : 0, w = slotW( m.def );
 			var fit = moduleFit( m.def );
-			beginFrame( 0, y, collapsed[ m.id ] ? 1 : fit.k );
-			drawRearDevice( m.id, 0, 0, collapsed[ m.id ] ? PANEL_W : fit.w, fit.h, m.def.title );
-			endFrame();
-		}
-		else if(collapsed[ m.id ])
-		{
-			beginFrame( 0, y, 1 );
-			id_prefix = m.id + ".";
-			var end = drawCollapsedBar( m.id, 0, 0, PANEL_W, m.def.title, m.def.jacks );
-			id_prefix = "";
-			moduleButtons( m, i, mods.length, function(k){ return [ end + 22 + k * 22, DEVICE_COLLAPSED_H * 0.5 ]; } );
-			endFrame();
-		}
-		else
-		{
-			var fit = moduleFit( m.def );
-			beginFrame( 0, y, fit.k );
-			id_prefix = m.id + ".";
-			m.def.draw( m );
-			id_prefix = "";
-			collapseButton( m.id, 36, 11 );
-			// on the right wood cheek
-			moduleButtons( m, i, mods.length, function(k){ return [ fit.w - 11, 20 + k * 22 ]; } );
-			endFrame();
-		}
-		y += moduleRowH( m ) + KB_GAP;
+			if(show_rear)
+			{
+				beginFrame( x, y, collapsed[ m.id ] ? 1 : fit.k );
+				drawRearDevice( m.id, 0, 0, collapsed[ m.id ] ? w : fit.w, fit.h, m.def.title );
+				endFrame();
+			}
+			else if(collapsed[ m.id ])
+			{
+				beginFrame( x, y, 1 );
+				id_prefix = m.id + ".";
+				var end = drawCollapsedBar( m.id, 0, 0, w, m.def.title, m.def.jacks );
+				id_prefix = "";
+				moduleButtons( m, i, mods.length, function(k){ return [ end + 22 + k * 22, DEVICE_COLLAPSED_H * 0.5 ]; } );
+				endFrame();
+			}
+			else
+			{
+				beginFrame( x, y, fit.k );
+				id_prefix = m.id + ".";
+				m.def.draw( m );
+				id_prefix = "";
+				collapseButton( m.id, 36, 11 );
+				// on the right wood cheek
+				moduleButtons( m, i, mods.length, function(k){ return [ fit.w - 11, 20 + k * 22 ]; } );
+				endFrame();
+			}
+		});
+		y += row.h + KB_GAP;
 	});
 	return y - y0;
 }
 
-// ---------------------------------------------------------------------------
-// post FX devices (bottom row): reverb and delay on the master output
 
-function drawReverbDevice( x, y, w, h )
-{
-	var fx = rack.settings.fx;
-	var s = rack.settings;
-	drawDevicePanel( x, y, w, h, "REVERB", ["CONVOLUTION", "SEND EFFECT"] );
-	s.reverb = knob( "fx_reverb_mix", x + 100, y + 70, 28, s.reverb, 0, 1, {
-		label: "MIX", def: 0.15, format: fmtPct
-	});
-	fx.reverb_predelay = knob( "fx_reverb_predelay", x + 210, y + 70, 24, fx.reverb_predelay, 0, 0.25, {
-		label: "PRE-DELAY", style: "ring", def: 0.02, format: fmtTime
-	});
-	fx.reverb_tone = knob( "fx_reverb_tone", x + 310, y + 70, 24, fx.reverb_tone, 500, 16000, {
-		label: "TONE", exp: true, def: 12000, format: fmtHz
-	});
-	// ROOM: name display with previous / next buttons
-	var rooms = WR.REVERB_ROOMS, ri = WR.reverbRoomIndex( fx.reverb_room );
-	drawLabel( "ROOM", x + 476, y + 30, 11 );
-	var lx = x + 392, lw = 168, ly = y + 42;
-	ctx.fillStyle = "#050505";
-	ctx.beginPath(); ctx.roundRect( lx - 3, ly - 3, lw + 6, 30, 5 ); ctx.fill();
-	ctx.fillStyle = "#16240f";
-	ctx.beginPath(); ctx.roundRect( lx, ly, lw, 24, 3 ); ctx.fill();
-	ctx.font = "bold 13px 'Courier New', monospace";
-	ctx.textAlign = "center";
-	ctx.textBaseline = "middle";
-	ctx.fillStyle = "#b6f06a";
-	ctx.fillText( (ri + 1) + "/" + rooms.length + " " + fx.reverb_room + (rack.reverbLoading() ? " \u2026" : ""), lx + lw * 0.5, ly + 13 );
-	if(button( "fx_reverb_prev", lx, y + 84, 36, 22, "\u25c0" ).clicked)
-		fx.reverb_room = rooms[ (ri - 1 + rooms.length) % rooms.length ][0];
-	if(button( "fx_reverb_next", lx + 42, y + 84, 36, 22, "\u25b6" ).clicked)
-		fx.reverb_room = rooms[ (ri + 1) % rooms.length ][0];
-	if(button( "fx_reverb_on", lx + 92, y + 84, 76, 22, "ON", fx.reverb_on ).clicked)
-		fx.reverb_on = !fx.reverb_on;
-	// DRY off = 100% wet, for the reverb on a mixer's aux send
-	if(button( "fx_reverb_dry", lx + 92, y + 112, 76, 22, "DRY", fx.reverb_dry ).clicked)
-		fx.reverb_dry = !fx.reverb_dry;
-}
-
-function drawDelayDevice( x, y, w, h )
-{
-	var fx = rack.settings.fx;
-	drawDevicePanel( x, y, w, h, "DELAY", ["STEREO", "PING-PONG ECHO"] );
-	if(fx.delay_sync)
-		fx.delay_div = knob( "fx_delay_div", x + 100, y + 70, 28, fx.delay_div, 0, WR.DELAY_DIVS.length - 1, {
-			label: "TIME", step: 1, def: 3, style: "ring",
-			format: function(v){ return WR.DELAY_DIVS[v][0] + "  " + Math.round( rack.delayTime() * 1000 ) + " ms"; }
-		});
-	else
-		fx.delay_time = knob( "fx_delay_time", x + 100, y + 70, 28, fx.delay_time, 0.01, 2, {
-			label: "TIME", exp: true, def: 0.3, style: "ring", format: fmtTime
-		});
-	fx.delay_feedback = knob( "fx_delay_feedback", x + 200, y + 70, 24, fx.delay_feedback, 0, 0.95, {
-		label: "FEEDBACK", def: 0.4, format: fmtPct
-	});
-	fx.delay_tone = knob( "fx_delay_tone", x + 290, y + 70, 24, fx.delay_tone, 500, 16000, {
-		label: "TONE", exp: true, def: 5000, format: fmtHz
-	});
-	fx.delay_mix = knob( "fx_delay_mix", x + 380, y + 70, 24, fx.delay_mix, 0, 1, {
-		label: "MIX", def: 0.3, format: fmtPct
-	});
-	if(button( "fx_delay_sync", x + 448, y + 40, 84, 22, "SYNC", fx.delay_sync ).clicked)
-		fx.delay_sync = !fx.delay_sync;
-	if(button( "fx_delay_pingpong", x + 448, y + 68, 84, 22, "PING-PONG", fx.delay_pingpong ).clicked)
-		fx.delay_pingpong = !fx.delay_pingpong;
-	if(button( "fx_delay_on", x + 448, y + 96, 84, 22, "ON", fx.delay_on ).clicked)
-		fx.delay_on = !fx.delay_on;
-	if(button( "fx_delay_dry", x + 360, y + 112, 64, 22, "DRY", fx.delay_dry ).clicked)
-		fx.delay_dry = !fx.delay_dry;
-}
 
 
 
@@ -1657,7 +1441,7 @@ function outputChange( dir )
 // every cable plugged into it. The front CV / gate cables are not shown here
 
 var show_rear = false;
-var device_names = { io: "AUDIO I/O", keys: "KEYS", lfo: "DUAL LFO", comp: "COMPRESSOR", reverb: "REVERB", delay: "DELAY" };
+var device_names = { io: "AUDIO I/O", keys: "KEYS" };
 
 // [label, "ain" | "aout", jack id] on the back of a device, ids as in the patches
 function rearSockets( id )
@@ -1688,18 +1472,16 @@ function jackDevice( id )
 // what the rear sticker says about the device's audio
 function rearNote( id )
 {
-	var fx = rack.settings.fx;
 	switch(id)
 	{
 		case "io": return "MAIN IN TO THE SPEAKERS \u00b7 INPUT FROM THE INTERFACE";
 		case "keys": return "NO AUDIO: NOTES AND CV ON THE FRONT";
-		case "lfo": return "NO AUDIO: CV ON THE FRONT";
-		case "comp": return rack.settings.comp.on ? "STEREO, LINKED \u00b7 IN R NORMALLED TO IN L" : "BYPASSED (OFF)";
-		case "delay": return !fx.delay_on ? "BYPASSED (OFF): DRY THROUGH" : (fx.delay_dry ? "DRY + ECHOES" : "100% WET (DRY OFF)");
-		case "reverb": return !fx.reverb_on ? "BYPASSED (OFF): DRY THROUGH" : (fx.reverb_dry ? "DRY + REVERB" : "100% WET (DRY OFF)");
 	}
 	var m = rack.settings.modules.find(function(m){ return m.id == id; });
-	if(m && WR.types[ m.type ].mixer)
+	var def = m && WR.types[ m.type ];
+	if(def && def.rear_note)
+		return def.rear_note( m.settings );
+	if(def && def.mixer)
 		return "LINE INPUTS, AUX SEND / RETURN, STEREO MAIN";
 	return "MONO AUDIO OUT, POST VOLUME";
 }
@@ -2118,10 +1900,6 @@ function draw()
 	endFrame();
 	y += deviceH( "keys", KB_H ) + KB_GAP;
 	y += drawModules( y );
-	view.devices_y = y;
-	beginFrame( 0, y, 1 );
-	drawDevices();
-	endFrame();
 	updateCables(); // front or rear: only the jacks of the side shown are registered
 	drawCables();
 	drawTooltips();
@@ -2145,7 +1923,7 @@ function onRackSide( x, y )
 	if(x < cheek || x > PANEL_W - cheek || y < 0 || y > PANEL_H)
 		return true;
 	var half = (PANEL_W - DEVICE_GAP) * 0.5;
-	return y >= view.devices_y && x > half - cheek && x < half + DEVICE_GAP + cheek;
+	return x > half - cheek && x < half + DEVICE_GAP + cheek && (view.half_rows || []).some(function(r){ return y >= r[0] && y <= r[1]; });
 }
 
 // after the widgets had their chance: a press nothing took, on the sides, grabs the rack
@@ -2349,8 +2127,7 @@ $("power").addEventListener("click", function(){
 });
 function updatePanelHeight()
 {
-	var rows = deviceRowsH();
-	PANEL_H = deviceH( "io", IO_H ) + KB_GAP + deviceH( "keys", KB_H ) + KB_GAP + modulesH() + rows[0] + DEVICE_GAP + rows[1];
+	PANEL_H = deviceH( "io", IO_H ) + KB_GAP + deviceH( "keys", KB_H ) + KB_GAP + modulesH() - KB_GAP;
 	if(show_rear)
 		PANEL_H += 50; // room for the rear cables hanging below the bottom row
 }
@@ -2468,12 +2245,26 @@ $("randomize").addEventListener("click", function(){
 });
 
 // inserts a new synth at the bottom of the rack
+// inserts a new device at the bottom of the rack: the menu is grouped by the devices' categories
+var DEVICE_CATEGORIES = ["Synths", "Modulation", "Mixing", "Effects"];
 function refreshAddSynth()
 {
 	var html = '<option value="">Add device\u2026</option>';
+	var cats = DEVICE_CATEGORIES.slice();
 	WR.order.forEach(function(type){
-		var def = WR.types[ type ];
-		html += '<option value="' + type + '" title="' + def.description + '">' + def.title + '</option>';
+		var c = WR.types[ type ].category || "Synths";
+		if(cats.indexOf( c ) == -1) cats.push( c );
+	});
+	cats.forEach(function(c){
+		var types = WR.order.filter(function(type){ return (WR.types[ type ].category || "Synths") == c; });
+		if(!types.length)
+			return;
+		html += '<optgroup label="' + c + '">';
+		types.forEach(function(type){
+			var def = WR.types[ type ];
+			html += '<option value="' + type + '" title="' + def.description + '">' + def.title + '</option>';
+		});
+		html += '</optgroup>';
 	});
 	$("add-synth").innerHTML = html;
 }
@@ -2482,11 +2273,21 @@ $("add-synth").addEventListener("change", function(e){
 	var type = e.target.value;
 	e.target.value = "";
 	e.target.blur();
-	if(!WR.types[ type ])
+	var def = WR.types[ type ];
+	if(!def)
 		return;
 	var m = rack.addModule( type );
-	setStatus( "Added " + WR.types[ type ].title + " (" + m.id + ") at the bottom of the rack" + (WR.types[ type ].midi_in ? ", MIDI cabled from the keys" : "") +
-		(WR.types[ type ].mixer ? ": the synths' audio now goes through it (Tab shows the cables)" : "") );
+	if(!m)
+	{
+		setStatus( "The rack can't hold more than " + def.max + " " + def.title + " devices" );
+		return;
+	}
+	var how = def.midi_in ? ", MIDI cabled from the keys" : "";
+	if(def.mixer)
+		how = ": the synths' audio now goes through it (Tab shows the cables)";
+	else if(def.rear_jacks && !def.audio_out)
+		how = ": patch its audio on the back (Tab)";
+	setStatus( "Added " + def.title + " (" + m.id + ") at the bottom of the rack" + how );
 });
 
 $("patch-save").addEventListener("click", function(){

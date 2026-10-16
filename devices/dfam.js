@@ -1,4 +1,4 @@
-// synths/dfam.js
+// devices/dfam.js
 // DFAM (Moog "Drummer From Another Mother") module for the rack: settings, patch bay and panel,
 // laid out like the hardware's front panel: two rows of synth controls, the 8-step sequencer
 // with a PITCH and a VELOCITY knob per step, and the 24 point patch bay. DSP in dfam-worklet.js.
@@ -269,8 +269,9 @@ function drawPatchBay()
 WR.registerSynth( "dfam", {
 	title: "DFAM",
 	description: "DFAM: semi-modular analog percussion synthesizer",
-	worklet: "synths/dfam-worklet.js",
+	worklet: "devices/dfam-worklet.js",
 	jacks: JACKS,
+	category: "Synths",
 	midi_in: null,
 	rear_jacks: [["AUDIO OUT", "aout", "audio"]], // line level, on the back
 	audio_out: "audio",

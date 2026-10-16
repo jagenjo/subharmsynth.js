@@ -1,4 +1,4 @@
-// synths/dfam-worklet.js
+// devices/dfam-worklet.js
 // DFAM (Moog "Drummer From Another Mother") DSP, hosted by the rack processor (rack-worklet.js).
 // Two VCOs (triangle / square) with a shared decay-only pitch envelope, 1->2 FM and hard sync,
 // white noise (or the EXT AUDIO input), a ladder filter with LP / HP modes and noise modulation,
@@ -11,7 +11,7 @@
 
 const C4 = 261.6255653005986;
 
-// must match the jack ids in synths/dfam.js
+// must match the jack ids in devices/dfam.js
 // (the last one, "audio", is the AUDIO OUT socket on the back: line level, not +-5V)
 const OUT_IDS = ["vca","vca_eg","vcf_eg","vco_eg","vco1","vco2","trigger_out","velocity_out","pitch_out","audio"];
 const IN_IDS = ["trigger_in","vca_cv","velocity_in","vca_decay_in","ext_audio","vcf_decay_in","noise_level_in","vco_decay_in",

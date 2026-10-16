@@ -1,4 +1,4 @@
-// synths/mixer-worklet.js
+// devices/mixer-worklet.js
 // 6 channel line mixer DSP, hosted by the rack processor (rack-worklet.js).
 // Per channel: mono input (rear), fader, LEVEL CV (front, a VCA: 5V = the fader's level),
 // balance pan, post-fader aux send, mute and solo. AUX RETURN L / R (R normalled to L) is mixed
