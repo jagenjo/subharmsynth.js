@@ -1533,7 +1533,7 @@ function drawIODevice( x, y, w, h )
 	ctx.fillText( "AUDIO I/O", mx - 40, y + h * 0.5 + 1 );
 	io.master = knob( "io_master", mx, y + 42, 18, io.master, 0, 1, {
 		label: "MASTER", labelSize: 10, def: 0.8,
-		format: function(v){ var g = v * v * 1.25; return g > 0 ? (20 * Math.log10( g )).toFixed(1) + " dB" : "-inf dB"; }
+		format: function(v){ var g = WRContext.masterGain( v ); return g > 0 ? (20 * Math.log10( g )).toFixed(1) + " dB" : "-inf dB"; }
 	});
 	var meter = rack.updateMeter();
 	var bx = mx + 40, bw = x + w - 22 - 24 - bx;

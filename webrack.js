@@ -470,6 +470,9 @@ WRContext.prototype.saveIO = function()
 	try { localStorage.setItem( WRContext.IO_KEY, JSON.stringify( this.io ) ); } catch(err) {}
 }
 
+// MASTER knob 0..1 -> gain: 0.8 (the default) is unity, full is +3.9 dB
+WRContext.masterGain = function( v ) { return (v / 0.8) * (v / 0.8); }
+
 // gains from the knobs; called every frame, cheap when nothing changed
 WRContext.prototype.updateIO = function()
 {
@@ -480,7 +483,7 @@ WRContext.prototype.updateIO = function()
 		return;
 	this._io_sent = key;
 	var t = this.context.currentTime;
-	this.master.gain.setTargetAtTime( this.io.master * this.io.master * 1.25, t, 0.02 ); // 0.8 = unity
+	this.master.gain.setTargetAtTime( WRContext.masterGain( this.io.master ), t, 0.02 );
 	this.input_gain.gain.setTargetAtTime( 4 * this.io.input_gain * this.io.input_gain, t, 0.02 ); // 0.5 = unity
 	this.saveIO();
 }

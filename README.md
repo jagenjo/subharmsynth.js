@@ -99,7 +99,7 @@ The thin row at the top. Its settings are remembered by the browser, not saved i
   - Device names appear once access has been granted.
 - **GAIN** sets the input level: unity at the middle, up to +12 dB.
 - **IN L / IN R** jacks carry the input as ±5 V signals, so it can be patched anywhere. For example: DFAM EXT AUDIO to filter the microphone, the scope, the compressor's sidechain, or a pitch / cutoff input for audio-rate modulation.
-- **MASTER** is the volume of everything (after the reverb): 0 dB at the default position, up to +2 dB. The L / R meters show the peak level after it.
+- **MASTER** is the volume of everything (after the reverb): 0 dB at the default position, up to +3.9 dB. The L / R meters show the peak level after it.
 
 ## Keys device and MIDI
 
