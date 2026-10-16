@@ -46,7 +46,7 @@ try { show_wires = localStorage.getItem("SUBHARM_wires") != "hidden"; } catch(er
 // every row (the keys, each synth, the device rows) is drawn in its own coordinates: a frame
 // is its offset and scale in the rack. Jacks and tooltips are stored in rack coordinates
 var frame = { ox: 0, oy: 0, k: 1 };
-// widget and jack ids get the id of the module being drawn in front ("dfam2." + "cutoff")
+// widget and jack ids get the id of the module being drawn in front ("dram2." + "cutoff")
 var id_prefix = "";
 
 function beginFrame( ox, oy, k )

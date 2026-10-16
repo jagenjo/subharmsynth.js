@@ -1,5 +1,5 @@
-// devices/dfam-worklet.js
-// DFAM (Moog "Drummer From Another Mother") DSP, hosted by the rack processor (rack-worklet.js).
+// devices/dram-worklet.js
+// DRAM DSP (a replica of the Moog DFAM, "Drummer From Another Mother"), hosted by the rack processor (rack-worklet.js).
 // Two VCOs (triangle / square) with a shared decay-only pitch envelope, 1->2 FM and hard sync,
 // white noise (or the EXT AUDIO input), a ladder filter with LP / HP modes and noise modulation,
 // a VCA with FAST / SLOW attack, and the 8-step sequencer with a pitch and a velocity per step.
@@ -11,7 +11,7 @@
 
 const C4 = 261.6255653005986;
 
-// must match the jack ids in devices/dfam.js
+// must match the jack ids in devices/dram.js
 // (the last one, "audio", is the AUDIO OUT socket on the back: line level, not +-5V)
 const OUT_IDS = ["vca","vca_eg","vcf_eg","vco_eg","vco1","vco2","trigger_out","velocity_out","pitch_out","audio"];
 const IN_IDS = ["trigger_in","vca_cv","velocity_in","vca_decay_in","ext_audio","vcf_decay_in","noise_level_in","vco_decay_in",
@@ -63,7 +63,7 @@ function decayCoef(time, cv) {
 	return Math.exp(-DECAY_TC / (t * sampleRate));
 }
 
-class DfamDSP {
+class DramDSP {
 	constructor() {
 		this.s = null;
 		this.outs = new Float32Array(OUT_IDS.length);
@@ -277,11 +277,11 @@ class DfamDSP {
 		};
 	}
 }
-DfamDSP.OUT_IDS = OUT_IDS;
-DfamDSP.IN_IDS = IN_IDS;
-DfamDSP.MIDI_IN = null; // no MIDI on the hardware: play it from the keys device with CV cables
+DramDSP.OUT_IDS = OUT_IDS;
+DramDSP.IN_IDS = IN_IDS;
+DramDSP.MIDI_IN = null; // no MIDI on the hardware: play it from the keys device with CV cables
 
 globalThis.WR_DSP = globalThis.WR_DSP || {};
-globalThis.WR_DSP.dfam = DfamDSP;
+globalThis.WR_DSP.dram = DramDSP;
 
 })();

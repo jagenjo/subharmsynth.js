@@ -1,6 +1,6 @@
 # subharmsynth.js
 
-A browser rack of semi-modular synthesizers built on the WebAudio API: replicas of the Moog Subharmonicon (polyrhythmic synthesizer), DFAM (percussion synthesizer) and Mother-32 (synthesizer with a 32 step sequencer) and Labyrinth (parallel generative synthesizer), with a mixer, LFOs, compressors, reverbs and delays, all patchable with each other.
+A browser rack of semi-modular synthesizers built on the WebAudio API: replicas of the Moog Subharmonicon (polyrhythmic synthesizer), DFAM (percussion synthesizer, here called DRAM), Mother-32 (synthesizer with a 32 step sequencer, here called Brother-32) and Labyrinth (parallel generative synthesizer), with a mixer, LFOs, compressors, reverbs and delays, all patchable with each other.
 
 All synthesis runs in real time in one `AudioWorkletProcessor` (`rack-worklet.js`), which hosts each synth's DSP and copies the patch cables between them every sample. Oscillators, filters, envelopes, clocks, sequencers and the cables are all computed per sample, so patching between synths is sample-accurate. The reverb and delay are native WebAudio nodes after it.
 
@@ -15,8 +15,8 @@ Needs a browser with AudioWorklet support, served over `https://` or `localhost`
 | `rack-worklet.js` | the audio processor: hosts the synths' DSP, routes the cables, runs the keys outputs, LFOs, compressor and scope |
 | `code.js` | the rack UI: canvas widgets (knobs, buttons, switches, jacks), cables, shared devices, scrolling and zoom, toolbar, keyboard shortcuts |
 | `devices/subharm.js`, `devices/subharm-worklet.js` | the Subharmonicon: panel, jacks and settings; DSP |
-| `devices/dfam.js`, `devices/dfam-worklet.js` | the DFAM |
-| `devices/m32.js`, `devices/m32-worklet.js` | the Mother-32 |
+| `devices/dram.js`, `devices/dram-worklet.js` | the DRAM |
+| `devices/b32.js`, `devices/b32-worklet.js` | the Brother-32 |
 | `devices/labyrinth.js`, `devices/labyrinth-worklet.js` | the Labyrinth |
 | `devices/mixer.js`, `devices/mixer-worklet.js` | the 6 channel mixer |
 | `devices/lfo.js`, `devices/lfo-worklet.js` | the dual LFO |
@@ -40,8 +40,8 @@ A new rack has a Subharm, an LFO and a compressor, then a reverb and a delay, ca
 
 One patch bay spans all of them: any output can be cabled to any input of any device. The front carries CV, gates and audio at ±5 V; the back carries the line-level audio between devices (see *Rear view*).
 
-- **Add device** (toolbar) inserts a new device at the bottom of the rack. The menu is grouped into synths (Subharm, DFAM, Mother-32, Labyrinth), modulation (dual LFO), mixing (mixer, compressor) and effects (reverb, delay).
-  - You can have several of the same kind (`dfam`, `dfam2`, …). Reverbs are limited to 8, one per send / return slot of the audio engine.
+- **Add device** (toolbar) inserts a new device at the bottom of the rack. The menu is grouped into synths (Subharm, DRAM, Brother-32, Labyrinth), modulation (dual LFO), mixing (mixer, compressor) and effects (reverb, delay).
+  - You can have several of the same kind (`dram`, `dram2`, …). Reverbs are limited to 8, one per send / return slot of the audio engine.
   - A new LFO, compressor, reverb or delay arrives unpatched: patch its audio on the back (Tab).
   - A synth with a MIDI IN gets the keys' MIDI cable.
   - A new synth's audio goes to the first free mixer channel; with no mixer, to wherever the other synths go (or the compressor).
@@ -116,9 +116,9 @@ A replica of the Moog Labyrinth, following its manual.
 - **MIDI** (cabled from the keys when it's added): notes transpose the VCO and fire the envelopes; MIDI clock and start / stop drive the sequencers.
 - **Factory patches:** *Alien Bells* and *Folded Bongos*.
 
-## Mother-32
+## Brother-32
 
-A replica of the Moog Mother-32.
+A replica of the Moog Mother-32, named Brother-32 here. Patches that still use the old `mother32` name load as Brother-32.
 
 - **VCO:**
   - FREQUENCY (C1–C7; the sequence and the keys add to it, C4 = 0 V) and PULSE WIDTH.
@@ -138,12 +138,12 @@ A replica of the Moog Mother-32.
 - **32-point patch bay** (4 × 8):
   - 18 inputs: EXT AUDIO, MIX CV, VCA CV, VCF CUTOFF, VCF RES, VCO 1V/OCT, VCO LIN FM, VCO MOD, LFO RATE, MIX 1, MIX 2, VC MIX CTRL, MULT, GATE, TEMPO (a clock that replaces the internal one), RUN/STOP, RESET, HOLD.
   - 14 outputs: VCA, NOISE, VCF, VCO SAW, VCO PULSE, LFO TRI, LFO SQ, VC MIX, MULT 1, MULT 2, ASSIGN, EG, KB, GATE.
-- **MIDI IN** (cabled from the keys when the Mother-32 is added): notes, pitch bend, and clock (24 ppqn to 16ths) with start / stop.
-- **Factory patches:** *Acid Line*, *PWM Drift* and, in RACK, *Mother & Drummer* (the Mother-32's ASSIGN clock drives the DFAM).
+- **MIDI IN** (cabled from the keys when the Brother-32 is added): notes, pitch bend, and clock (24 ppqn to 16ths) with start / stop.
+- **Factory patches:** *Acid Line*, *PWM Drift* and, in RACK, *Brother & Drummer* (the Brother-32's ASSIGN clock drives the DRAM).
 
-## DFAM
+## DRAM
 
-A replica of the Moog DFAM ("Drummer From Another Mother"):
+A replica of the Moog DFAM ("Drummer From Another Mother"), named DRAM here. Patches that still use the old `dfam` name load as DRAM.
 
 - **Two VCOs**, 10 Hz to 10 kHz, each with a triangle / square switch.
   - A shared decay-only **VCO EG**, set by VCO DECAY. It goes to each VCO through a bipolar EG AMOUNT (±5 octaves).
@@ -161,7 +161,7 @@ A replica of the Moog DFAM ("Drummer From Another Mother"):
 - **24-point patch bay**, 15 inputs and 9 outputs.
   - Inputs: TRIGGER, VCA CV, VELOCITY, VCA DECAY, EXT AUDIO, VCF DECAY, NOISE LEVEL, VCO DECAY, VCF MOD, VCO 1 CV, 1→2 FM AMT, VCO 2 CV, TEMPO, RUN / STOP, ADV / CLOCK.
   - Outputs: VCA, VCA EG, VCF EG, VCO EG, VCO 1, VCO 2, TRIGGER, VELOCITY, PITCH.
-  - A cable in ADV / CLOCK replaces the internal clock: each pulse advances a step. To sync the DFAM to the Subharm, patch the Subharm's CLOCK output there.
+  - A cable in ADV / CLOCK replaces the internal clock: each pulse advances a step. To sync the DRAM to the Subharm, patch the Subharm's CLOCK output there.
   - A cable in VCA CV replaces the envelope on the VCA.
   - The decay inputs stretch their decay time by one octave of time per volt.
 - Like the hardware, it has no MIDI. Play it from the keys device with cables, e.g. KEY 1 → VCO 1 CV and TRIG → TRIGGER.
@@ -188,7 +188,7 @@ The thin row at the top. Its settings are remembered by the browser, not saved i
   - Echo cancellation, noise suppression and auto gain are turned off.
   - Device names appear once access has been granted.
 - **GAIN** sets the input level: unity at the middle, up to +12 dB.
-- **IN L / IN R** jacks carry the input as ±5 V signals, so it can be patched anywhere. For example: DFAM EXT AUDIO to filter the microphone, the scope, the compressor's sidechain, or a pitch / cutoff input for audio-rate modulation.
+- **IN L / IN R** jacks carry the input as ±5 V signals, so it can be patched anywhere. For example: DRAM EXT AUDIO to filter the microphone, the scope, the compressor's sidechain, or a pitch / cutoff input for audio-rate modulation.
 - **MASTER** is the volume of everything (after the reverb): 0 dB at the default position, up to +3.9 dB. The L / R meters show the peak level after it.
 
 ## Keys device and MIDI
@@ -211,7 +211,7 @@ As on the hardware, MIDI reaches the synth only through its MIDI IN jack, so the
 
 - **Scala scales.** Type a scale name in the toolbar to add a fifth quantize mode, SCALA. It uses the selected `.scl` file, rooted at C.
 - **Patches**: a patch is the whole rack, meaning its synths, all their settings, the shared devices and the cables.
-  - The toolbar menu has 21 factory patches (in `data/patches.json`), grouped as SUBHARM, DFAM, MOTHER-32, LABYRINTH and RACK (several devices patched together), plus your own.
+  - The toolbar menu has 21 factory patches (in `data/patches.json`), grouped as SUBHARM, DRAM, BROTHER-32, LABYRINTH and RACK (several devices patched together), plus your own.
   - *Save as…* stores the rack under a name in the browser.
   - *Export* / *Import* write and read `.json` files, so patches can be shared or added to the repo.
   - Patches saved before the rack existed load as a rack with one Subharm.
@@ -238,8 +238,8 @@ As on the hardware, MIDI reaches the synth only through its MIDI IN jack, so the
 Some details are educated guesses, not measurements of the hardware:
 
 - Labyrinth: how much CORRUPT changes per pass, the ranges of the amounts, the wavefolder and filter curves, the scales after the ones the manual lists, how notes are handled over MIDI, and the panel layout (an arrangement of the manual's controls, not a copy of the panel)
-- Mother-32: the placement of the patch bay jacks within the 4 × 8 grid, the ranges of the knobs, the ASSIGN choices, and the step editing (a step grid instead of the button modes)
-- DFAM: the order of the patch bay jacks within their rows, the envelope curves and ranges, the FM depth and the HP filter (a 4-pole high pass from the same ladder)
+- Brother-32: the placement of the patch bay jacks within the 4 × 8 grid, the ranges of the knobs, the ASSIGN choices, and the step editing (a step grid instead of the button modes)
+- DRAM: the order of the patch bay jacks within their rows, the envelope curves and ranges, the FM depth and the HP filter (a 4-pole high pass from the same ladder)
 - how strongly the SUB and RHYTHM CV inputs (and sequencers assigned to a sub) shift the division: 3 steps per volt
 - the envelope curves
 - the exact 12-JI ratio table

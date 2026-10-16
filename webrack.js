@@ -13,7 +13,7 @@ var WR = {
 	order: []
 };
 
-WR.VERSION = "20261016l"; // bump together with the ?v= in index.html so browsers reload the scripts
+WR.VERSION = "20261016m"; // bump together with the ?v= in index.html so browsers reload the scripts
 
 // def: {
 //   title, description,           names for menus and the panel
@@ -672,6 +672,51 @@ WR.migrateV4 = function( data )
 		add_audio: !(data.version >= 4) }; // from before the rear sockets: cable the old fixed audio path
 }
 
+// devices that were renamed: older saves have the old type, module ids ("dfam", "dfam2") and jacks
+WR.RENAMED_TYPES = { dfam: "dram", mother32: "brother32" };
+
+WR.migrateRenamed = function( data )
+{
+	var mods = Array.isArray(data.modules) ? data.modules : [];
+	if(!mods.some(function(m){ return m && WR.RENAMED_TYPES[ m.type ]; }))
+		return data;
+	var taken = {}, rename = {};
+	mods.forEach(function(m){ if(m && typeof m.id == "string") taken[ m.id ] = true; });
+	var modules = mods.map(function(m){
+		var type = m && WR.RENAMED_TYPES[ m.type ];
+		if(!type)
+			return m;
+		var id = m.id;
+		if(typeof id == "string" && id.indexOf( m.type ) == 0)
+		{
+			var nid = type + id.substr( m.type.length );
+			if(!taken[ nid ])
+			{
+				rename[id] = nid;
+				id = nid;
+			}
+		}
+		var r = {};
+		for(var k in m) r[k] = m[k];
+		r.type = type;
+		r.id = id;
+		return r;
+	});
+	var patches = (Array.isArray(data.patches) ? data.patches : []).map(function(p){
+		if(!Array.isArray(p))
+			return p;
+		return p.map(function(id, k){
+			var dot = k < 2 && typeof id == "string" ? id.indexOf(".") : -1;
+			return dot > 0 && rename[ id.substr( 0, dot ) ] ? rename[ id.substr( 0, dot ) ] + id.substr( dot ) : id;
+		});
+	});
+	var r = {};
+	for(var k in data) r[k] = data[k];
+	r.modules = modules;
+	r.patches = patches;
+	return r;
+}
+
 WRContext.prototype.setSettings = function( data )
 {
 	data = data || {};
@@ -679,6 +724,7 @@ WRContext.prototype.setSettings = function( data )
 		data = WR.migrateV2( data );
 	if(!(data.version >= 5))
 		data = WR.migrateV4( data );
+	data = WR.migrateRenamed( data );
 	var add_audio = !!data.add_audio;
 	var s = WR.mergeValid( WRContext.rackDefaults(), data );
 	s.version = 5;

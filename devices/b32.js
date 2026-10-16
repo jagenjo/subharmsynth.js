@@ -1,10 +1,10 @@
-// devices/m32.js
-// Mother-32 (Moog) module: settings, the 32 point patch bay and the panel, laid out like the
+// devices/b32.js
+// Brother-32 module, a replica of the Moog Mother-32: settings, the 32 point patch bay and the panel, laid out like the
 // hardware's front: oscillator and filter controls on the left, LFO, VCA, envelope and tempo on the
 // right, the 32 step sequencer with its 13 key keyboard below, the patch bay on the right side.
 // The real unit edits steps through button modes; here every step is a cell of the step grid
 // (click to select, click again for a rest) and the keyboard writes notes in REC.
-// DSP in m32-worklet.js.
+// DSP in b32-worklet.js.
 
 (function(){
 
@@ -146,8 +146,8 @@ function drawBackground()
 	ctx.textBaseline = "alphabetic";
 	ctx.font = "bold 30px " + FONT;
 	ctx.fillStyle = TEXT_COLOR;
-	ctx.fillText( "MOTHER-32", 46, 560 );
-	var tw = ctx.measureText( "MOTHER-32" ).width;
+	ctx.fillText( "BROTHER-32", 46, 560 );
+	var tw = ctx.measureText( "BROTHER-32" ).width;
 	ctx.fillRect( 54 + tw, 534, 1.5, 28 );
 	ctx.font = "11px " + FONT;
 	ctx.fillText( "SEMI-MODULAR ANALOG", 62 + tw, 546 );
@@ -368,11 +368,11 @@ function drawPatchBay()
 		}
 }
 
-WR.registerSynth( "mother32", {
-	title: "MOTHER-32",
-	description: "Mother-32: semi-modular synthesizer with a 32 step sequencer",
+WR.registerSynth( "brother32", {
+	title: "BROTHER-32",
+	description: "Brother-32: semi-modular synthesizer with a 32 step sequencer",
 	category: "Synths",
-	worklet: "devices/m32-worklet.js",
+	worklet: "devices/b32-worklet.js",
 	jacks: JACKS,
 	rear_jacks: [["AUDIO OUT", "aout", "audio"]],
 	audio_out: "audio",

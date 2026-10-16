@@ -1,5 +1,5 @@
-// devices/m32-worklet.js
-// Mother-32 (Moog) DSP, hosted by the rack processor (rack-worklet.js): a VCO (saw / pulse with
+// devices/b32-worklet.js
+// Brother-32 DSP (a replica of the Moog Mother-32), hosted by the rack processor (rack-worklet.js): a VCO (saw / pulse with
 // pulse width, linear FM, EG or LFO modulation of frequency or pulse width), a VCO / noise mixer,
 // a ladder filter (LP / HP), an AD envelope with a sustain switch, a VCA (EG or always on), an LFO
 // (triangle / square), glide, the VC mix crossfader, a mult, and the 32 step sequencer with a note,
@@ -12,7 +12,7 @@
 
 const C4 = 261.6255653005986;
 
-// must match the jack ids in devices/m32.js ("audio" is the AUDIO OUT socket on the back, line level)
+// must match the jack ids in devices/b32.js ("audio" is the AUDIO OUT socket on the back, line level)
 const IN_IDS = ["ext_audio","mix_cv","vca_cv","cutoff_in","res_in","pitch_in","lin_fm","vco_mod","lfo_rate_in",
 	"mix1","mix2","vc_mix_ctrl","mult_in","gate_in","tempo_in","run_stop","reset_in","hold"];
 const OUT_IDS = ["vca","noise","vcf","saw","pulse","lfo_tri","lfo_sq","vc_mix","mult1","mult2","assign","eg","kb","gate","audio"];
@@ -45,7 +45,7 @@ function fastTanh(x) {
 
 function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
 
-class M32DSP {
+class B32DSP {
 	constructor() {
 		this.s = null;
 		this.outs = new Float32Array(OUT_IDS.length);
@@ -324,11 +324,11 @@ class M32DSP {
 }
 function s_lfo(p) { return 1 - 4 * Math.abs(p - 0.5); }
 
-M32DSP.OUT_IDS = OUT_IDS;
-M32DSP.IN_IDS = IN_IDS;
-M32DSP.MIDI_IN = "midi_in";
+B32DSP.OUT_IDS = OUT_IDS;
+B32DSP.IN_IDS = IN_IDS;
+B32DSP.MIDI_IN = "midi_in";
 
 globalThis.WR_DSP = globalThis.WR_DSP || {};
-globalThis.WR_DSP.mother32 = M32DSP;
+globalThis.WR_DSP.brother32 = B32DSP;
 
 })();

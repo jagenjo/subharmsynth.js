@@ -1,7 +1,7 @@
-// devices/dfam.js
-// DFAM (Moog "Drummer From Another Mother") module for the rack: settings, patch bay and panel,
+// devices/dram.js
+// DRAM module for the rack, a replica of the Moog DFAM ("Drummer From Another Mother"): settings, patch bay and panel,
 // laid out like the hardware's front panel: two rows of synth controls, the 8-step sequencer
-// with a PITCH and a VELOCITY knob per step, and the 24 point patch bay. DSP in dfam-worklet.js.
+// with a PITCH and a VELOCITY knob per step, and the 24 point patch bay. DSP in dram-worklet.js.
 
 (function(){
 
@@ -140,8 +140,8 @@ function drawBackground()
 	ctx.textBaseline = "alphabetic";
 	ctx.font = "bold 30px " + FONT;
 	ctx.fillStyle = TEXT_COLOR;
-	ctx.fillText( "DFAM", 46, 560 );
-	var tw = ctx.measureText( "DFAM" ).width;
+	ctx.fillText( "DRAM", 46, 560 );
+	var tw = ctx.measureText( "DRAM" ).width;
 	ctx.fillRect( 54 + tw, 534, 1.5, 28 );
 	ctx.font = "11px " + FONT;
 	ctx.fillText( "SEMI-MODULAR ANALOG", 62 + tw, 546 );
@@ -266,10 +266,10 @@ function drawPatchBay()
 		}
 }
 
-WR.registerSynth( "dfam", {
-	title: "DFAM",
-	description: "DFAM: semi-modular analog percussion synthesizer",
-	worklet: "devices/dfam-worklet.js",
+WR.registerSynth( "dram", {
+	title: "DRAM",
+	description: "DRAM: semi-modular analog percussion synthesizer",
+	worklet: "devices/dram-worklet.js",
 	jacks: JACKS,
 	category: "Synths",
 	midi_in: null,
