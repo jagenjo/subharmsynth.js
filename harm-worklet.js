@@ -110,6 +110,7 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
 		this.vcos = [0, 1].map(() => ({
 			phase: Math.random(), cnt1: 0, cnt2: 0,
 			knob: null, drift: 0, pitch: 0, freq: 0,
+			prePitch: 0, scale: null, lastCv: NaN, lastQ: 0, // unquantized pitch, for the patched pitch input
 			div1: 1, div2: 1, curDiv1: 1, curDiv2: 1
 		}));
 		this.lp = new Float64Array(4);
@@ -261,6 +262,9 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
 			const seqCv = s.seq[i][this.step[i]] * s.seq_oct;
 			const a = s.seq_assign[i];
 			let p = v.knob + (a.osc ? seqCv : 0) + this.midiPitch;
+			v.prePitch = p;
+			v.scale = scale;
+			v.lastCv = NaN;
 			if (scale) p = quantize(p, scale);
 			v.pitch = p + this.bend;
 
@@ -428,7 +432,19 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
 			for (let i = 0; i < 2; i++) {
 				const v = this.vcos[i];
 				let pitch = v.pitch + v.drift;
-				if (patched[I_VCO_PITCH[i]]) pitch += ins[I_VCO_PITCH[i]];
+				if (patched[I_VCO_PITCH[i]]) {
+					// the patched pitch CV goes through the quantizer too (only re-quantized when it changes)
+					const cv = ins[I_VCO_PITCH[i]];
+					if (!v.scale)
+						pitch += cv;
+					else {
+						if (cv !== v.lastCv) {
+							v.lastCv = cv;
+							v.lastQ = quantize(v.prePitch + cv, v.scale);
+						}
+						pitch = v.lastQ + this.bend + v.drift;
+					}
+				}
 				const f = C4 * Math.exp(pitch * Math.LN2);
 				const dt = clamp(f / sr, 0, 0.45);
 				v.freq = f;
