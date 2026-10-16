@@ -1608,10 +1608,24 @@ function drawReverbDevice( x, y, w, h )
 	fx.reverb_tone = knob( "fx_reverb_tone", x + 310, y + 70, 24, fx.reverb_tone, 500, 16000, {
 		label: "TONE", exp: true, def: 12000, format: fmtHz
 	});
-	drawLabel( "ROOM", x + 430, y + 48, 11 );
-	if(button( "fx_reverb_room", x + 392, y + 58, 76, 22, Harm.REVERB_ROOMS[ fx.reverb_room ][0] ).clicked)
-		fx.reverb_room = (fx.reverb_room + 1) % Harm.REVERB_ROOMS.length;
-	if(button( "fx_reverb_on", x + 392, y + 92, 76, 22, "ON", fx.reverb_on ).clicked)
+	// ROOM: name display with previous / next buttons
+	var rooms = Harm.REVERB_ROOMS, ri = Harm.reverbRoomIndex( fx.reverb_room );
+	drawLabel( "ROOM", x + 476, y + 30, 11 );
+	var lx = x + 392, lw = 168, ly = y + 42;
+	ctx.fillStyle = "#050505";
+	ctx.beginPath(); ctx.roundRect( lx - 3, ly - 3, lw + 6, 30, 5 ); ctx.fill();
+	ctx.fillStyle = "#16240f";
+	ctx.beginPath(); ctx.roundRect( lx, ly, lw, 24, 3 ); ctx.fill();
+	ctx.font = "bold 13px 'Courier New', monospace";
+	ctx.textAlign = "center";
+	ctx.textBaseline = "middle";
+	ctx.fillStyle = "#b6f06a";
+	ctx.fillText( (ri + 1) + "/" + rooms.length + " " + fx.reverb_room + (synth.reverbLoading() ? " \u2026" : ""), lx + lw * 0.5, ly + 13 );
+	if(button( "fx_reverb_prev", lx, y + 84, 36, 22, "\u25c0" ).clicked)
+		fx.reverb_room = rooms[ (ri - 1 + rooms.length) % rooms.length ][0];
+	if(button( "fx_reverb_next", lx + 42, y + 84, 36, 22, "\u25b6" ).clicked)
+		fx.reverb_room = rooms[ (ri + 1) % rooms.length ][0];
+	if(button( "fx_reverb_on", lx + 92, y + 84, 76, 22, "ON", fx.reverb_on ).clicked)
 		fx.reverb_on = !fx.reverb_on;
 }
 

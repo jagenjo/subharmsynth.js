@@ -22,7 +22,7 @@ function Harm()
 }
 
 Harm.STORAGE_KEY = "SUBHARM_state_v2";
-Harm.VERSION = "20261016e"; // bump together with the ?v= in index.html so browsers reload the scripts
+Harm.VERSION = "20261016f"; // bump together with the ?v= in index.html so browsers reload the scripts
 
 Harm.defaultSettings = function()
 {
@@ -58,7 +58,7 @@ Harm.defaultSettings = function()
 		eg_hold: false,     // EG button: envelopes locked at maximum (drone)
 		reverb: 0.15,       // reverb MIX
 		// post FX devices: delay (off by default) and reverb settings
-		fx: { reverb_on: true, reverb_room: 1, reverb_predelay: 0.02, reverb_tone: 12000,
+		fx: { reverb_on: true, reverb_room: "HALL B", reverb_predelay: 0.02, reverb_tone: 12000,
 			delay_on: false, delay_sync: true, delay_div: 3, delay_time: 0.3, delay_feedback: 0.4, delay_tone: 5000, delay_mix: 0.3, delay_pingpong: true },
 		scale_file: null,
 		// extra devices below the panel
@@ -164,7 +164,44 @@ Harm.prototype.sync = function()
 //   synth -> delay (two lines, normal or ping-pong, lowpass in the feedback) -> bus
 //   bus -> pre-delay -> convolver -> tone -> reverb mix -> speakers
 
-Harm.REVERB_ROOMS = [["HALL A", "data/BIG HALL E002 M2S.wav"], ["HALL B", "data/BIG HALL E003 M2S.wav"]];
+// reverb rooms, short to long: [name, impulse file]; a null file is generated in code.
+// data/impulses/ are Voxengo "IM Reverbs" (see data/impulses/license.txt)
+Harm.REVERB_ROOMS = [
+	["DRUM ROOM S", "data/impulses/Small Drum Room.wav"],
+	["DRUM ROOM", "data/impulses/Nice Drum Room.wav"],
+	["CAVE", "data/impulses/Small Prehistoric Cave.wav"],
+	["SALON", "data/impulses/French 18th Century Salon.wav"],
+	["PLATE", null],
+	["OPERA HALL", "data/impulses/Scala Milan Opera Hall.wav"],
+	["SILO", "data/impulses/In The Silo.wav"],
+	["HALL A", "data/BIG HALL E002 M2S.wav"],
+	["HALL B", "data/BIG HALL E003 M2S.wav"],
+	["GARAGE", "data/impulses/Parking Garage.wav"],
+	["ECHO HALL", "data/impulses/Large Long Echo Hall.wav"],
+	["CHURCH", "data/impulses/St Nicolaes Church.wav"]
+];
+Harm.reverbRoomIndex = function( name ) { return Harm.REVERB_ROOMS.findIndex(function(r){ return r[0] == name; }); }
+
+// synthetic plate: dense decorrelated noise per channel, -60dB after `seconds`,
+// getting darker as it decays (one-pole lowpass closing over time)
+Harm.makePlate = function( ctx, seconds )
+{
+	var sr = ctx.sampleRate, n = Math.round( sr * seconds );
+	var buffer = ctx.createBuffer( 2, n, sr );
+	for(var c = 0; c < 2; ++c)
+	{
+		var data = buffer.getChannelData( c ), y = 0;
+		for(var i = 0; i < n; ++i)
+		{
+			var t = i / n;
+			var a = 0.85 - 0.75 * t;  // lowpass coefficient, bright to dark
+			y += a * ((Math.random() * 2 - 1) - y);
+			var env = Math.exp( -6.9 * t ) * Math.min( 1, i / (sr * 0.002) );
+			data[i] = y * env;
+		}
+	}
+	return buffer;
+}
 Harm.DELAY_DIVS = [["1/16", 0.25], ["1/8T", 1/3], ["1/8", 0.5], ["1/8D", 0.75], ["1/4T", 2/3], ["1/4", 1], ["1/4D", 1.5], ["1/2", 2], ["1/1", 4]];
 
 Harm.prototype.buildPostFx = function( ctx, node )
@@ -202,7 +239,7 @@ Harm.prototype.buildPostFx = function( ctx, node )
 	// reverb send
 	var r = this.reverb = {
 		predelay: ctx.createDelay( 1 ), convolver: ctx.createConvolver(),
-		tone: ctx.createBiquadFilter(), wet: ctx.createGain(), buffers: [], room: -1
+		tone: ctx.createBiquadFilter(), wet: ctx.createGain(), buffers: {}, loading: {}, room: null
 	};
 	r.tone.type = "lowpass";
 	r.wet.gain.value = 0;
@@ -211,13 +248,34 @@ Harm.prototype.buildPostFx = function( ctx, node )
 	r.convolver.connect( r.tone );
 	r.tone.connect( r.wet );
 	r.wet.connect( ctx.destination );
-	Harm.REVERB_ROOMS.forEach(function(room, i){
-		fetch( room[1] )
-			.then(function(res){ return res.arrayBuffer(); })
-			.then(function(b){ return ctx.decodeAudioData(b); })
-			.then(function(buffer){ r.buffers[i] = buffer; r.room = -1; that.updatePostFx(); })
-			.catch(function(err){ console.warn("reverb impulse not loaded", room[1], err); });
-	});
+}
+
+// impulses are loaded the first time their room is selected
+Harm.prototype.loadReverbRoom = function( name )
+{
+	var r = this.reverb, that = this;
+	var room = Harm.REVERB_ROOMS[ Harm.reverbRoomIndex( name ) ];
+	if(!room || r.buffers[name] || r.loading[name])
+		return;
+	if(!room[1])
+	{
+		r.buffers[name] = Harm.makePlate( this.context, 2.6 );
+		return;
+	}
+	r.loading[name] = true;
+	var ctx = this.context;
+	fetch( room[1] )
+		.then(function(res){ if(!res.ok) throw new Error("HTTP " + res.status); return res.arrayBuffer(); })
+		.then(function(b){ return ctx.decodeAudioData(b); })
+		.then(function(buffer){ r.buffers[name] = buffer; that.updatePostFx(); })
+		.catch(function(err){ console.warn("reverb impulse not loaded", room[1], err); })
+		.finally(function(){ delete r.loading[name]; });
+}
+
+// true while the selected room's impulse is still downloading
+Harm.prototype.reverbLoading = function()
+{
+	return !!(this.reverb && this.reverb.loading[ this.settings.fx.reverb_room ]);
 }
 
 Harm.prototype.delayTime = function()
@@ -252,6 +310,7 @@ Harm.prototype.updatePostFx = function()
 	set( d.wet.gain, on * fx.delay_mix );
 
 	var r = this.reverb;
+	this.loadReverbRoom( fx.reverb_room );
 	if(r.room != fx.reverb_room && r.buffers[ fx.reverb_room ])
 	{
 		r.convolver.buffer = r.buffers[ fx.reverb_room ];
@@ -340,7 +399,10 @@ Harm.prototype.setSettings = function( data )
 		s.seq_oct = 1;
 	s.scale_file = typeof data.scale_file == "string" ? data.scale_file : null;
 	var jack_ids = Harm.jackTypes();
-	s.fx.reverb_room = Math.min( Harm.REVERB_ROOMS.length - 1, Math.max( 0, Math.round( s.fx.reverb_room ) ) );
+	if(data.fx && typeof data.fx.reverb_room == "number") // saves from when there were two rooms
+		s.fx.reverb_room = data.fx.reverb_room == 0 ? "HALL A" : "HALL B";
+	if(Harm.reverbRoomIndex( s.fx.reverb_room ) == -1)
+		s.fx.reverb_room = "HALL B";
 	s.fx.delay_div = Math.min( Harm.DELAY_DIVS.length - 1, Math.max( 0, Math.round( s.fx.delay_div ) ) );
 	s.fx.delay_feedback = Math.min( 0.95, Math.max( 0, s.fx.delay_feedback ) );
 	if(Harm.SCOPE_TIMES.indexOf( s.scope.time ) == -1)

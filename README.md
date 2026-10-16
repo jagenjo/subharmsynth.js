@@ -16,6 +16,7 @@ Needs a browser with AudioWorklet support, served over `https://` or `localhost`
 | `harm-worklet.js` | the DSP engine |
 | `data/patches.json` | factory patches |
 | `old/` | the original version of this replica, as in the first commit |
+| `data/impulses/` | reverb impulse responses from Voxengo's free "IM Reverbs" pack, redistributed unaltered under its `license.txt` (© Aleksey Vaneev) |
 | `data/scales/` | Scala `.scl` scales, plus `index.json` used by the scale picker |
 
 ## What it emulates
@@ -52,7 +53,7 @@ As on the hardware, MIDI reaches the synth only through its MIDI IN jack, so the
 - **Scala scales.** Type a scale name in the toolbar to add a fifth quantize mode, SCALA. It uses the selected `.scl` file, rooted at C.
 - **Patches**: a toolbar menu with 8 factory patches (in `data/patches.json`) and your own. *Save as…* stores the whole panel and its cables under a name in the browser. *Export* / *Import* write and read `.json` patch files, so patches can be shared or added to the repo. A patch only needs the fields that differ from Init; anything missing or invalid falls back to the Init value.
 - **Post FX row** at the bottom, on the master output after the compressor:
-  - **Reverb** (send): MIX, PRE-DELAY, TONE (lowpass on the tail), ROOM (two hall impulses) and ON.
+  - **Reverb** (send): MIX, PRE-DELAY, TONE (lowpass on the tail), ON and ROOM with 12 spaces from short to long: drum rooms, cave, salon, a plate generated in code, opera hall, silo, two big halls, parking garage, echo hall and a church. Impulses load the first time their room is selected.
   - **Delay**: TIME (free 10 ms – 2 s, or tempo divisions 1/16 – 1/1 with SYNC), FEEDBACK, TONE (lowpass in the feedback), MIX, PING-PONG and ON. Off by default.
 - **Collapsible devices**: the chevron on the top left corner of the KEYS, LFO, compressor, reverb and delay devices folds the whole row (both devices sharing it) into slim bars; their jacks stay on the bar as small sockets, so cables stay connected.
 - **Device row** below the synth, in the same style, patchable from and to the main patch bay:
