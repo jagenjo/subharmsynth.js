@@ -8,7 +8,7 @@
 
 (function(){
 
-var SIZE = [1568, 596]; // 60HP, like the others
+var SIZE = [1568, 500]; // 60HP, more compact than the Subharm and DRAM panels
 var STEPS = 32;
 var VCO_MIN = 32.70, VCO_MAX = 2093; // C1..C7
 var ASSIGNS = [["accent", "ACCENT"], ["clock", "CLOCK"], ["ramp", "SEQ RAMP"]];
@@ -133,7 +133,7 @@ function fmtFreq( v ) { return freqToNoteName( v ) + "  " + fmtHz( v ); }
 // panel
 
 var JACK_COLS = [1292, 1357, 1422, 1487];
-var GRID_X = 300, GRID_Y = 334, CELL_W = 56, CELL_H = 34, CELL_GAP = 2;
+var GRID_X = 300, GRID_Y = 280, CELL_W = 56, CELL_H = 30, CELL_GAP = 2;
 
 function drawBackground()
 {
@@ -146,23 +146,23 @@ function drawBackground()
 	ctx.textBaseline = "alphabetic";
 	ctx.font = "bold 30px " + FONT;
 	ctx.fillStyle = TEXT_COLOR;
-	ctx.fillText( "BROTHER-32", 46, 560 );
+	ctx.fillText( "BROTHER-32", 46, h - 30 );
 	var tw = ctx.measureText( "BROTHER-32" ).width;
-	ctx.fillRect( 54 + tw, 534, 1.5, 28 );
+	ctx.fillRect( 54 + tw, h - 56, 1.5, 28 );
 	ctx.font = "11px " + FONT;
-	ctx.fillText( "SEMI-MODULAR ANALOG", 62 + tw, 546 );
-	ctx.fillText( "SYNTHESIZER + SEQUENCER", 62 + tw, 559 );
+	ctx.fillText( "SEMI-MODULAR ANALOG", 62 + tw, h - 44 );
+	ctx.fillText( "SYNTHESIZER + SEQUENCER", 62 + tw, h - 31 );
 }
 
 function drawSynthControls()
 {
 	var s = M.settings, st = M.state;
-	var A = 95, B = 240;
+	var A = 90, B = 212;
 	var time = { style: "ring", exp: true, format: fmtTime };
 	var with_ = function(o, extra) { var r = {}; for(var k in o) r[k] = o[k]; for(var k in extra) r[k] = extra[k]; return r; };
 
 	drawSection( "VCO / MIXER", 40, 700, 22 );
-	s.freq = knob( "freq", 95, A, 34, s.freq, VCO_MIN, VCO_MAX, { label: "FREQUENCY", style: "ring", exp: true, def: 261.63,
+	s.freq = knob( "freq", 95, A, 30, s.freq, VCO_MIN, VCO_MAX, { label: "FREQUENCY", style: "ring", exp: true, def: 261.63,
 		format: function(){ return fmtFreq( st.freq || s.freq ); } } );
 	s.pw = knob( "pw", 215, A, 24, s.pw, 0.03, 0.97, { label: "PULSE WIDTH", def: 0.5, format: fmtPct } );
 	s.vco_mod = knob( "vco_mod", 315, A, 24, s.vco_mod, 0, 1, { label: "VCO MOD AMOUNT", def: 0, format: fmtPct } );
@@ -172,8 +172,8 @@ function drawSynthControls()
 	s.mix = knob( "mix", 650, A, 24, s.mix, 0, 1, { label: "VCO / NOISE", def: 0,
 		format: function(v){ return v < 0.01 ? "VCO" : (v > 0.99 ? "NOISE" : Math.round( (1 - v) * 100 ) + "% VCO / " + Math.round( v * 100 ) + "% NOISE"); } } );
 
-	drawSection( "VCF", 40, 700, 168 );
-	s.cutoff = knob( "cutoff", 95, B, 34, s.cutoff, 20, 20000, { label: "CUTOFF", exp: true, def: 600, format: fmtHz } );
+	drawSection( "VCF", 40, 700, 148 );
+	s.cutoff = knob( "cutoff", 95, B, 28, s.cutoff, 20, 20000, { label: "CUTOFF", exp: true, def: 600, format: fmtHz } );
 	s.resonance = knob( "resonance", 215, B, 24, s.resonance, 0, 1, { label: "RESONANCE", def: 0, format: fmtPct } );
 	s.vcf_mod = knob( "vcf_mod", 315, B, 24, s.vcf_mod, -1, 1, { label: "VCF MOD AMOUNT", bipolar: true, def: 0, format: fmtSigned } );
 	s.vcf_mod_src = leverSwitch( "vcf_mod_src", 378, B - 20, s.vcf_mod_src, [["eg", "EG"], ["lfo", "LFO"]], "VCF MOD" );
@@ -197,7 +197,7 @@ function drawSynthControls()
 		s.assign = ASSIGNS[ (k + 1) % ASSIGNS.length ][0];
 	}
 
-	drawSection( "EG / TEMPO", 730, 1240, 168 );
+	drawSection( "EG / TEMPO", 730, 1240, 148 );
 	s.attack = knob( "attack", 780, B, 24, s.attack, 0.001, 10, with_( time, { label: "ATTACK", def: 0.002 } ) );
 	s.decay = knob( "decay", 880, B, 24, s.decay, 0.002, 10, with_( time, { label: "DECAY", def: 0.25 } ) );
 	drawLed( 912, B - 36, 3.5, st.eg > 0.05, "#ffb02f" );
@@ -212,17 +212,17 @@ function drawSequencer()
 {
 	var s = M.settings, st = M.state, u = uiOf( M.id );
 	var len = s.length;
-	drawSection( "SEQUENCER", GRID_X - 30, GRID_X + 16 * (CELL_W + CELL_GAP), 318 );
+	drawSection( "SEQUENCER", GRID_X - 30, GRID_X + 16 * (CELL_W + CELL_GAP), 266 );
 
 	// transport and MIDI IN on the left
-	if(button( "run", 50, 340, 100, 28, "RUN / STOP", st.playing ).clicked)
+	if(button( "run", 50, 280, 100, 26, "RUN / STOP", st.playing ).clicked)
 		send({ type: "play" });
-	if(button( "reset", 160, 340, 100, 28, "RESET" ).clicked)
+	if(button( "reset", 160, 280, 100, 26, "RESET" ).clicked)
 		send({ type: "reset" });
-	if(button( "next", 50, 380, 100, 28, "NEXT STEP" ).clicked)
+	if(button( "next", 50, 314, 100, 26, "NEXT STEP" ).clicked)
 		send({ type: "next" });
 	var j = JACKS[8][0];
-	drawJack( j[2], 210, 420, j[0], j[1] );
+	drawJack( j[2], 210, 358, j[0], j[1] );
 
 	// step grid: 2 rows of 16
 	for(var i = 0; i < STEPS; ++i)
@@ -272,20 +272,20 @@ function drawSequencer()
 		}
 	}
 
-	drawKeyboard13( GRID_X, 430, 8 * 56, 92 );
+	drawKeyboard13( GRID_X, 356, 8 * 40, 60 );
 
 	// step editing
 	var sel = s.steps[ u.sel ];
-	var bx = 790;
-	if(button( "rest", bx, 430, 74, 24, "REST", !sel.gate ).clicked) sel.gate = !sel.gate;
-	if(button( "accent", bx + 82, 430, 74, 24, "ACCENT", sel.accent ).clicked) sel.accent = !sel.accent;
-	if(button( "glide_step", bx + 164, 430, 74, 24, "GLIDE", sel.glide ).clicked) sel.glide = !sel.glide;
-	if(button( "rec", bx, 466, 74, 24, "REC", u.rec ).clicked) u.rec = !u.rec;
-	if(button( "oct_down", bx + 82, 466, 74, 24, "OCT -" ).clicked) u.oct = Math.max( -2, u.oct - 1 );
-	if(button( "oct_up", bx + 164, 466, 74, 24, "OCT +" ).clicked) u.oct = Math.min( 2, u.oct + 1 );
-	drawLcd( bx, 504, 238, 22, "STEP " + (u.sel + 1) + "/" + len + "  " + (sel.gate ? noteName( sel.note ) : "REST") +
+	var bx = 660;
+	if(button( "rest", bx, 356, 74, 24, "REST", !sel.gate ).clicked) sel.gate = !sel.gate;
+	if(button( "accent", bx + 82, 356, 74, 24, "ACCENT", sel.accent ).clicked) sel.accent = !sel.accent;
+	if(button( "glide_step", bx + 164, 356, 74, 24, "GLIDE", sel.glide ).clicked) sel.glide = !sel.glide;
+	if(button( "rec", bx, 388, 74, 24, "REC", u.rec ).clicked) u.rec = !u.rec;
+	if(button( "oct_down", bx + 82, 388, 74, 24, "OCT -" ).clicked) u.oct = Math.max( -2, u.oct - 1 );
+	if(button( "oct_up", bx + 164, 388, 74, 24, "OCT +" ).clicked) u.oct = Math.min( 2, u.oct + 1 );
+	drawLcd( bx, 424, 238, 22, "STEP " + (u.sel + 1) + "/" + len + "  " + (sel.gate ? noteName( sel.note ) : "REST") +
 		(sel.accent ? " ACC" : "") + (sel.glide ? " GLD" : "") + (u.rec ? "  REC" : ""), "left" );
-	s.length = knob( "length", 1150, 474, 24, s.length, 1, STEPS, { label: "LENGTH", step: 1, style: "ring", def: 16, ticks: 32,
+	s.length = knob( "length", 1000, 396, 24, s.length, 1, STEPS, { label: "LENGTH", step: 1, style: "ring", def: 16, ticks: 32,
 		format: function(v){ return v + " STEPS"; } } );
 }
 
@@ -335,11 +335,11 @@ function drawKeyboard13( x, y, w, h )
 	ctx.fillRect( x - 2, y - 2, w + 4, h + 4 );
 	var lit = function(n) { return u.key === n || st.key === n; };
 	keys.forEach(function(k){
-		ctx.fillStyle = lit( k.note ) ? "#e2574c" : "#e9e6de";
+		ctx.fillStyle = lit( k.note ) ? "#e2574c" : "#8f8c85";
 		ctx.fillRect( k.x + 0.5, k.y, k.w - 1, k.h );
 	});
 	blacks.forEach(function(k){
-		ctx.fillStyle = lit( k.note ) ? "#e2574c" : "#1a1a19";
+		ctx.fillStyle = lit( k.note ) ? "#e2574c" : "#262624";
 		ctx.fillRect( k.x, k.y, k.w, k.h );
 	});
 	drawLabel( noteName( first ) + "–" + noteName( first + 12 ), x + w * 0.5, y + h + 12, 10, false, DIM_COLOR );
@@ -364,7 +364,7 @@ function drawPatchBay()
 		for(var c = 0; c < 4; ++c)
 		{
 			var j = JACKS[r][c];
-			drawJack( j[2], JACK_COLS[c], 74 + r * 69, j[0], j[1] );
+			drawJack( j[2], JACK_COLS[c], 68 + r * 55, j[0], j[1] ); // rows closer than on the Subharm
 		}
 }
 
