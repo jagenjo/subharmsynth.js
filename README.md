@@ -44,6 +44,10 @@ Click *Enable* in the toolbar.
 - **Scala scales.** Type a scale name in the toolbar to add a fifth quantize mode, SCALA. It uses the selected `.scl` file, rooted at C.
 - **Patches**: a toolbar menu with 7 factory patches (in `data/patches.json`) and your own. *Save as…* stores the whole panel and its cables under a name in the browser. *Export* / *Import* write and read `.json` patch files, so patches can be shared or added to the repo. A patch only needs the fields that differ from Init; anything missing or invalid falls back to the Init value.
 - **Reverb send.**
+- **Device row** below the synth, in the same style, patchable from and to the main patch bay:
+  - **Dual LFO**: per LFO RATE (0.01–100 Hz), SHAPE (sine, triangle, saw, ramp, square, sample & hold), LEVEL (an attenuator, since the Subharmonicon has none), RATE CV inputs (1 V/oct) and SYNC inputs (a gate restarts the cycle). Outputs are ±5 V.
+  - **Compressor** on the master output, before the reverb: THRESHOLD, RATIO, ATTACK, RELEASE, MAKEUP, MIX (parallel), ON, a gain reduction meter, a SIDECHAIN input (the detector rectifies, so use envelopes or gates for ducking) and a GR output (gain reduction as CV, 4 dB per volt).
+- **Randomize** (toolbar) rolls a new playable sound, keeping volume, compressor, reverb, cables and the loaded scale.
 - **Two panel layouts**, switched with the *Layout* toolbar button: *Hardware* places every control where it is on the real front panel; *Classic* is the original compact layout of this replica, grouped by section.
 
 ## Controls

@@ -14,19 +14,26 @@
 const C4 = 261.6255653005986;
 
 // must match the jack ids in harm.js
-const OUT_IDS = ["vco1","vco1_sub1","vco1_sub2","vco2","vco2_sub1","vco2_sub2","vca","vca_eg","vcf_eg","seq1","seq1_clk","seq2","seq2_clk","clock_out","trigger_out"];
-const IN_IDS = ["vco1_in","vco1_sub_in","vco1_pwm","vca_in","vco2_in","vco2_sub_in","vco2_pwm","cutoff_in","play_in","reset_in","trigger_in","rhythm1_in","rhythm2_in","rhythm3_in","rhythm4_in","clock_in"];
+const OUT_IDS = ["vco1","vco1_sub1","vco1_sub2","vco2","vco2_sub1","vco2_sub2","vca","vca_eg","vcf_eg","seq1","seq1_clk","seq2","seq2_clk","clock_out","trigger_out",
+	"lfo1","lfo2","comp_gr"];
+const IN_IDS = ["vco1_in","vco1_sub_in","vco1_pwm","vca_in","vco2_in","vco2_sub_in","vco2_pwm","cutoff_in","play_in","reset_in","trigger_in","rhythm1_in","rhythm2_in","rhythm3_in","rhythm4_in","clock_in",
+	"lfo1_rate","lfo2_rate","lfo1_sync","lfo2_sync","comp_sc"];
 
 const O_VCO = [0, 3]; // +1 = sub 1, +2 = sub 2
 const O_VCA = 6, O_VCA_EG = 7, O_VCF_EG = 8, O_SEQ = [9, 11], O_SEQ_CLK = [10, 12], O_CLOCK = 13, O_TRIG = 14;
 const I_VCO_PITCH = [0, 4], I_VCO_SUB = [1, 5], I_VCO_PWM = [2, 6];
 const I_VCA = 3, I_CUTOFF = 7, I_PLAY = 8, I_RESET = 9, I_TRIG = 10, I_RHYTHM = 11, I_CLOCK = 15;
+// extra devices: dual LFO and compressor
+const O_LFO = [15, 16], O_COMP_GR = 17;
+const I_LFO_RATE = [16, 17], I_LFO_SYNC = [18, 19], I_COMP_SC = 20;
+const LFO_SHAPES = { sine: 0, tri: 1, saw: 2, ramp: 3, square: 4, sh: 5 };
 const PULSE_OUTS = [O_SEQ_CLK[0], O_SEQ_CLK[1], O_CLOCK, O_TRIG];
 
 const WAVE_SQUARE = 0, WAVE_PWM = 1, WAVE_SAW = 2;
 const WAVE_MODES = { square: WAVE_SQUARE, pwm: WAVE_PWM, saw: WAVE_SAW };
 
 const GATE_V = 5;
+const DB_TO_LN = Math.LN10 / 20;
 const GATE_THRESHOLD = 1;
 const PULSE_TIME = 0.005;
 const SUB_DIV_PER_VOLT = 3;   // how many subharmonic divisions one volt of CV shifts
@@ -127,6 +134,12 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
 		this.midiTicks = 0;
 		this.midiClockCount = 0;
 		this.lastMidiClock = -1e12;
+
+		this.lfoPhase = [0, 0];
+		this.lfoHold = [Math.random() * 2 - 1, Math.random() * 2 - 1];
+		this.lfoValue = [0, 0];
+		this.compEnv = 0;
+		this.compGrPeak = 0;
 
 		this.sampleCount = 0;
 		this.stateCounter = 0;
@@ -322,12 +335,18 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
 		sm.vol += (volTarget - sm.vol) * k;
 		const lv = sm.lv;
 		const fbk = sm.res * 4.6; // self-oscillates over the last ~15% of the knob
-		const comp = 1 + fbk * 0.3;
+		const resComp = 1 + fbk * 0.3; // passband gain compensation for resonance
 		// wave switch: up = all square, middle = pulse VCO + saw subs (SUB 1 normalled to PWM), down = all saw
 		const waveMode = [WAVE_MODES[s.vco[0].wave] || 0, WAVE_MODES[s.vco[1].wave] || 0];
 		const vcaC = this.egCoefs(s.vca_attack, s.vca_decay);
 		const vcfC = this.egCoefs(s.vcf_attack, s.vcf_decay);
 		const egAmt = s.vcf_eg_amt * EG_CUTOFF_OCTAVES;
+		const lfoShape = [LFO_SHAPES[s.lfo[0].shape] || 0, LFO_SHAPES[s.lfo[1].shape] || 0];
+		const comp = s.comp;
+		const compAtk = 1 - Math.exp(-1 / (Math.max(comp.attack, 0.0001) * sr));
+		const compRel = 1 - Math.exp(-1 / (Math.max(comp.release, 0.001) * sr));
+		const compSlope = 1 - 1 / Math.max(comp.ratio, 1);
+		const compMakeup = Math.exp(comp.makeup * DB_TO_LN);
 
 		// clock source: patched CLOCK input > MIDI clock > internal tempo
 		const extClock = patched[I_CLOCK] === 1;
@@ -355,6 +374,34 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
 
 			if (this.gateEdge(I_PLAY)) this.setPlaying(!this.playing);
 			if (this.gateEdge(I_RESET)) this.reset();
+
+			// ---- dual LFO ----
+			for (let i = 0; i < 2; i++) {
+				const lfo = s.lfo[i];
+				if (this.gateEdge(I_LFO_SYNC[i])) {
+					this.lfoPhase[i] = 0;
+					this.lfoHold[i] = Math.random() * 2 - 1;
+				}
+				let rate = lfo.rate;
+				if (patched[I_LFO_RATE[i]]) rate *= Math.exp(ins[I_LFO_RATE[i]] * Math.LN2);
+				let p = this.lfoPhase[i] + clamp(rate, 0.001, 200) / sr;
+				if (p >= 1) {
+					p -= Math.floor(p);
+					this.lfoHold[i] = Math.random() * 2 - 1;
+				}
+				this.lfoPhase[i] = p;
+				let v;
+				switch (lfoShape[i]) {
+					case 0: v = Math.sin(2 * Math.PI * p); break;
+					case 1: v = 1 - 4 * Math.abs(p - 0.5); break;
+					case 2: v = 1 - 2 * p; break;
+					case 3: v = 2 * p - 1; break;
+					case 4: v = p < 0.5 ? 1 : -1; break;
+					default: v = this.lfoHold[i];
+				}
+				this.lfoValue[i] = v * lfo.level;
+				outs[O_LFO[i]] = v * lfo.level * 5;
+			}
 			if (this.gateEdge(I_TRIG)) this.triggerEGs();
 			this.holdInput = this.gateHigh[I_TRIG] === 1;
 			const clockEdge = this.gateEdge(I_CLOCK);
@@ -452,7 +499,7 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
 				lp[2] += g * (lp[1] - lp[2]);
 				lp[3] += g * (lp[2] - lp[3]);
 			}
-			const filtered = lp[3] * comp;
+			const filtered = lp[3] * resComp;
 
 			// ---- VCA ----
 			let vca;
@@ -471,7 +518,23 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
 				else outs[idx] = 0;
 			}
 
-			const y = fastTanh(vcaOut * sm.vol * 2); // soft limiter on the output
+			// ---- compressor on the master output (sidechain jack replaces the detector input) ----
+			let master = vcaOut * sm.vol * 2;
+			if (comp.on) {
+				const det = patched[I_COMP_SC] ? ins[I_COMP_SC] / 5 : master;
+				const a = det < 0 ? -det : det;
+				this.compEnv += (a > this.compEnv ? compAtk : compRel) * (a - this.compEnv);
+				const over = 20 * Math.log10(this.compEnv + 1e-9) - comp.threshold;
+				let gr = 0; // gain reduction in dB, 6dB soft knee
+				if (over > 3) gr = over * compSlope;
+				else if (over > -3) gr = compSlope * (over + 3) * (over + 3) / 12;
+				master *= (1 - comp.mix) + comp.mix * Math.exp(-gr * DB_TO_LN) * compMakeup;
+				outs[O_COMP_GR] = clamp(gr / 4, 0, 10);
+				if (gr > this.compGrPeak) this.compGrPeak = gr;
+			}
+			else
+				outs[O_COMP_GR] = 0;
+			const y = fastTanh(master); // soft limiter on the output
 			L[j] = y;
 			if (R) R[j] = y;
 		}
@@ -493,8 +556,11 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
 				freq: this.vcos.map(v => v.freq),
 				div: this.vcos.map(v => [v.curDiv1, v.curDiv2]),
 				vca_eg: this.vcaEg.level,
-				vcf_eg: this.vcfEg.level
+				vcf_eg: this.vcfEg.level,
+				lfo: this.lfoValue.slice(),
+				comp_gr: this.compGrPeak
 			});
+			this.compGrPeak = 0;
 		}
 		return true;
 	}

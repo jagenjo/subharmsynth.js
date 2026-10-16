@@ -11,7 +11,7 @@ function Harm()
 	this.settings = Harm.defaultSettings();
 	this.state = {
 		playing: false, step: [0,0], rhythm: [false,false,false,false], clock: false,
-		clock_source: "internal", freq: [0,0], div: [[1,1],[1,1]], vca_eg: 0, vcf_eg: 0
+		clock_source: "internal", freq: [0,0], div: [[1,1],[1,1]], vca_eg: 0, vcf_eg: 0, lfo: [0,0], comp_gr: 0
 	};
 	this.custom_scale = null; // { file, description, degrees, period }
 	this.midi = { access: null, inputs: [], selected: "all", activity: 0, notes: [], status: "off" };
@@ -56,6 +56,12 @@ Harm.defaultSettings = function()
 		eg_hold: false,     // EG button: envelopes locked at maximum (drone)
 		reverb: 0.15,
 		scale_file: null,
+		// extra devices below the panel
+		lfo: [
+			{ rate: 0.5, shape: "sine", level: 1 },  // rate in Hz, level scales the +-5V output
+			{ rate: 4, shape: "tri", level: 0.5 }
+		],
+		comp: { on: true, threshold: -12, ratio: 3, attack: 0.005, release: 0.12, makeup: 0, mix: 1 }, // dB / s
 		patches: []          // [output id, input id, color index]
 	};
 }
@@ -76,6 +82,26 @@ Harm.VCO_MIN_FREQ = 261.63; // VCO FREQ knob range is C4..C8
 Harm.VCO_MAX_FREQ = 4186.0;
 Harm.TEMPO_MIN = 20;         // 0.333Hz..50Hz at 1 ppq
 Harm.TEMPO_MAX = 3000;
+
+// jacks of the devices below the panel
+Harm.LFO_JACKS = [
+	[["RATE 1","in","lfo1_rate"], ["RATE 2","in","lfo2_rate"]],
+	[["SYNC 1","in","lfo1_sync"], ["SYNC 2","in","lfo2_sync"]],
+	[["LFO 1","out","lfo1"], ["LFO 2","out","lfo2"]]
+];
+Harm.COMP_JACKS = [
+	[["SIDECHAIN","in","comp_sc"], ["GR","out","comp_gr"]]
+];
+Harm.LFO_SHAPES = ["sine","tri","saw","ramp","square","sh"];
+
+Harm.jackTypes = function()
+{
+	var types = {};
+	Harm.JACKS.concat( Harm.LFO_JACKS, Harm.COMP_JACKS ).forEach(function(row){
+		row.forEach(function(j){ types[ j[2] ] = j[1]; });
+	});
+	return types;
+}
 
 Harm.QUANTIZE_MODES = ["OFF","12-ET","8-ET","12-JI","8-JI","SCL"];
 
@@ -214,8 +240,11 @@ Harm.prototype.setSettings = function( data )
 	if([1,2,5].indexOf( s.seq_oct ) == -1)
 		s.seq_oct = 1;
 	s.scale_file = typeof data.scale_file == "string" ? data.scale_file : null;
-	var jack_ids = {};
-	Harm.JACKS.forEach(function(row){ row.forEach(function(j){ jack_ids[ j[2] ] = j[1]; }); });
+	var jack_ids = Harm.jackTypes();
+	s.lfo.forEach(function(l){
+		if(Harm.LFO_SHAPES.indexOf( l.shape ) == -1)
+			l.shape = "sine";
+	});
 	s.patches = (Array.isArray(data.patches) ? data.patches : []).filter(function(p){
 		return Array.isArray(p) && jack_ids[ p[0] ] == "out" && jack_ids[ p[1] ] == "in";
 	}).map(function(p){ return [ p[0], p[1], (p[2] | 0) ]; });
@@ -293,6 +322,64 @@ Harm.prototype.importPatch = function( text )
 		throw new Error("not a patch file");
 	this.setSettings( settings );
 	return typeof data.name == "string" ? data.name : "";
+}
+
+// ---- randomize ----
+
+// new random sound; volume, compressor, reverb, cables and the loaded scale are kept
+Harm.prototype.randomize = function()
+{
+	var s = this.settings;
+	var rnd = function(a, b) { return a + Math.random() * (b - a); };
+	var expRnd = function(a, b) { return a * Math.pow( b / a, Math.random() ); };
+	var pick = function(list) { return list[ Math.floor( Math.random() * list.length ) ]; };
+	var chance = function(p) { return Math.random() < p; };
+
+	s.vco.forEach(function(v){
+		v.freq = expRnd( Harm.VCO_MIN_FREQ, 1046.5 );
+		v.wave = pick( ["square", "pwm", "saw"] );
+		v.sub1 = pick( [2, 2, 3, 3, 4, 5, 6, 8] );
+		v.sub2 = pick( [3, 4, 4, 5, 6, 7, 8, 12, 16] );
+		v.level = chance(0.8) ? rnd( 0.25, 0.8 ) : 0;
+		v.sub1_level = rnd( 0.2, 0.8 );
+		v.sub2_level = chance(0.8) ? rnd( 0.15, 0.7 ) : 0;
+	});
+	s.seq_oct = pick( [1, 1, 1, 2, 2, 5] );
+	var spread = s.seq_oct == 1 ? 1 : (s.seq_oct == 2 ? 0.6 : 0.25);
+	s.seq = [0, 1].map(function(){ return [0, 1, 2, 3].map(function(k){ return k == 0 ? 0 : Math.round( rnd( -spread, spread ) * 24 ) / 24; }); });
+	s.seq_assign = [0, 1].map(function(){
+		var a = { osc: chance(0.85), sub1: chance(0.3), sub2: chance(0.3) };
+		if(!a.osc && !a.sub1 && !a.sub2)
+			a.osc = true;
+		return a;
+	});
+	var modes = ["12-ET", "8-ET", "12-JI", "8-JI", "8-ET", "8-JI", "OFF"];
+	if(this.custom_scale)
+		modes.push( "SCL", "SCL" );
+	s.quantize = pick( modes );
+
+	s.tempo = expRnd( 90, 720 );
+	s.rhythm = [0, 1, 2, 3].map(function(){ return pick( [1, 2, 2, 3, 3, 4, 5, 6, 7, 8] ); });
+	s.rhythm_seq1 = [0, 1, 2, 3].map(function(){ return chance(0.4); });
+	s.rhythm_seq2 = [0, 1, 2, 3].map(function(){ return chance(0.4); });
+	// every sequencer gets at least one rhythm so the patch always plays
+	if(s.rhythm_seq1.indexOf(true) == -1) s.rhythm_seq1[ Math.floor( Math.random() * 4 ) ] = true;
+	if(s.rhythm_seq2.indexOf(true) == -1) s.rhythm_seq2[ Math.floor( Math.random() * 4 ) ] = true;
+
+	s.cutoff = expRnd( 250, 5000 );
+	s.resonance = rnd( 0, 0.7 );
+	s.vcf_eg_amt = chance(0.8) ? rnd( 0.1, 0.8 ) : rnd( -0.5, 0 );
+	s.vcf_attack = chance(0.75) ? expRnd( 0.001, 0.03 ) : expRnd( 0.03, 1 );
+	s.vcf_decay = expRnd( 0.05, 1.5 );
+	s.vca_attack = chance(0.8) ? expRnd( 0.001, 0.02 ) : expRnd( 0.02, 0.8 );
+	s.vca_decay = expRnd( 0.08, 2 );
+	s.eg_hold = chance(0.08);
+
+	s.lfo.forEach(function(l){
+		l.rate = expRnd( 0.05, 8 );
+		l.shape = pick( Harm.LFO_SHAPES );
+		l.level = rnd( 0.2, 1 );
+	});
 }
 
 // ---- Scala scales (extension, not on the hardware) ----

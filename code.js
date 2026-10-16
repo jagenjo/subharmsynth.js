@@ -9,12 +9,12 @@ var FONT = "Antonio, Oswald, 'Arial Narrow', sans-serif";
 // two panel layouts: "hardware" mirrors the real front panel (60HP, ~2.37:1, plus wood
 // cheeks), "classic" is the original compact layout of this replica
 var LAYOUTS = {
-	hardware: { w: 1568, h: 642, name: "Hardware" },
+	hardware: { w: 1568, h: 596, name: "Hardware" },
 	classic: { w: 1460, h: 750, name: "Classic" }
 };
 var layout = "hardware";
 try { if(LAYOUTS[ localStorage.getItem("SUBHARM_layout") ]) layout = localStorage.getItem("SUBHARM_layout"); } catch(err) {}
-var PANEL_W = LAYOUTS[layout].w, PANEL_H = LAYOUTS[layout].h;
+var PANEL_W, PANEL_H, MAIN_H; // set by setLayout(); PANEL_H includes the device row
 var KNOB_A0 = Math.PI * 0.75, KNOB_SWEEP = Math.PI * 1.5;
 var CABLE_COLORS = ["#e8c547","#e05a47","#4fa3e0","#6cc070","#c77dd8","#ececec","#f08c3a"];
 var TEXT_COLOR = "#e8e4dc", DIM_COLOR = "#8c8a84";
@@ -325,24 +325,26 @@ function drawKnob( cx, cy, r, n, highlight, ticks, bipolar, style )
 	ctx.stroke();
 	ctx.lineCap = "butt";
 
-	// brushed aluminium cap
+	// machined aluminium cap: muted metal with concentric turning rings and a dark centre
 	var cr = r * 0.62;
-	g = ctx.createRadialGradient( cx - cr * 0.3, cy - cr * 0.35, cr * 0.05, cx, cy, cr );
-	g.addColorStop( 0, highlight ? "#ffffff" : "#f4f4f2" );
-	g.addColorStop( 0.55, "#c4c4c0" );
-	g.addColorStop( 1, "#86867f" );
+	g = ctx.createRadialGradient( cx, cy, 0, cx, cy, cr );
+	g.addColorStop( 0, "#3a3a38" );
+	g.addColorStop( 0.18, "#5c5c58" );
+	g.addColorStop( 0.6, highlight ? "#8e8e88" : "#80807b" );
+	g.addColorStop( 0.92, highlight ? "#9a9a94" : "#8c8c86" );
+	g.addColorStop( 1, "#5a5a55" );
 	ctx.fillStyle = g;
 	ctx.beginPath(); ctx.arc( cx, cy, cr, 0, Math.PI * 2 ); ctx.fill();
-	ctx.strokeStyle = "rgba(255,255,255,0.18)";
-	ctx.lineWidth = 0.7;
-	ctx.beginPath();
-	for(var i = 0; i < 8; ++i)
+	ctx.lineWidth = 0.6;
+	var rings = Math.max( 4, Math.round( cr / 2.5 ) );
+	for(var i = 1; i < rings; ++i)
 	{
-		var b = (i / 8) * Math.PI;
-		ctx.moveTo( cx - Math.cos(b) * cr * 0.9, cy - Math.sin(b) * cr * 0.9 );
-		ctx.lineTo( cx + Math.cos(b) * cr * 0.9, cy + Math.sin(b) * cr * 0.9 );
+		ctx.strokeStyle = i % 2 ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.12)";
+		ctx.beginPath(); ctx.arc( cx, cy, cr * i / rings, 0, Math.PI * 2 ); ctx.stroke();
 	}
-	ctx.stroke();
+	ctx.strokeStyle = "rgba(0,0,0,0.45)";
+	ctx.lineWidth = 1;
+	ctx.beginPath(); ctx.arc( cx, cy, cr, 0, Math.PI * 2 ); ctx.stroke();
 }
 
 // rubber button that lights up red when `lit` (classic layout: LED dot, none if lit is undefined). returns { clicked, held }
@@ -574,7 +576,7 @@ function updateCables()
 function drawCable( x1, y1, x2, y2, color, alpha )
 {
 	var d = Math.hypot( x2 - x1, y2 - y1 );
-	var sag = 20 + d * 0.3;
+	var sag = Math.min( 20 + d * 0.3, 90 ); // long cables between rows would hang off the panel
 	// quadratic curve: the lowest point hangs `sag` below the midpoint
 	var mx = (x1 + x2) * 0.5, my = (y1 + y2) * 0.5 + sag;
 	ctx.save();
@@ -631,52 +633,28 @@ var SEQ_COLS = [100, 180, 260, 340];
 var VCO_COLS = [[455, 545, 635], [785, 875, 965]]; // SUB 1, VCO, SUB 2 columns
 var CENTER_X = 710;
 var FILTER_COLS = [1082, 1192];
-var FILTER_ROWS = [104, 244, 384, 524];
+var FILTER_ROWS = [100, 228, 356, 484];
 var JACK_COLS = [1292, 1357, 1422, 1487];
 
 function drawPanelBackground()
 {
-	// wooden cheeks
-	[0, PANEL_W - 22].forEach(function(x){
-		var g = ctx.createLinearGradient( x, 0, x + 22, 0 );
-		g.addColorStop( 0, "#4a2c18" );
-		g.addColorStop( 0.5, "#8a5a34" );
-		g.addColorStop( 1, "#5a3620" );
-		ctx.fillStyle = g;
-		ctx.fillRect( x, 0, 22, PANEL_H );
-		ctx.strokeStyle = "rgba(40,20,8,0.35)";
-		ctx.lineWidth = 1;
-		ctx.beginPath();
-		for(var i = 0; i < 6; ++i)
-		{
-			var xx = x + 3 + i * 3.4;
-			ctx.moveTo( xx, 0 );
-			ctx.bezierCurveTo( xx + 2, PANEL_H * 0.3, xx - 2, PANEL_H * 0.6, xx + 1, PANEL_H );
-		}
-		ctx.stroke();
-	});
-
-	var g = ctx.createLinearGradient( 0, 0, PANEL_W, PANEL_H );
-	g.addColorStop( 0, "#1d1d1c" );
-	g.addColorStop( 1, "#141414" );
-	ctx.fillStyle = g;
-	ctx.fillRect( 22, 0, PANEL_W - 44, PANEL_H );
+	drawCasing( 0, 0, PANEL_W, MAIN_H );
 
 	drawScrew( 36, 12 ); drawScrew( PANEL_W - 36, 12 );
-	drawScrew( 36, PANEL_H - 12 ); drawScrew( PANEL_W - 36, PANEL_H - 12 );
-	drawScrew( 690, PANEL_H - 12 ); drawScrew( 690, 12 );
+	drawScrew( 36, MAIN_H - 12 ); drawScrew( PANEL_W - 36, MAIN_H - 12 );
+	drawScrew( 690, MAIN_H - 12 ); drawScrew( 690, 12 );
 
 	// name, bottom left
 	ctx.textAlign = "left";
 	ctx.textBaseline = "alphabetic";
 	ctx.font = "bold 30px " + FONT;
 	ctx.fillStyle = TEXT_COLOR;
-	ctx.fillText( "SUBHARM", 46, 600 );
+	ctx.fillText( "SUBHARM", 46, 560 );
 	var w = ctx.measureText( "SUBHARM" ).width;
-	ctx.fillRect( 54 + w, 574, 1.5, 28 );
+	ctx.fillRect( 54 + w, 534, 1.5, 28 );
 	ctx.font = "11px " + FONT;
-	ctx.fillText( "SEMI-MODULAR ANALOG", 62 + w, 586 );
-	ctx.fillText( "POLYRHYTHMIC SYNTHESIZER", 62 + w, 599 );
+	ctx.fillText( "SEMI-MODULAR ANALOG", 62 + w, 546 );
+	ctx.fillText( "POLYRHYTHMIC SYNTHESIZER", 62 + w, 559 );
 }
 
 function drawSequencers()
@@ -685,7 +663,7 @@ function drawSequencers()
 	var st = synth.state;
 	for(var i = 0; i < 2; ++i)
 	{
-		var y = 76 + i * 108;
+		var y = 72 + i * 100;
 		drawLabel( "SEQUENCER " + (i + 1), 220, y - 50, 13 );
 		var assign = s.seq_assign[i];
 		for(var k = 0; k < 4; ++k)
@@ -712,19 +690,19 @@ function drawSequencers()
 function drawPolyrhythm()
 {
 	var s = synth.settings;
-	drawLabel( "POLYRHYTHM", 220, 242, 13 );
+	drawLabel( "POLYRHYTHM", 220, 228, 13 );
 	for(var i = 0; i < 4; ++i)
 	{
 		var cx = SEQ_COLS[i];
 		ctx.strokeStyle = "#8a877f";
 		ctx.lineWidth = 1;
-		ctx.beginPath(); ctx.moveTo( cx, 292 ); ctx.lineTo( cx, 352 ); ctx.stroke();
-		s.rhythm[i] = knob( "rhythm" + i, cx, 292, 14, s.rhythm[i], 1, 16, {
+		ctx.beginPath(); ctx.moveTo( cx, 272 ); ctx.lineTo( cx, 330 ); ctx.stroke();
+		s.rhythm[i] = knob( "rhythm" + i, cx, 272, 14, s.rhythm[i], 1, 16, {
 			label: "RHYTHM " + (i + 1), style: "ring", step: 1, def: 1, labelSize: 10, format: fmtDiv
 		});
-		if(button( "r" + i + "s1", cx - 24, 322, 48, 20, "SEQ 1", s.rhythm_seq1[i] ).clicked)
+		if(button( "r" + i + "s1", cx - 24, 300, 48, 20, "SEQ 1", s.rhythm_seq1[i] ).clicked)
 			s.rhythm_seq1[i] = !s.rhythm_seq1[i];
-		if(button( "r" + i + "s2", cx - 24, 350, 48, 20, "SEQ 2", s.rhythm_seq2[i] ).clicked)
+		if(button( "r" + i + "s2", cx - 24, 326, 48, 20, "SEQ 2", s.rhythm_seq2[i] ).clicked)
 			s.rhythm_seq2[i] = !s.rhythm_seq2[i];
 	}
 }
@@ -734,7 +712,7 @@ function drawTransport()
 	var s = synth.settings;
 	var st = synth.state;
 
-	s.tempo = knob( "tempo", 84, 482, 38, s.tempo, Harm.TEMPO_MIN, Harm.TEMPO_MAX, {
+	s.tempo = knob( "tempo", 84, 446, 38, s.tempo, Harm.TEMPO_MIN, Harm.TEMPO_MAX, {
 		label: "TEMPO", labelSize: 13, style: "ring", exp: true, def: 120,
 		format: function(v){
 			if(st.clock_source == "midi") return "MIDI CLOCK";
@@ -743,18 +721,18 @@ function drawTransport()
 		}
 	});
 
-	if(button( "reset", 160, 446, 54, 26, "RESET" ).clicked)
+	if(button( "reset", 160, 410, 54, 26, "RESET" ).clicked)
 		act(function(){ synth.reset(); });
 	// EG is lit normally and blinks while the envelopes are held open
 	var blink = (performance.now() % 600) < 300;
-	if(button( "eg", 222, 446, 54, 26, "EG", s.eg_hold ? blink : true ).clicked)
+	if(button( "eg", 222, 410, 54, 26, "EG", s.eg_hold ? blink : true ).clicked)
 		s.eg_hold = !s.eg_hold;
-	if(button( "next", 284, 446, 54, 26, "NEXT" ).clicked)
+	if(button( "next", 284, 410, 54, 26, "NEXT" ).clicked)
 		act(function(){ synth.next(); });
 
-	if(button( "play", 160, 488, 84, 28, "PLAY", st.playing ).clicked)
+	if(button( "play", 160, 450, 84, 28, "PLAY", st.playing ).clicked)
 		act(function(){ synth.play(); });
-	var trig = button( "trigger", 254, 488, 84, 28, "TRIGGER", trigger_held );
+	var trig = button( "trigger", 254, 450, 84, 28, "TRIGGER", trigger_held );
 	if(trig.clicked)
 		act(function(){ synth.trigger(true); });
 	if((trigger_held || trig.clicked) && !trig.held)
@@ -784,16 +762,16 @@ function drawOscillators()
 		var cols = VCO_COLS[i];
 		var assign = s.seq_assign[i];
 
-		osc.freq = knob( "vco" + n + "_freq", cols[1], 105, 38, osc.freq, Harm.VCO_MIN_FREQ, Harm.VCO_MAX_FREQ, {
+		osc.freq = knob( "vco" + n + "_freq", cols[1], 100, 38, osc.freq, Harm.VCO_MIN_FREQ, Harm.VCO_MAX_FREQ, {
 			label: "VCO " + n + " FREQ", labelSize: 12, style: "ring", exp: true, def: i == 0 ? 261.63 : 392,
 			format: (function(i){ return function(){ return freqToNoteName( st.freq[i] ) + "  " + fmtHz( st.freq[i] ); }; })(i)
 		});
 		var wx = i == 0 ? cols[0] - 7 : cols[2] - 7;
-		drawLabel( "VCO " + n + " WAVE", wx + 7, 62, 10 );
-		osc.wave = waveSwitch( "vco" + n + "_wave", wx, 80, osc.wave, i == 0 );
+		drawLabel( "VCO " + n + " WAVE", wx + 7, 57, 10 );
+		osc.wave = waveSwitch( "vco" + n + "_wave", wx, 74, osc.wave, i == 0 );
 
 		[["sub1", "SUB 1 FREQ", cols[0], 0], ["sub2", "SUB 2 FREQ", cols[2], 1]].forEach(function(sub){
-			osc[ sub[0] ] = knob( "vco" + n + "_" + sub[0], sub[2], 215, 28, osc[ sub[0] ], 1, 16, {
+			osc[ sub[0] ] = knob( "vco" + n + "_" + sub[0], sub[2], 200, 28, osc[ sub[0] ], 1, 16, {
 				label: sub[1], style: "ring", step: 1, reverse: true, def: sub[3] ? 4 : 2,
 				format: (function(i, k){ return function(v){
 					var div = st.div[i][k] || v;
@@ -805,23 +783,23 @@ function drawOscillators()
 		// SEQ ASSIGN bracket with the three buttons
 		ctx.strokeStyle = "#a9a69e";
 		ctx.lineWidth = 1;
-		ctx.strokeRect( cols[0] - 2, 268, cols[2] - cols[0] + 4, 30 );
+		ctx.strokeRect( cols[0] - 2, 252, cols[2] - cols[0] + 4, 30 );
 		ctx.fillStyle = "#1a1a19";
-		ctx.fillRect( cols[1] - 46, 262, 92, 12 );
-		drawLabel( "SEQ " + n + " ASSIGN", cols[1], 268, 10 );
+		ctx.fillRect( cols[1] - 46, 246, 92, 12 );
+		drawLabel( "SEQ " + n + " ASSIGN", cols[1], 252, 10 );
 		[["osc", "OSC " + n, cols[0]], ["sub1", "SUB 1", cols[1]], ["sub2", "SUB 2", cols[2]]].forEach(function(b){
-			if(button( "assign" + n + b[0], b[2] - 26, 286, 52, 22, b[1], assign[ b[0] ] ).clicked)
+			if(button( "assign" + n + b[0], b[2] - 26, 270, 52, 22, b[1], assign[ b[0] ] ).clicked)
 				assign[ b[0] ] = !assign[ b[0] ];
 		});
 
 		// mixer: VCO level above, sub levels below, in the same columns
-		osc.level = knob( "vco" + n + "_level", cols[1], 392, 26, osc.level, 0, 1, {
+		osc.level = knob( "vco" + n + "_level", cols[1], 362, 26, osc.level, 0, 1, {
 			label: "VCO " + n + " LEVEL", def: 0, format: fmtPct
 		});
-		osc.sub1_level = knob( "vco" + n + "_sub1_level", cols[0], 500, 26, osc.sub1_level, 0, 1, {
+		osc.sub1_level = knob( "vco" + n + "_sub1_level", cols[0], 462, 26, osc.sub1_level, 0, 1, {
 			label: "SUB 1 LEVEL", def: 0, format: fmtPct
 		});
-		osc.sub2_level = knob( "vco" + n + "_sub2_level", cols[2], 500, 26, osc.sub2_level, 0, 1, {
+		osc.sub2_level = knob( "vco" + n + "_sub2_level", cols[2], 462, 26, osc.sub2_level, 0, 1, {
 			label: "SUB 2 LEVEL", def: 0, format: fmtPct
 		});
 	}
@@ -836,7 +814,7 @@ function drawCenterStrip()
 	ctx.beginPath();
 	ctx.moveTo( x, 34 ); ctx.lineTo( x, 62 );
 	ctx.moveTo( x, 170 ); ctx.lineTo( x, 232 );
-	ctx.moveTo( x, 424 ); ctx.lineTo( x, 610 );
+	ctx.moveTo( x, 424 ); ctx.lineTo( x, MAIN_H - 40 );
 	ctx.stroke();
 
 	[[5, "±5"], [2, "±2"], [1, "±1"]].forEach(function(o, k){
@@ -901,7 +879,7 @@ function drawPatchBay()
 	jacks = {};
 	var x = JACK_COLS[0] - 30;
 	ctx.fillStyle = "#1f1f1e";
-	ctx.beginPath(); ctx.roundRect( x, 14, JACK_COLS[3] - x + 30, PANEL_H - 28, 6 ); ctx.fill();
+	ctx.beginPath(); ctx.roundRect( x, 14, JACK_COLS[3] - x + 30, MAIN_H - 28, 6 ); ctx.fill();
 	ctx.font = "13px " + FONT;
 	var w1 = ctx.measureText( "IN / " ).width, w2 = ctx.measureText( "OUT" ).width + 6;
 	var cx = (JACK_COLS[1] + JACK_COLS[2]) * 0.5;
@@ -917,7 +895,7 @@ function drawPatchBay()
 		for(var c = 0; c < 4; ++c)
 		{
 			var j = Harm.JACKS[r][c];
-			drawJack( j[2], JACK_COLS[c], 78 + r * 73, j[0], j[1] );
+			drawJack( j[2], JACK_COLS[c], 74 + r * 69, j[0], j[1] );
 		}
 }
 
@@ -1019,31 +997,7 @@ function classicButtonFace( x, y, w, h, text, lit, hover, held )
 
 function classicBackground()
 {
-	// wooden cheeks
-	[0, PANEL_W - 22].forEach(function(x){
-		var g = ctx.createLinearGradient( x, 0, x + 22, 0 );
-		g.addColorStop( 0, "#4a2c18" );
-		g.addColorStop( 0.5, "#8a5a34" );
-		g.addColorStop( 1, "#5a3620" );
-		ctx.fillStyle = g;
-		ctx.fillRect( x, 0, 22, PANEL_H );
-		ctx.strokeStyle = "rgba(40,20,8,0.35)";
-		ctx.lineWidth = 1;
-		ctx.beginPath();
-		for(var i = 0; i < 6; ++i)
-		{
-			var xx = x + 3 + i * 3.4;
-			ctx.moveTo( xx, 0 );
-			ctx.bezierCurveTo( xx + 2, PANEL_H * 0.3, xx - 2, PANEL_H * 0.6, xx + 1, PANEL_H );
-		}
-		ctx.stroke();
-	});
-
-	var g = ctx.createLinearGradient( 0, 0, 0, PANEL_H );
-	g.addColorStop( 0, "#1c1c1b" );
-	g.addColorStop( 1, "#121212" );
-	ctx.fillStyle = g;
-	ctx.fillRect( 22, 0, PANEL_W - 44, PANEL_H );
+	drawCasing( 0, 0, PANEL_W, MAIN_H );
 
 	// patch bay plate
 	ctx.fillStyle = "#222220";
@@ -1053,16 +1007,16 @@ function classicBackground()
 	ctx.stroke();
 
 	drawScrew( 36, 14 ); drawScrew( PANEL_W - 36, 14 );
-	drawScrew( 36, PANEL_H - 14 ); drawScrew( PANEL_W - 36, PANEL_H - 14 );
+	drawScrew( 36, MAIN_H - 14 ); drawScrew( PANEL_W - 36, MAIN_H - 14 );
 
 	ctx.font = "26px " + FONT;
 	ctx.textAlign = "left";
 	ctx.textBaseline = "middle";
 	ctx.fillStyle = TEXT_COLOR;
-	ctx.fillText( "SUBHARM", 50, PANEL_H - 24 );
+	ctx.fillText( "SUBHARM", 50, MAIN_H - 24 );
 	ctx.font = "12px " + FONT;
 	ctx.fillStyle = DIM_COLOR;
-	ctx.fillText( "POLYRHYTHMIC SUBHARMONIC SYNTHESIZER", 150, PANEL_H - 22 );
+	ctx.fillText( "POLYRHYTHMIC SUBHARMONIC SYNTHESIZER", 150, MAIN_H - 22 );
 }
 
 function classicOscillatorGroup( i, gx )
@@ -1268,6 +1222,159 @@ function drawClassicPanel()
 	classicPatchBay();
 }
 
+// ---------------------------------------------------------------------------
+// extra devices, in a row below the main panel: dual LFO and compressor
+
+var DEVICE_GAP = 10, DEVICE_H = 200;
+var LFO_SHAPE_LABELS = { sine: "SINE", tri: "TRI", saw: "SAW", ramp: "RAMP", square: "SQUARE", sh: "S&H" };
+
+// wood cheeks + black panel, shared by the main panel and the devices
+function drawCasing( x, y, w, h )
+{
+	[x, x + w - 22].forEach(function(cx){
+		var g = ctx.createLinearGradient( cx, 0, cx + 22, 0 );
+		g.addColorStop( 0, "#4a2c18" );
+		g.addColorStop( 0.5, "#8a5a34" );
+		g.addColorStop( 1, "#5a3620" );
+		ctx.fillStyle = g;
+		ctx.fillRect( cx, y, 22, h );
+		ctx.strokeStyle = "rgba(40,20,8,0.35)";
+		ctx.lineWidth = 1;
+		ctx.beginPath();
+		for(var i = 0; i < 6; ++i)
+		{
+			var xx = cx + 3 + i * 3.4;
+			ctx.moveTo( xx, y );
+			ctx.bezierCurveTo( xx + 2, y + h * 0.3, xx - 2, y + h * 0.6, xx + 1, y + h );
+		}
+		ctx.stroke();
+	});
+	var g = layout == "classic" ? ctx.createLinearGradient( 0, y, 0, y + h ) : ctx.createLinearGradient( x, y, x + w, y + h );
+	g.addColorStop( 0, layout == "classic" ? "#1c1c1b" : "#1d1d1c" );
+	g.addColorStop( 1, layout == "classic" ? "#121212" : "#141414" );
+	ctx.fillStyle = g;
+	ctx.fillRect( x + 22, y, w - 44, h );
+}
+
+function drawDevicePanel( x, y, w, h, name, subtitle )
+{
+	drawCasing( x, y, w, h );
+	drawScrew( x + 36, y + 12 ); drawScrew( x + w - 36, y + 12 );
+	drawScrew( x + 36, y + h - 12 ); drawScrew( x + w - 36, y + h - 12 );
+
+	// name bottom left, styled like the main panel's
+	ctx.textAlign = "left";
+	ctx.textBaseline = "alphabetic";
+	ctx.font = "bold 20px " + FONT;
+	ctx.fillStyle = TEXT_COLOR;
+	ctx.fillText( name, x + 44, y + h - 14 );
+	var nw = ctx.measureText( name ).width;
+	ctx.fillRect( x + 52 + nw, y + h - 32, 1.5, 20 );
+	ctx.font = "10px " + FONT;
+	ctx.fillText( subtitle[0], x + 60 + nw, y + h - 24 );
+	ctx.fillText( subtitle[1], x + 60 + nw, y + h - 13 );
+}
+
+function drawDeviceJacks( x, y, w, h, rows )
+{
+	var px = x + w - 22 - 182;
+	ctx.fillStyle = "#1f1f1e";
+	ctx.beginPath(); ctx.roundRect( px, y + 10, 170, h - 20, 6 ); ctx.fill();
+	rows.forEach(function(row, r){
+		row.forEach(function(j, c){
+			drawJack( j[2], px + 45 + c * 80, y + 50 + r * 58, j[0], j[1] );
+		});
+	});
+	return px;
+}
+
+function fmtRate( v ) { return (v < 1 ? v.toFixed(2) : v.toFixed(1)) + " Hz" + (v < 1 ? "  (" + (1 / v).toFixed(1) + " s)" : ""); }
+function fmtDb( v ) { return (v > 0 ? "+" : "") + v.toFixed(1) + " dB"; }
+
+// a column of LEDs with labels, used for LFO shapes and the GR meter
+function drawLedColumn( x, y, labels, lit, colors )
+{
+	labels.forEach(function(label, k){
+		var ly = y + k * 16;
+		drawLed( x, ly, 4, lit(k), colors ? colors(k) : null );
+		ctx.textAlign = "left";
+		ctx.textBaseline = "middle";
+		ctx.font = "10px " + FONT;
+		ctx.fillStyle = TEXT_COLOR;
+		ctx.fillText( label, x + 9, ly + 1 );
+	});
+}
+
+function drawLfoDevice( x, y, w, h )
+{
+	var s = synth.settings;
+	var st = synth.state;
+	drawDevicePanel( x, y, w, h, "DUAL LFO", ["LOW FREQUENCY", "OSCILLATORS"] );
+	var px = drawDeviceJacks( x, y, w, h, Harm.LFO_JACKS );
+	var sw = (px - 10 - (x + 40)) / 2; // section width
+
+	for(var i = 0; i < 2; ++i)
+	{
+		var lfo = s.lfo[i];
+		var gx = x + 40 + i * sw;
+		drawSection( "LFO " + (i + 1), gx, gx + sw - 16, y + 20 );
+
+		lfo.rate = knob( "lfo" + i + "_rate", gx + 38, y + 92, 28, lfo.rate, 0.01, 100, {
+			label: "RATE", style: "ring", exp: true, def: i ? 4 : 0.5, format: fmtRate
+		});
+		drawLed( gx + 72, y + 48, 3.5, (st.lfo[i] || 0) > 0.05, "#ffb02f" );
+		lfo.level = knob( "lfo" + i + "_level", gx + 118, y + 96, 20, lfo.level, 0, 1, {
+			label: "LEVEL", def: 1, format: function(v){ return fmtPct(v) + "  (\u00b1" + (v * 5).toFixed(1) + " V)"; }
+		});
+		drawLedColumn( gx + sw - 70, y + 40, Harm.LFO_SHAPES.map(function(sh){ return LFO_SHAPE_LABELS[sh]; }),
+			function(k){ return lfo.shape == Harm.LFO_SHAPES[k]; } );
+		if(button( "lfo" + i + "_shape", gx + sw - 80, y + 136, 58, 22, "SHAPE" ).clicked)
+			lfo.shape = Harm.LFO_SHAPES[ (Harm.LFO_SHAPES.indexOf( lfo.shape ) + 1) % Harm.LFO_SHAPES.length ];
+	}
+}
+
+function drawCompressor( x, y, w, h )
+{
+	var c = synth.settings.comp;
+	var st = synth.state;
+	drawDevicePanel( x, y, w, h, "COMPRESSOR", ["MASTER BUS", "DYNAMICS PROCESSOR"] );
+	var px = drawDeviceJacks( x, y, w, h, Harm.COMP_JACKS );
+
+	// six knobs in a row, then the gain reduction meter and the ON button
+	var mx = px - 62;
+	var step = (mx - 10 - (x + 40)) / 6;
+	var r = Math.min( 24, step * 0.3 );
+	drawSection( "DYNAMICS", x + 40, mx - 14, y + 20 );
+	var knobs = [
+		["threshold", "THRESHOLD", -48, 0, { def: -12, format: fmtDb }],
+		["ratio", "RATIO", 1, 20, { exp: true, def: 3, format: function(v){ return v.toFixed(1) + " : 1"; } }],
+		["attack", "ATTACK", 0.0005, 0.2, { style: "ring", exp: true, def: 0.005, format: fmtTime }],
+		["release", "RELEASE", 0.01, 2, { style: "ring", exp: true, def: 0.12, format: fmtTime }],
+		["makeup", "MAKEUP", 0, 24, { def: 0, format: fmtDb }],
+		["mix", "MIX", 0, 1, { def: 1, format: function(v){ return Math.round(v * 100) + "% WET"; } }]
+	];
+	knobs.forEach(function(k, i){
+		k[4].label = k[1];
+		c[ k[0] ] = knob( "comp_" + k[0], x + 40 + step * (i + 0.5), y + 96, r, c[ k[0] ], k[2], k[3], k[4] );
+	});
+
+	drawSection( "GR", mx, px - 12, y + 20 );
+	var levels = [20, 15, 10, 6, 3, 1];
+	drawLedColumn( mx + 14, y + 40, levels.map(function(db){ return "-" + db; }),
+		function(k){ return c.on && st.comp_gr >= levels[k]; },
+		function(k){ return k < 2 ? "#ff3b2f" : "#ffb02f"; } );
+	if(button( "comp_on", mx + 2, y + 136, 44, 22, "ON", c.on ).clicked)
+		c.on = !c.on;
+}
+
+function drawDevices()
+{
+	var y = MAIN_H + DEVICE_GAP;
+	var w = (PANEL_W - DEVICE_GAP) * 0.5;
+	drawLfoDevice( 0, y, w, DEVICE_H );
+	drawCompressor( w + DEVICE_GAP, y, w, DEVICE_H );
+}
+
 function drawHardwarePanel()
 {
 	drawPanelBackground();
@@ -1319,6 +1426,7 @@ function draw()
 		drawClassicPanel();
 	else
 		drawHardwarePanel();
+	drawDevices();
 	updateCables();
 	drawCables();
 	drawTooltips();
@@ -1472,7 +1580,8 @@ function setLayout( name )
 {
 	layout = name;
 	PANEL_W = LAYOUTS[name].w;
-	PANEL_H = LAYOUTS[name].h;
+	MAIN_H = LAYOUTS[name].h;
+	PANEL_H = MAIN_H + DEVICE_GAP + DEVICE_H;
 	jacks = {};
 	cable_drag = null;
 	$("layout").textContent = "Layout: " + LAYOUTS[name].name;
@@ -1550,6 +1659,12 @@ $("patch-select").addEventListener("change", function(e){
 	}
 	$("patch-delete").hidden = v.substr(0, 2) != "u:";
 	e.target.blur();
+});
+
+$("randomize").addEventListener("click", function(){
+	synth.randomize();
+	refreshPatchList();
+	setStatus( "Random patch: " + synth.settings.quantize + ", " + Math.round( synth.settings.tempo ) + " BPM (Save as\u2026 to keep it)" );
 });
 
 $("patch-save").addEventListener("click", function(){
