@@ -1,18 +1,55 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<!DOCTYPE html>
+<html lang="en">
 <head>
-<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
-
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>SUBHARM</title>
-	<link rel="preconnect" href="https://fonts.gstatic.com">
-	<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500&display=swap" rel="stylesheet">
-	<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@700&display=swap" rel="stylesheet">
-	<!-- <link rel="stylesheet" type="text/css" href="style.css" /> -->
-	<style type='text/css'>* { margin: 0; padding: 0; }</style>
-
+<link rel="preconnect" href="https://fonts.gstatic.com">
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@500;700&family=Oswald:wght@500&display=swap" rel="stylesheet">
+<style>
+	* { margin: 0; padding: 0; box-sizing: border-box; }
+	html, body { height: 100%; background: #0b0b0b; color: #e8e4dc; overflow: hidden; }
+	body { display: flex; flex-direction: column; font: 13px Antonio, Oswald, "Arial Narrow", sans-serif; letter-spacing: 0.03em; }
+	header { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 7px 14px; background: #1a1a19; border-bottom: 1px solid #2c2c2a; }
+	header .group { display: flex; align-items: center; gap: 6px; }
+	header .title { font-size: 18px; font-weight: 700; margin-right: 4px; }
+	button, select, input { font: inherit; color: #e8e4dc; background: #2b2b29; border: 1px solid #44443f; border-radius: 4px; padding: 3px 9px; }
+	button { cursor: pointer; }
+	button:hover { background: #363633; }
+	button.on { background: #6b231c; border-color: #a33a2e; }
+	input[type=range] { padding: 0; width: 90px; accent-color: #c9483a; }
+	#scale { width: 210px; }
+	#status { color: #8c8a84; flex: 1; min-width: 160px; text-align: right; }
+	#help { color: #8c8a84; font-size: 12px; }
+	canvas { flex: 1; display: block; width: 100%; min-height: 0; touch-action: none; }
+</style>
 </head>
-<body><canvas></canvas></body>
-<script src="libs/glui.js"></script>
+<body>
+<header>
+	<span class="title">SUBHARM</span>
+	<div class="group">
+		<button id="power" title="Start / suspend the audio engine">Audio off</button>
+		<button id="save" title="Save the panel and patch cables in this browser">Save</button>
+		<button id="load">Load</button>
+		<button id="init" title="Reset every control to the init patch">Init</button>
+	</div>
+	<label class="group">Reverb <input id="reverb" type="range" min="0" max="1" step="0.01" /></label>
+	<div class="group">
+		MIDI
+		<button id="midi-enable" title="Notes transpose both VCOs, clock / start / stop sync the sequencer">Enable</button>
+		<select id="midi-input" hidden></select>
+	</div>
+	<div class="group">
+		Scale
+		<input id="scale" list="scale-list" placeholder="loading scales&hellip;" spellcheck="false" />
+		<datalist id="scale-list"></datalist>
+		<button id="scale-clear" title="Remove the custom scale">&times;</button>
+	</div>
+	<span id="help" title="Drag knobs vertically (Shift = fine), double-click resets. Drag from a jack to patch, double-click or right-click a jack to unplug. Keys: Space play, R reset, N next, T trigger.">? help</span>
+	<span id="status"></span>
+</header>
+<canvas id="panel"></canvas>
 <script src="harm.js"></script>
 <script src="code.js"></script>
+</body>
 </html>

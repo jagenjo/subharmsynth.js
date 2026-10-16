@@ -1,665 +1,396 @@
+// harm.js
+// Subharmonicon controller: panel settings, patch bay definition, audio graph,
+// Scala scales and Web MIDI. The DSP itself lives in harm-worklet.js.
 
+var C4_FREQ = 261.6255653005986;
 
-function Harm( context )
+function Harm()
 {
-	this.context = context || null;
-
-	this.playing = false;
-	this.time_ms = 0;
-
-	this.current_seq = [0,0];
-	this.note = "A4";
-	this.rhythm_last_tick = [0,0,0,0];
-
-	this.last_trigger_time = 0;
-
-	this.globals = {
-		amp_factor: 0.5,
-		reverb_factor: 0.5,
-		delay_factor: 0.5,
-		cutoff_max: 2000,
-		resonance_max: 20,
-		subharmonic_freq_factor: 1,
-		vcf_attack_range: [0.001, 10],
-		vcf_decay_range: [0.005, 10],
-		vca_attack_range: [0.001, 10],
-		vca_decay_range: [0.005, 10]
+	this.context = null;
+	this.node = null;
+	this.settings = Harm.defaultSettings();
+	this.state = {
+		playing: false, step: [0,0], rhythm: [false,false,false,false], clock: false,
+		clock_source: "internal", freq: [0,0], div: [[1,1],[1,1]], vca_eg: 0, vcf_eg: 0
 	};
+	this.custom_scale = null; // { file, description, degrees, period }
+	this.midi = { access: null, inputs: [], selected: "all", activity: 0, notes: [], status: "off" };
+	this.onmidichange = null;
+	this._sent = null;
+	this._initializing = null;
+}
 
-	this.settings = {
-		volume: 0.3,
-		tempo: 120,
-		eg: true,
-		freq: 440, 
-		cutoff: 0.25,
-		resonance: 0,
-		vcf_eg_amt: 0,
-		vcf_attack: 0.1,
-		vcf_decay: 0.1,
-		vca_attack: 0.02,
-		vca_decay: 0.1,
-		reverb: 0.1,
-		delay: 0.1,
-		seq_oct:1, //2 or //5
-		quantize:"12-ET", //8-ET, 12-JI, 8-JI
-		osc: [{
-				shape: "square",
-				freq_factor: 1,
-				amp: 0.5,
-				subosc1_factor: 0.5,
-				subosc1_amp: 0.5,
-				subosc1_detune: 10,
-				subosc2_factor: 4,
-				subosc2_amp: 0.5,
-				subosc2_detune: 10,
-				osc1_assign: true,
-				sub1_assign: true,
-				sub2_assign: true
-			},{
-				shape: "square",
-				freq_factor: 1,
-				amp: 0,
-				subosc1_factor: 0.5,
-				subosc1_amp: 0,
-				subosc1_detune: 10,
-				subosc2_factor: 4,
-				subosc2_amp: 0,
-				subosc2_detune: 10,
-				osc1_assign: true,
-				sub1_assign: true,
-				sub2_assign: true
-			}],
+Harm.STORAGE_KEY = "SUBHARM_state_v2";
+
+Harm.defaultSettings = function()
+{
+	return {
+		version: 2,
+		vco: [
+			{ freq: 130.81, wave: "saw", sub1: 2, sub2: 3, level: 0.75, sub1_level: 0.55, sub2_level: 0.4 },
+			{ freq: 196.00, wave: "square", sub1: 4, sub2: 5, level: 0.45, sub1_level: 0.35, sub2_level: 0.3 }
+		],
 		seq: [
-				[0,0,0,0],
-				[0,0,0,0]
-			],
-		rhythm_sub: [1,1,1,1],
-		rhythm_seq1: [1,0,0,0],
-		rhythm_seq2: [0,0,0,0]
+			[0, 3/12, 5/12, 7/12],
+			[0, -3/12, 2/12, -1/12]
+		],
+		seq_assign: [
+			{ osc: true, sub1: false, sub2: false },
+			{ osc: true, sub1: false, sub2: false }
+		],
+		seq_oct: 1,         // +-1, +-2 or +-5 octaves
+		quantize: "12-ET",  // OFF, 12-ET, 8-ET, 12-JI, 8-JI, SCL (custom Scala scale)
+		tempo: 300,
+		rhythm: [2, 3, 5, 7],
+		rhythm_seq1: [true, false, true, false],
+		rhythm_seq2: [false, true, false, true],
+		cutoff: 900,
+		resonance: 0.35,
+		vcf_eg_amt: 0.45,
+		vcf_attack: 0.004,
+		vcf_decay: 0.35,
+		vca_attack: 0.004,
+		vca_decay: 0.6,
+		volume: 0.7,
+		vca_eg: true,
+		reverb: 0.15,
+		scale_file: null,
+		patches: []          // [output id, input id, color index]
 	};
-
-	this.voices = [];
-
-	this.sockets = [];
 }
 
-Harm.socket_names = [
-	["VCO 1","VCO 1 SUB","VCO 1 PWM","!VCA"],
-	["!VCO 1","!VCO 1 SUB 1","!VCO 1 SUB 2","VCA"],
-	["VCO 2","VCO 2 SUB","VCO 2 PWM","!VCA EG"],
-	["!VCO 2","!VCO 2 SUB 1","!VCO 2 SUB 2","CUTOFF"],
-	["PLAY","RESET","TRIGGER","!VCF EG"],
-	["RHYTHM 1","RHYTHM 2","RHYTHM 3","RHYTHM 4"],
-	["!SEQ 1","!SEQ 1 CLK","!SEQ 2","!SEQ 2 CLK"],
-	["MIDI IN","CLOCK","!CLOCK","!TRIGGER"]
+// patch bay, 4 columns x 8 rows, same layout as the hardware
+Harm.JACKS = [
+	[["VCO 1","in","vco1_in"], ["VCO 1 SUB","in","vco1_sub_in"], ["VCO 1 PWM","in","vco1_pwm"], ["VCA","out","vca"]],
+	[["VCO 1","out","vco1"], ["VCO 1 SUB 1","out","vco1_sub1"], ["VCO 1 SUB 2","out","vco1_sub2"], ["VCA","in","vca_in"]],
+	[["VCO 2","in","vco2_in"], ["VCO 2 SUB","in","vco2_sub_in"], ["VCO 2 PWM","in","vco2_pwm"], ["VCA EG","out","vca_eg"]],
+	[["VCO 2","out","vco2"], ["VCO 2 SUB 1","out","vco2_sub1"], ["VCO 2 SUB 2","out","vco2_sub2"], ["CUTOFF","in","cutoff_in"]],
+	[["PLAY","in","play_in"], ["RESET","in","reset_in"], ["TRIGGER","in","trigger_in"], ["VCF EG","out","vcf_eg"]],
+	[["RHYTHM 1","in","rhythm1_in"], ["RHYTHM 2","in","rhythm2_in"], ["RHYTHM 3","in","rhythm3_in"], ["RHYTHM 4","in","rhythm4_in"]],
+	[["SEQ 1","out","seq1"], ["SEQ 1 CLK","out","seq1_clk"], ["SEQ 2","out","seq2"], ["SEQ 2 CLK","out","seq2_clk"]],
+	[["MIDI IN","midi","midi_in"], ["CLOCK","in","clock_in"], ["CLOCK","out","clock_out"], ["TRIGGER","out","trigger_out"]]
 ];
-
-Harm.prototype.play = function()
-{
-	if(this.playing)
-	{
-		this.playing = false;
-		clearTimeout( this.timeout );
-		this.timeout = null;
-		return;
-	}
-
-	this.playing = true;
-	//var now = performance.now();
-	var now = this.context.currentTime;
-	this.rhythm_last_tick = [now,now,now,now];
-	var that = this;
-	loop();
-
-	function loop()
-	{
-		that.timeout = setTimeout( loop, 1 ); //as fast as possible
-		that.onTick();
-	}
-}
-
-Harm.prototype.reset = function()
-{
-	this.time_ms = 0;
-	this.current_seq[0] = 0;
-	this.current_seq[1] = 0;
-
-	var now = this.context.currentTime;
-	for(var i = 0; i < 4; ++i)
-		this.rhythm_last_tick[i] = now;
-}
-
-Harm.prototype.next = function()
-{
-	this.current_seq[0] = (this.current_seq[0] + 1) % 4;
-	this.current_seq[1] = (this.current_seq[1] + 1) % 4;
-}
-
-Harm.prototype.trigger = function()
-{
-	this.last_trigger_time = this.context.currentTime;
-
-	if( this.settings.eg )
-	{
-		this.voices[0].triggerEnvelope( this.settings.vca_attack * 0.5, this.settings.vca_decay * 0.5 ); //half a second
-		this.voices[1].triggerEnvelope( this.settings.vca_attack * 0.5, this.settings.vca_decay * 0.5 ); //half a second
-	}
-}
-
-Harm.prototype.tickSequencer = function(num)
-{
-	//advance
-	this.current_seq[num] = (this.current_seq[num] + 1) % 4;
-
-	if(!this.voices.length)
-		return;
-
-	this.last_trigger_time = this.context.currentTime;
-
-	//trigger envelope
-	if(this.settings.eg)
-		this.voices[num].triggerEnvelope( this.settings.vca_attack * 0.5, this.settings.vca_decay * 0.5 ); //half a second
-}
-
-//every 1 ms
-Harm.prototype.onTick = function()
-{
-	var audio_ctx = this.context;
-	//var now = performance.now();
-	var now = audio_ctx.currentTime;
-
-	var settings = this.settings;
-	
-	for(var i = 0; i < 4; ++i)
-	{
-		var last = this.rhythm_last_tick[i];
-		var bps = (settings.tempo / 60);
-		var delta = (1 / bps) * settings.rhythm_sub[i]; //ms until next subbeat
-		var next = last + delta;
-		if( now < next )
-			continue;
-		this.rhythm_last_tick[i] = now;
-		if( settings.rhythm_seq1[i] )
-			this.tickSequencer(0);
-		if( settings.rhythm_seq2[i] )
-			this.tickSequencer(1);
-	}
-}
-
-Harm.prototype.playNote = function( note )
-{
-	/*
-	this.current_seq0 = (this.current_seq0 + 1) % 4;
-	this.current_seq1 = (this.current_seq1 + 1) % 4;
-
-	var seq0 = this.settings.seq0[ this.current_seq0 ];
-	var seq1 = this.settings.seq1[ this.current_seq1 ];
-
-	var freq = getNoteFrequency( note, seq0 );
-
-	this.settings.freq = freq;
-	var voice = this.voices[0];
-	if(voice)
-		voice.triggerEnvelope( this.settings.attack, this.settings.decay, this.settings.sustain, this.settings.release );
-	*/
-}
 
 Harm.prototype.init = function()
 {
-	console.log("initializing synth");
+	if(this._initializing)
+		return this._initializing;
+	var that = this;
+	var ctx = this.context = new AudioContext({ latencyHint: "interactive" });
+	this._initializing = ctx.audioWorklet.addModule("harm-worklet.js").then(function(){
+		var node = that.node = new AudioWorkletNode( ctx, "subharmonicon", {
+			numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2]
+		});
+		node.port.onmessage = function(e) {
+			if(e.data.type == "state")
+				that.state = e.data;
+		};
 
-	var audio_ctx = this.context = new AudioContext();
+		that.dry_gain = ctx.createGain();
+		node.connect( that.dry_gain );
+		that.dry_gain.connect( ctx.destination );
 
-	var out = audio_ctx.destination;
+		// reverb is not part of the hardware, it is an extra send effect
+		that.reverb = ctx.createConvolver();
+		that.reverb_gain = ctx.createGain();
+		that.reverb_gain.gain.value = 0;
+		node.connect( that.reverb );
+		that.reverb.connect( that.reverb_gain );
+		that.reverb_gain.connect( ctx.destination );
+		fetch("data/BIG HALL E003 M2S.wav")
+			.then(function(r){ return r.arrayBuffer(); })
+			.then(function(b){ return ctx.decodeAudioData(b); })
+			.then(function(buffer){ that.reverb.buffer = buffer; })
+			.catch(function(err){ console.warn("reverb impulse not loaded", err); });
 
-	this.volume_gain = audio_ctx.createGain();
-	this.volume_gain.gain.value = 0.5;
-	this.volume_gain.connect( out );
-
-	//reverb
-	this.reverb_gain = audio_ctx.createGain();
-	this.reverb_gain.gain.value = 0.2;
-	this.reverb_gain.connect( audio_ctx.destination );
-	var reverb = this.reverb = audio_ctx.createConvolver();
-	this.reverb.connect( this.reverb_gain );
-	// load impulse response from file
-    fetch("data/BIG HALL E003 M2S.wav")
-		.then(resp=>resp.arrayBuffer())
-		.then(arraybuffer=>audio_ctx.decodeAudioData(arraybuffer))
-		.then(buffer=>reverb.buffer = buffer );
-
-	//delay
-	/*
-	this.delay_gain = audio_ctx.createGain();
-	this.delay_gain.gain.value = 0.2;
-	this.delay_gain.connect( reverb );
-	var delay = this.delay = audio_ctx.createDelay();
-	delay.delayTime.value = 1;
-	this.delay.connect( this.delay_gain );
-	*/
-
-	this.filter = audio_ctx.createBiquadFilter();
-	this.filter.connect( this.volume_gain );
-	this.filter.connect( this.reverb );
-
-
-	//filter controller ****
-	/*
-	this.filter_controller = audio_ctx.createConstantSource();
-	this.filter_controller.offset.value = 0;
-	this.filter_controller.connect( this.filter.frequency );
-	this.filter_controller.start();
-	*/
-
-	/*
-	var lfo = this.lfo = audio_ctx.createOscillator();
-	lfo.frequency.value = 1;
-	lfo.start();
-	lfo.connect( this.filter.frequency );
-	*/
-
-	//create voices
-	var voice = this.createVoice( this.filter );
-	this.voices.push(voice);
-	voice = this.createVoice( this.filter );
-	this.voices.push(voice);
+		that._sent = null;
+		that.sync();
+		that.sendScale();
+	});
+	return this._initializing;
 }
 
-Harm.prototype.createVoice = function( output )
+Harm.prototype.post = function( msg )
 {
-	var ctx = this.context;
+	if(this.node)
+		this.node.port.postMessage( msg );
+}
 
-	var envelope = ctx.createGain();
-	envelope.gain.value = 0;
-	envelope.connect( output );
+// sends the settings to the audio thread when they changed
+Harm.prototype.sync = function()
+{
+	if(!this.node)
+		return;
+	var json = JSON.stringify( this.settings );
+	if(json === this._sent)
+		return;
+	this._sent = json;
+	this.post({ type: "settings", settings: this.settings });
+	var reverb = this.settings.reverb;
+	this.reverb_gain.gain.setTargetAtTime( reverb * reverb * 0.8, this.context.currentTime, 0.02 );
+}
 
-	var osc = ctx.createOscillator();
-	osc.frequency.value = 440;
-	osc.type = "square"; //"sawtooth";
-	osc.start();
+Harm.prototype.play = function() { this.post({ type: "play" }); }
+Harm.prototype.reset = function() { this.post({ type: "reset" }); }
+Harm.prototype.next = function() { this.post({ type: "next" }); }
+Harm.prototype.trigger = function( gate ) { this.post({ type: "trigger", gate: gate }); }
 
-	var osc_gain = ctx.createGain();
-	osc_gain.gain.value = 0.5;
-	osc.connect( osc_gain );
-	osc_gain.connect( envelope );
+Harm.prototype.cycleQuantize = function()
+{
+	// hardware order: 12-ET, 8-ET, 12-JI, 8-JI, off (no LED). SCL only if a scale is loaded
+	var order = ["12-ET","8-ET","12-JI","8-JI"];
+	if(this.custom_scale)
+		order.push("SCL");
+	order.push("OFF");
+	var i = order.indexOf( this.settings.quantize );
+	this.settings.quantize = order[ (i + 1) % order.length ];
+}
 
-	var subosc1 = ctx.createOscillator();
-	subosc1.frequency.value = 220;
-	subosc1.detune.value = (Math.random() * 2 - 1) * 10;
-	subosc1.start();
+Harm.prototype.cycleSeqOct = function()
+{
+	var s = this.settings;
+	s.seq_oct = s.seq_oct == 1 ? 2 : (s.seq_oct == 2 ? 5 : 1);
+}
 
-	var subosc1_gain = ctx.createGain();
-	subosc1_gain.gain.value = 0.5;
-	subosc1.connect( subosc1_gain );
-	subosc1_gain.connect( envelope );
+// ---- patching ----
 
-	var subosc2 = ctx.createOscillator();
-	subosc2.frequency.value = 220;
-	subosc2.detune.value = (Math.random() * 2 - 1) * 10;
-	subosc2.start();
+Harm.prototype.connect = function( out_id, in_id, color )
+{
+	var patches = this.settings.patches;
+	for(var i = patches.length - 1; i >= 0; --i)
+		if(patches[i][1] == in_id)
+			patches.splice(i,1); // an input takes a single cable
+	patches.push([ out_id, in_id, color || 0 ]);
+}
 
-	var subosc2_gain = ctx.createGain();
-	subosc2_gain.gain.value = 0.5;
-	subosc2.connect( subosc2_gain );
-	subosc2_gain.connect( envelope );
+Harm.prototype.disconnect = function( jack_id )
+{
+	this.settings.patches = this.settings.patches.filter(function(p){ return p[0] != jack_id && p[1] != jack_id; });
+}
 
-	return {
-		env_value: 0,
-		envelope: envelope,
-		osc: osc,
-		osc_gain: osc_gain,
-		subosc1: subosc1,
-		subosc1_gain: subosc1_gain,
-		subosc2: subosc2,
-		subosc2_gain: subosc2_gain,
+// ---- save / load ----
 
-		triggerEnvelope: function( a,d )
-		{	
-			var now = ctx.currentTime;
-			var gain = this.envelope.gain;
-			gain.cancelScheduledValues(now);
-			gain.linearRampToValueAtTime( 1, now + a );
-			gain.setTargetAtTime( 0, now + a, a + d );
-			//gain.exponentialRampToValueAtTime( 1, now + a );
-			//gain.setTargetAtTime( s, now + a, d );
-			//gain.setTargetAtTime( 0, now + a + d, r );
-		},
+Harm.prototype.save = function()
+{
+	try {
+		localStorage.setItem( Harm.STORAGE_KEY, JSON.stringify( this.settings ) );
+		return true;
+	} catch(err) { return false; }
+}
 
-		open: function()
+Harm.prototype.load = function()
+{
+	var data = null;
+	try { data = localStorage.getItem( Harm.STORAGE_KEY ); } catch(err) {}
+	if(!data)
+		return false;
+	this.setSettings( JSON.parse( data ) );
+	return true;
+}
+
+Harm.prototype.setSettings = function( data )
+{
+	// fill missing fields from the defaults so older saves keep working
+	var s = Object.assign( Harm.defaultSettings(), data );
+	s.vco = [0,1].map(function(i){ return Object.assign( Harm.defaultSettings().vco[i], (data.vco || [])[i] ); });
+	this.settings = s;
+	if(!s.scale_file)
+		this.clearScale();
+	else if(!this.custom_scale || this.custom_scale.file != s.scale_file)
+	{
+		var quantize = s.quantize;
+		var that = this;
+		this.loadScale( s.scale_file ).then(function(){ that.settings.quantize = quantize; }, function(){});
+	}
+}
+
+// ---- Scala scales (extension, not on the hardware) ----
+
+Harm.parseScala = function( text )
+{
+	var lines = text.split(/\r?\n/).filter(function(l){ return l.trim()[0] != "!"; });
+	if(lines.length < 2)
+		return null;
+	var description = lines[0].trim();
+	var count = parseInt( lines[1] );
+	if(!(count > 0))
+		return null;
+	var pitches = [];
+	for(var i = 2; i < lines.length && pitches.length < count; ++i)
+	{
+		var tok = lines[i].trim().split(/\s+/)[0];
+		if(!tok)
+			continue;
+		var oct;
+		if(tok.indexOf(".") != -1)
+			oct = parseFloat(tok) / 1200;
+		else if(tok.indexOf("/") != -1)
 		{
-			var now = ctx.currentTime;
-			var gain = this.envelope.gain;
-			gain.cancelScheduledValues(now);
-			gain.linearRampToValueAtTime( 1, now);
+			var t = tok.split("/");
+			oct = Math.log2( parseFloat(t[0]) / parseFloat(t[1]) );
 		}
-	};
+		else
+			oct = Math.log2( parseFloat(tok) );
+		if(isFinite(oct))
+			pitches.push( oct );
+	}
+	if(!pitches.length)
+		return null;
+	var period = pitches[ pitches.length - 1 ];
+	if(!(period > 0))
+		period = 1;
+	var degrees = [0];
+	for(var i = 0; i < pitches.length - 1; ++i)
+	{
+		var d = pitches[i] - Math.floor( pitches[i] / period ) * period;
+		if(d > 1e-9 && d < period - 1e-9)
+			degrees.push( d );
+	}
+	degrees.sort(function(a,b){ return a - b; });
+	return { description: description, degrees: degrees, period: period };
 }
 
-Harm.prototype.update = function(dt)
+Harm.prototype.loadScale = function( file )
 {
-	if(!this.context)
+	var that = this;
+	return fetch( "data/scales/" + encodeURIComponent(file) )
+		.then(function(r){ if(!r.ok) throw new Error("HTTP " + r.status); return r.text(); })
+		.then(function(text){
+			var scale = Harm.parseScala( text );
+			if(!scale)
+				throw new Error("invalid scala file");
+			scale.file = file;
+			that.custom_scale = scale;
+			that.settings.scale_file = file;
+			that.settings.quantize = "SCL";
+			that.sendScale();
+			return scale;
+		});
+}
+
+Harm.prototype.clearScale = function()
+{
+	this.custom_scale = null;
+	this.settings.scale_file = null;
+	if(this.settings.quantize == "SCL")
+		this.settings.quantize = "12-ET";
+	this.sendScale();
+}
+
+Harm.prototype.sendScale = function()
+{
+	var s = this.custom_scale;
+	this.post({ type: "scale", scale: s ? { degrees: s.degrees, period: s.period } : null });
+}
+
+// ---- MIDI ----
+
+Harm.prototype.initMIDI = function()
+{
+	var that = this;
+	if(!navigator.requestMIDIAccess)
+	{
+		this.midi.status = "Web MIDI not supported in this browser";
+		this.notifyMIDI();
+		return Promise.resolve(false);
+	}
+	return navigator.requestMIDIAccess().then(function(access){
+		that.midi.access = access;
+		that.midi.status = "on";
+		access.onstatechange = function(){ that.bindMIDI(); };
+		that.bindMIDI();
+		return true;
+	}, function(){
+		that.midi.status = "MIDI access denied";
+		that.notifyMIDI();
+		return false;
+	});
+}
+
+Harm.prototype.bindMIDI = function()
+{
+	var that = this;
+	var midi = this.midi;
+	midi.inputs = Array.from( midi.access.inputs.values() );
+	midi.inputs.forEach(function(input){
+		var active = midi.selected == "all" || midi.selected == input.id;
+		input.onmidimessage = active ? function(e){ that.onMIDIMessage(e.data); } : null;
+	});
+	this.notifyMIDI();
+}
+
+Harm.prototype.selectMIDIInput = function( id )
+{
+	this.midi.selected = id;
+	this.midi.notes.length = 0;
+	this.post({ type: "midi", gate: false });
+	if(this.midi.access)
+		this.bindMIDI();
+}
+
+Harm.prototype.notifyMIDI = function()
+{
+	if(this.onmidichange)
+		this.onmidichange( this.midi );
+}
+
+Harm.prototype.onMIDIMessage = function( data )
+{
+	var midi = this.midi;
+	var st = data[0];
+	midi.activity = performance.now();
+
+	switch(st)
+	{
+		case 0xF8: this.post({ type: "midiClock" }); return;
+		case 0xFA: this.post({ type: "midiStart" }); return;
+		case 0xFB: this.post({ type: "midiContinue" }); return;
+		case 0xFC: this.post({ type: "midiStop" }); return;
+	}
+	if(st >= 0xF0)
 		return;
 
-	var now = this.context.currentTime;
-	if(this.playing)
+	var cmd = st & 0xF0;
+	var note = data[1];
+	if(cmd == 0x90 && data[2] > 0)
 	{
-		this.time_ms += dt;
+		// last note priority; the note transposes both VCOs relative to C4
+		midi.notes = midi.notes.filter(function(n){ return n != note; });
+		midi.notes.push( note );
+		this.post({ type: "midi", pitch: (note - 60) / 12, gate: true, retrigger: true });
 	}
-
-	var settings = this.settings;
-	var globals = this.globals;
-
-	this.volume_gain.gain.value = settings.volume * this.globals.amp_factor;
-	this.reverb_gain.gain.value = settings.reverb * this.globals.reverb_factor;
-	//this.delay_gain.gain.value = settings.delay * this.globals.delay_factor;
-
-	var cutoff = settings.cutoff;
-	var since_trigger = now - this.last_trigger_time;
-	var attack_filter = settings.vcf_attack;
-	var decay_filter = settings.vcf_decay;
-	var vcf_factor = 0;
-	if( since_trigger < attack_filter )
-		vcf_factor = remap( since_trigger,0,attack_filter,0,1 );
-	else if ( (since_trigger - attack_filter) < decay_filter )
-		vcf_factor = remap( (since_trigger - attack_filter),0,decay_filter,1,0 );
-	cutoff += vcf_factor * settings.vcf_eg_amt;
-
-	//this.filter.frequency.value = cutoff * this.globals.cutoff_max;
-	var filter_freq = Math.max(cutoff * this.globals.cutoff_max,0);
-	//this.filter_controller.offset.value = filter_freq;
-	this.filter.frequency.setValueAtTime( filter_freq, now );
-	this.filter.Q.value = settings.resonance * this.globals.resonance_max;
-
-	var quantize_mode = this.settings.quantize;
-
-	for(var i = 0; i < 2; ++i)
+	else if(cmd == 0x80 || cmd == 0x90)
 	{
-		var voice = this.voices[i];
-		var osc = settings.osc[i];
-
-		if( !this.settings.eg )
-			voice.open();
-
-		var seq = this.settings.seq[i][ this.current_seq[i] ] * this.settings.seq_oct;
-		var freq = getNoteFrequency( this.note, seq );
-		freq *= osc.freq_factor;
-		this.settings.freq = freq;
-
-		var freq_flat = getNoteFrequency( this.note, 0 );
-		freq_flat *= osc.freq_factor;
-
-		voice.osc.type = osc.shape || "square"; 
-		voice.osc.frequency.setValueAtTime( quantize( osc.osc1_assign ? freq : freq_flat, quantize_mode ), now );
-		voice.osc_gain.gain.value = osc.amp;
-		voice.subosc1.frequency.value = quantize( (osc.sub1_assign ? freq : freq_flat) / (osc.subosc1_factor * globals.subharmonic_freq_factor), quantize_mode );
-		voice.subosc1.detune.value = osc.subosc1_detune;
-		voice.subosc1_gain.gain.value = osc.subosc1_amp;
-		voice.subosc1.type = voice.osc.type; 
-		voice.subosc2.frequency.value = quantize( (osc.sub2_assign ? freq : freq_flat) / (osc.subosc2_factor * globals.subharmonic_freq_factor), quantize_mode );
-		voice.subosc2.detune.value = osc.subosc2_detune;
-		voice.subosc2_gain.gain.value = osc.subosc2_amp;
-		voice.subosc2.type = voice.osc.type; 
+		midi.notes = midi.notes.filter(function(n){ return n != note; });
+		if(midi.notes.length)
+			this.post({ type: "midi", pitch: (midi.notes[midi.notes.length-1] - 60) / 12, gate: true, retrigger: false });
+		else
+			this.post({ type: "midi", gate: false });
 	}
-
-	//var env = 1 - (now * 2) % 1;
-	//voice.env_value = env * 0.3 + voice.env_value * 0.7;
-	//voice.envelope.gain.exponentialRampToValueAtTime( voice.env_value, now + dt );
-}
-
-function getNoteKeyNumber( note )
-{
-    var notes = ['A', 'A#', 'B', 'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#'],
-        octave,
-        keyNumber;
-
-	note = note.toUpperCase();
-    if (note.length === 3) {
-        octave = note.charAt(2);
-    } else {
-        octave = note.charAt(1);
-    }
-
-    keyNumber = notes.indexOf(note.slice(0, -1));
-
-    if (keyNumber < 3) {
-        keyNumber = keyNumber + 12 + ((octave - 1) * 12) + 1; 
-    } else {
-        keyNumber = keyNumber + ((octave - 1) * 12) + 1; 
-    }
-	return keyNumber;
-}
-
-function getFrequency( key_number )
-{
-	var steps = (key_number - 69);
-	var ratio = steps / 12;
-    return 440 * Math.pow(2, ratio);
-}
-
-function getNote( freq )
-{
-	return (Math.log( freq / 440.0 ) / Math.log(2)) * 12 + 69; //69 is A4
-}
-
-function freqToLog( freq )
-{
-	return (Math.log( freq / 440.0 ) / Math.log(2));
-}
-
-function logToFreq( log )
-{
-	return Math.pow(2,log)*440;
-}
-
-function logToNote( log )
-{
-	return log * 12 + 69;
-}
-
-var JI_ratios = [1,25/24,9/8,6/5,5/4,4/3,45/32,3/2,8/5,5/3,9/5,15/8]; //,2
-var ET_ratios = [1,1.05946,1.12246,1.18921,1.25992,1.33483,1.41421,1.49831,1.58740,1.68179,1.78180,1.88775]; //,2
-var scale8 = [0,-1,0,0,-1,0,-1,0,0,-1,0,-1]; //starts at A4
-//var scale8 = [0,-1,0,-1,0,0,-1,0,-1,0,-1,0];
-
-function quantize( freq, mode )
-{
-	var log = freqToLog( freq );
-	var note = Math.round( logToNote( log ) );
-	var index = note % 12;
-	if(mode == "8-ET" || mode == "8-JI" )
-		note += scale8[ index ];
-	freq = getFrequency( note );
-	if(mode == "12-JI" || mode == "8-JI" )
+	else if(cmd == 0xE0)
 	{
-		//TODO
-		//log = freqToLog( freq );
-		//var logoctave = Math.floor( log );
+		var bend = ((data[2] << 7) | data[1]) - 8192;
+		this.post({ type: "bend", value: (bend / 8192) * (2 / 12) }); // +-2 semitones
 	}
-
-	return freq;
+	else if(cmd == 0xB0 && (data[1] == 123 || data[1] == 120))
+	{
+		midi.notes.length = 0; // all notes off / all sound off
+		this.post({ type: "midi", gate: false });
+	}
 }
 
-//https://gist.github.com/stuartmemo/3766449
-function getNoteFrequency( note, offset ) {
-	offset = offset || 0;
-	var keyNumber = getNoteKeyNumber( note ) + offset;
-    // Return frequency of note
-	return getFrequency( keyNumber );
-};
+// ---- helpers ----
 
-function remap(v, in_min, in_max, out_min, out_max ) {
-	return (v - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
-}
-
-//******************************
-
-Harm.prototype.draw = function ( ctx, x, y )
+function freqToNoteName( freq )
 {
-	var settings = this.settings;
-
-	ctx.fillStyle = "#222";
-	ctx.fillRect(x,y,1580,680);
-
-	//oscillators
-	for(var i = 0; i < 2; ++i )
-	{
-		var x1 = x + 450 + i * 300;
-		var osc = settings.osc[i];
-
-		var sidex = i == 0 ? x1 + 20: x1 + 200;		
-		drawLabel("VCO "+(i+1)+" SHAPE",sidex,y+100,0.5);
-		if( drawSwitch( sidex - 8,y+120,16,40, osc.shape == "square" ) )
-			osc.shape = (osc.shape == "square") ? "sawtooth" : "square";
-
-		drawLabel("VCO "+(i+1)+" FREQ",x1 + 110,y+70,1);
-		osc.freq_factor = GUI.Knob( x1 + 60,y+90,100,100, osc.freq_factor, 0, 2 );
-
-		drawLabel("SUB1 FREQ", x1 + 55,y+220,0.6);
-		osc.subosc1_factor = GUI.Knob( x1 + 20,y+240,70,70, osc.subosc1_factor, 16, 1,1,19 );
-
-		drawLabel("SUB2 FREQ",x1 + 180,y+220,0.6);
-		osc.subosc2_factor = GUI.Knob( x1 + 140,y+240,70,70, osc.subosc2_factor, 16, 1,1,19 );
-
-		drawLabel("SEQ "+(i+1)+" ASSIGN", x1 + 110,y+340,0.8);
-
-		ctx.font = "14px " + font_name;
-		if( drawButton( x1 + 30, y+350, 40, 30, "OSC 1", osc.osc1_assign ) )
-			osc.osc1_assign = !osc.osc1_assign;
-
-		if( drawButton( x1 + 90, y+350, 40, 30, "SUB 1", osc.sub1_assign ) )
-			osc.sub1_assign = !osc.sub1_assign;
-		if( drawButton( x1 + 150, y+350, 40, 30, "SUB 2", osc.sub2_assign ) )
-			osc.sub2_assign = !osc.sub2_assign;
-
-		drawLabel("VC0 1 LEVEL", x1 + 110,y+430,0.8);
-		osc.amp = GUI.Knob( x1 + 70,y+440,80,80, osc.amp, 0, 1 );
-
-		drawLabel("SUB 1 LEVEL", x1 + 40,y+550,0.8);
-		osc.subosc1_amp = GUI.Knob( x1,y+560,80,80, osc.subosc1_amp, 0, 1 );
-
-		drawLabel("SUB 2 LEVEL", x1 + 180,y+550,0.8);
-		osc.subosc2_amp = GUI.Knob( x1 + 140,y+560,80,80, osc.subosc2_amp, 0, 1 );
-	}
-
-	//selectors
-	var x1 = x + 650;
-	ctx.font = "14px " + font_name;
-	drawLed( x1 + 60, y+80, 10, settings.seq_oct == 5, "±5" );
-	drawLed( x1 + 60, y+110, 10, settings.seq_oct == 2, "±2" );
-	drawLed( x1 + 60, y+140, 10, settings.seq_oct == 1, "±1" );
-	if( drawButton( x1 + 30, y+170, 60, 30, "SEQ OCT" ) )
-	{
-		switch( settings.seq_oct )
-		{
-			case 5: settings.seq_oct = 2; break;
-			case 2: settings.seq_oct = 1; break;
-			case 1: settings.seq_oct = 5; break;
-		}
-	}
-
-	ctx.font = "14px " + font_name;
-	drawLed( x1 + 60, y+320, 10, settings.quantize == "12-ET", "12-ET" );
-	drawLed( x1 + 60, y+350, 10, settings.quantize == "8-ET", "8-ET" );
-	drawLed( x1 + 60, y+380, 10, settings.quantize == "12-JI", "12-JI" );
-	drawLed( x1 + 60, y+410, 10, settings.quantize == "8-JI", "8-JI" );
-	if( drawButton( x1 + 30, y+440, 60, 30, "QUANTIZE" ) )
-	{
-		switch( settings.quantize )
-		{
-			case "12-ET": settings.quantize = "8-ET"; break;
-			case "8-ET": settings.quantize = "12-JI"; break;
-			case "12-JI": settings.quantize = "8-JI"; break;
-			case "8-JI": settings.quantize = "12-ET"; break;
-		}
-	}
-
-	var x1 = x + 950;
-
-	drawLabel("CUTOFF",x1 + 110,y+40,1);
-	settings.cutoff = GUI.Knob( x1 + 60,y+50,100,100, settings.cutoff, 0, 1 );
-	drawLabel("RESONANCE",x1 + 110,y+200,1);
-	settings.resonance = GUI.Knob( x1 + 60,y+210,100,100, settings.resonance, 0, 1 );
-	drawLabel("VCF ATTACK",x1 + 110,y+370,1);
-	settings.vcf_attack = GUI.Knob( x1 + 60,y+380,100,100, settings.vcf_attack, 0, 1 );
-	drawLabel("VCA ATTACK",x1 + 110,y+540,1);
-	settings.vca_attack = GUI.Knob( x1 + 60,y+550,100,100, settings.vca_attack, 0, 1 );
-
-	drawLabel("VOLUME",x1 + 270,y+40,1);
-	settings.volume = GUI.Knob( x1 + 220,y+50,100,100, settings.volume, 0, 1 );
-	drawLabel("VCF EG AMT",x1 + 270,y+200,1);
-	settings.vcf_eg_amt = GUI.Knob( x1 + 220,y+210,100,100, settings.vcf_eg_amt, -1, 1 );
-	drawLabel("VCF DECAY",x1 + 270,y+370,1);
-	settings.vcf_decay = GUI.Knob( x1 + 220,y+380,100,100, settings.vcf_decay, 0, 1 );
-	drawLabel("VCA DECAY",x1 + 270,y+540,1);
-	settings.vca_decay = GUI.Knob( x1 + 220,y+550,100,100, settings.vca_decay, 0, 1 );
-
-
-	/*
-
-
-
-	settings.osc[0].subosc1_detune = GUI.Knob( 400,250,50,50, settings.osc[0].subosc1_detune, -100, 100 );
-	settings.osc[0].subosc2_detune = GUI.Knob( 600,250,50,50, settings.osc[0].subosc2_detune, -100, 100 );
-	*/
-
-	drawLabel("SEQUENCER 1",x+230,y+30,0.8);
-	drawLabel("SEQUENCER 2",x+230,y+180,0.8);
-	drawLabel("POLYRHYTHM",x+230,y+320,0.8);
-	drawLabel("OSCILLATORS",x+720,y+30,1);
-
-	for(var i = 0; i < 4; ++i)
-	{
-		var x1 = x + 50 + i * 100;
-
-		drawLabel("STEP "+(i+1),x1 + 25,y+60,0.6);
-		settings.seq[0][i] = GUI.Knob( x1,y+80,50,50, settings.seq[0][i], -12, 12,1,24 );
-		drawLed( x1 + 25, y+150, 10, i == synth.current_seq[0] );
-
-		drawLabel("STEP "+(i+1),x1 + 25,y+200,0.6);
-		settings.seq[1][i] = GUI.Knob( x1,y+220,50,50, settings.seq[1][i], -12, 12,1,24 );
-		drawLed( x1 + 25, y+290, 10, i == synth.current_seq[1] );
-
-		drawLabel("RHYTHM "+(i+1),x1 + 25,y+340,0.6);
-		settings.rhythm_sub[i] = GUI.Knob( x1,y+360,50,50, settings.rhythm_sub[i], 16, 1,1,16 );
-
-		if( drawButton( x1, y+430, 50, 30, "SEQ1", settings.rhythm_seq1[i] ) )
-			settings.rhythm_seq1[i] = !settings.rhythm_seq1[i];
-
-		if( drawButton( x1, y+480, 50, 30, "SEQ2", settings.rhythm_seq2[i] ) )
-			settings.rhythm_seq2[i] = !settings.rhythm_seq2[i];
-	}
-
-	var x1 = 70;
-	drawLabel("TEMPO",x + 80,y+550,1);
-	settings.tempo = GUI.Knob( x + 30,y+560,100,100, settings.tempo, 20, 3000 );
-
-	ctx.font = "14px " + font_name;
-	if( drawButton( x + 160, y+560, 40, 40, "RESET", false ) )
-		synth.reset();
-
-	if( drawButton( x + 220, y+560, 40, 40, "EG", settings.eg ) )
-		settings.eg = !settings.eg;
-
-	if( drawButton( x + 280, y+560, 40, 40, "NEXT", false ) )
-		synth.next();
-
-	if( drawButton( x + 160, y+620, 70, 40, "PLAY", synth.playing ) )
-		synth.play();
-
-	if( drawButton( x + 260, y+620, 70, 40, "TRIGGER", false ) )
-		synth.trigger();
-
-
-	var x1 = 1320;
-
-	for(var j = 0; j < 8; ++j)
-	{
-		for(var i = 0; i < 4; ++i)
-		{
-			if( drawSocket(x1 + i * 70, y + 100 + j * 70, Harm.socket_names[j][i] ) )
-			{
-				//connecting
-			}
-		}
-	}
+	if(!(freq > 0))
+		return "";
+	var names = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+	var midi = 69 + 12 * Math.log2( freq / 440 );
+	var n = Math.round( midi );
+	var cents = Math.round( (midi - n) * 100 );
+	var name = names[ ((n % 12) + 12) % 12 ] + (Math.floor(n / 12) - 1);
+	if(cents)
+		name += (cents > 0 ? " +" : " ") + cents + "c";
+	return name;
 }
