@@ -1503,7 +1503,7 @@ function drawDevices()
 }
 
 // ---------------------------------------------------------------------------
-// collapsible devices: a chevron button on the top left corner folds a device into a slim bar.
+// collapsible devices: a chevron button on the top left corner folds a device (and the others in its row) into a slim bar.
 // Its jacks stay on the bar as small sockets so cables keep their ends and can still be patched.
 
 var DEVICE_COLLAPSED_H = 26;
@@ -1513,9 +1513,16 @@ try { collapsed = JSON.parse( localStorage.getItem("SUBHARM_collapsed") || "{}" 
 
 function deviceH( id, h ) { return collapsed[id] ? DEVICE_COLLAPSED_H : h; }
 
+// devices sharing a row fold and unfold together
+var DEVICE_ROWS = [["keys"], ["lfo", "comp"], ["reverb", "delay"]];
+
 function toggleCollapsed( id )
 {
-	collapsed[id] = !collapsed[id];
+	var state = !collapsed[id];
+	DEVICE_ROWS.forEach(function(row){
+		if(row.indexOf( id ) != -1)
+			row.forEach(function(other){ collapsed[other] = state; });
+	});
 	try { localStorage.setItem( "SUBHARM_collapsed", JSON.stringify( collapsed ) ); } catch(err) {}
 }
 

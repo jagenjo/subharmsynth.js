@@ -22,7 +22,7 @@ function Harm()
 }
 
 Harm.STORAGE_KEY = "SUBHARM_state_v2";
-Harm.VERSION = "20261016d"; // bump together with the ?v= in index.html so browsers reload the scripts
+Harm.VERSION = "20261016e"; // bump together with the ?v= in index.html so browsers reload the scripts
 
 Harm.defaultSettings = function()
 {
