@@ -1,40 +1,77 @@
 // code.js
-// Panel UI of the Subharmonicon replica: canvas drawing, immediate mode
-// widgets (knobs, buttons, switches, LEDs), patch bay cables, toolbar and
-// keyboard shortcuts. The synth engine is in harm.js / harm-worklet.js.
+// Rack UI: canvas drawing, immediate mode widgets (knobs, buttons, switches, LEDs), patch
+// cables, the shared devices (keys, LFO, compressor, reverb, delay), toolbar and keyboard
+// shortcuts. Each synth draws its own panel (synths/*.js) with these widgets; the rack
+// controller is webrack.js and the DSP runs in rack-worklet.js + synths/*-worklet.js.
 
 var canvas = document.getElementById("panel");
 var ctx = canvas.getContext("2d");
 var FONT = "Antonio, Oswald, 'Arial Narrow', sans-serif";
-// two panel layouts: "hardware" mirrors the real front panel (60HP, ~2.37:1, plus wood
-// cheeks), "classic" is the original compact layout of this replica
+// two panel layouts: "hardware" mirrors the real front panels, "classic" is the original compact
+// layout of the Subharm. The rack is as wide as the Subharm's panel; other synths are scaled to fit
 var LAYOUTS = {
-	hardware: { w: 1568, h: 596, name: "Hardware" },
-	classic: { w: 1460, h: 640, name: "Classic" }
+	hardware: { w: 1568, name: "Hardware" },
+	classic: { w: 1460, name: "Classic" }
 };
 var layout = "hardware";
 try { if(LAYOUTS[ localStorage.getItem("SUBHARM_layout") ]) layout = localStorage.getItem("SUBHARM_layout"); } catch(err) {}
-var PANEL_W, PANEL_H, MAIN_H; // set by setLayout(); PANEL_H includes the device rows
-var OY = 0; // y offset of the row being drawn (jacks and tooltips are stored in page coordinates)
+var PANEL_W, PANEL_H; // set by setLayout() / updatePanelHeight(): the whole rack
 var KNOB_A0 = Math.PI * 0.75, KNOB_SWEEP = Math.PI * 1.5;
 var CABLE_COLORS = ["#e8c547","#e05a47","#4fa3e0","#6cc070","#c77dd8","#ececec","#f08c3a"];
 var TEXT_COLOR = "#e8e4dc", DIM_COLOR = "#8c8a84";
 
-var synth = new Harm();
+var rack = new WR.Context();
 
-var view = { scale: 1, ox: 0, oy: 0, dpr: 1 };
+// the rack's scale is the window width times the zoom (toolbar - / +), so by default it fills the
+// width and more devices make it scroll. sx / sy: scroll in screen pixels, with scrollbars
+// on the right and the bottom when the rack is taller / wider than the window
+var view = { scale: 1, zoom: 1, ox: 0, oy: 0, dpr: 1, sx: 0, sy: 0, max_sx: 0, max_sy: 0, drag: null };
+var SCROLLBAR_W = 12;
+var ZOOM_MIN = 0.4, ZOOM_MAX = 3, ZOOM_STEP = 1.15;
+try { view.zoom = clamp( parseFloat( localStorage.getItem("SUBHARM_zoom") ) || 1, ZOOM_MIN, ZOOM_MAX ); } catch(err) {}
+// pointer state. px / py are in rack coordinates, x / y in the coordinates of the row being drawn
 var ui = {
+	px: -1, py: -1,
 	x: -1, y: -1, down: false, pressed: false, released: false, rpressed: false, dbl: false,
-	shift: false, wheel: 0, active: null, hot: null,
+	shift: false, wheel: 0, wheel_x: 0, active: null, hot: null,
 	startY: 0, startN: 0, dragShift: false, lastDownTime: 0, lastDownPos: [0,0]
 };
 var tooltips = [];
-var jacks = {};          // jack id -> { x, y, type, label }
+var jacks = {};          // jack id -> { x, y, type, label }, in rack coordinates
 var cable_drag = null;   // { from: jack id, type: "out"|"in", color }
 var next_color = 0;
-var trigger_held = false;
 var show_wires = true;
 try { show_wires = localStorage.getItem("SUBHARM_wires") != "hidden"; } catch(err) {}
+
+// every row (the keys, each synth, the device rows) is drawn in its own coordinates: a frame
+// is its offset and scale in the rack. Jacks and tooltips are stored in rack coordinates
+var frame = { ox: 0, oy: 0, k: 1 };
+// widget and jack ids get the id of the module being drawn in front ("dfam2." + "cutoff")
+var id_prefix = "";
+
+function beginFrame( ox, oy, k )
+{
+	frame = { ox: ox, oy: oy, k: k || 1 };
+	ctx.save();
+	ctx.translate( ox, oy );
+	ctx.scale( frame.k, frame.k );
+	ui.x = (ui.px - ox) / frame.k;
+	ui.y = (ui.py - oy) / frame.k;
+}
+
+function endFrame()
+{
+	ctx.restore();
+	frame = { ox: 0, oy: 0, k: 1 };
+	ui.x = ui.px;
+	ui.y = ui.py;
+}
+
+function rackX( x ) { return frame.ox + x * frame.k; }
+function rackY( y ) { return frame.oy + y * frame.k; }
+
+// tooltip at x, y of the current frame
+function tip( text, x, y ) { tooltips.push([ text, rackX( x ), rackY( y ) ]); }
 
 function clamp(v,a,b) { return v < a ? a : (v > b ? b : v); }
 
@@ -43,12 +80,12 @@ function clamp(v,a,b) { return v < a ? a : (v > b ? b : v); }
 
 function ensureAudio()
 {
-	if(!synth.context)
-		return synth.init().then(updateToolbar, function(err){
+	if(!rack.context)
+		return rack.init().then(updateToolbar, function(err){
 			console.error(err);
 			setStatus("Audio engine failed to start: " + err.message);
 		});
-	return synth._initializing;
+	return rack._initializing;
 }
 
 function act( fn )
@@ -62,13 +99,42 @@ function act( fn )
 function toPanel( e )
 {
 	var r = canvas.getBoundingClientRect();
-	ui.x = (e.clientX - r.left - view.ox) / view.scale;
-	ui.y = (e.clientY - r.top - view.oy) / view.scale;
+	ui.cx = e.clientX - r.left; // kept to map the pointer again after a scroll
+	ui.cy = e.clientY - r.top;
+	ui.x = ui.px = (ui.cx - view.ox) / view.scale;
+	ui.y = ui.py = (ui.cy - view.oy) / view.scale;
 	ui.shift = e.shiftKey;
+}
+
+function setScroll( x, y )
+{
+	view.sx = clamp( x, 0, view.max_sx );
+	view.sy = clamp( y, 0, view.max_sy );
+}
+
+// "x" / "y" when the pointer is on a scrollbar
+function scrollbarHit( e )
+{
+	var r = canvas.getBoundingClientRect();
+	var x = e.clientX - r.left, y = e.clientY - r.top;
+	if(view.max_sy > 0 && x >= canvas.clientWidth - SCROLLBAR_W - 4)
+		return "y";
+	if(view.max_sx > 0 && y >= canvas.clientHeight - SCROLLBAR_W - 4)
+		return "x";
+	return null;
 }
 
 canvas.addEventListener("pointerdown", function(e){
 	toPanel(e);
+	var bar = e.button == 0 && scrollbarHit( e );
+	if(bar)
+	{
+		// dragging a scrollbar: the thumb follows the pointer
+		view.drag = { axis: bar, x: e.clientX, y: e.clientY, sx: view.sx, sy: view.sy };
+		canvas.setPointerCapture( e.pointerId );
+		e.preventDefault();
+		return;
+	}
 	if(e.button == 2)
 	{
 		ui.rpressed = true;
@@ -86,9 +152,25 @@ canvas.addEventListener("pointerdown", function(e){
 	canvas.setPointerCapture( e.pointerId );
 	e.preventDefault();
 });
-canvas.addEventListener("pointermove", toPanel);
+canvas.addEventListener("pointermove", function(e){
+	toPanel(e);
+	var d = view.drag;
+	if(d)
+	{
+		var w = canvas.clientWidth, h = canvas.clientHeight;
+		if(d.axis == "y")
+			setScroll( view.sx, d.sy + (e.clientY - d.y) * (view.max_sy + h) / h );
+		else
+			setScroll( d.sx + (e.clientX - d.x) * (view.max_sx + w) / w, view.sy );
+	}
+});
 function onPointerUp(e) {
 	toPanel(e);
+	if(view.drag)
+	{
+		view.drag = null;
+		return;
+	}
 	if(e.button == 2 || !ui.down)
 		return;
 	ui.down = false;
@@ -98,7 +180,11 @@ canvas.addEventListener("pointerup", onPointerUp);
 canvas.addEventListener("pointercancel", onPointerUp);
 canvas.addEventListener("wheel", function(e){
 	toPanel(e);
-	ui.wheel += Math.sign( e.deltaY );
+	// shift + wheel (or a sideways wheel) scrolls horizontally, unless a knob takes it
+	if(Math.abs( e.deltaX ) > Math.abs( e.deltaY ))
+		ui.wheel_x += Math.sign( e.deltaX );
+	else
+		ui.wheel += Math.sign( e.deltaY );
 	e.preventDefault();
 }, { passive: false });
 canvas.addEventListener("contextmenu", function(e){ e.preventDefault(); });
@@ -185,6 +271,7 @@ function drawScrew( x, y )
 function knob( id, cx, cy, r, value, min, max, o )
 {
 	o = o || {};
+	id = id_prefix + id;
 	var range = o.exp ? Math.log( max / min ) : (max - min);
 	// n is the knob rotation 0..1; reversed knobs (SUB FREQ) read min fully clockwise
 	var toN = function(v) { var n = o.exp ? Math.log( v / min ) / range : (v - min) / range; return o.reverse ? 1 - n : n; };
@@ -239,7 +326,7 @@ function knob( id, cx, cy, r, value, min, max, o )
 			drawLabel( o.label, cx, cy - (style == "small" ? r + 15 : (style == "ring" ? r * 1.2 + 16 : r * 1.12 + 18)), o.labelSize || 11 );
 	}
 	if((hover || ui.active === id) && o.format)
-		tooltips.push([ o.format( value ), cx, cy + r + 16 + OY ]);
+		tip( o.format( value ), cx, cy + r + 16 );
 	return value;
 }
 
@@ -371,6 +458,7 @@ function drawKnob( cx, cy, r, n, highlight, ticks, bipolar, style )
 // rubber button that lights up red when `lit` (classic layout: LED dot, none if lit is undefined). returns { clicked, held }
 function button( id, x, y, w, h, text, lit )
 {
+	id = id_prefix + id;
 	var hover = !cable_drag && (ui.active === null || ui.active === id) && hitRect( x, y, w, h );
 	var clicked = false;
 	if(hover && ui.pressed && ui.active === null)
@@ -422,510 +510,7 @@ function button( id, x, y, w, h, text, lit )
 	return { clicked: clicked, held: held };
 }
 
-function drawWaveIcon( kind, x, y )
-{
-	ctx.beginPath();
-	if(kind == "square")
-	{
-		ctx.moveTo( x, y + 3 ); ctx.lineTo( x, y - 3 ); ctx.lineTo( x + 5, y - 3 ); ctx.lineTo( x + 5, y + 3 ); ctx.lineTo( x + 10, y + 3 ); ctx.lineTo( x + 10, y - 3 );
-	}
-	else if(kind == "pwm")
-	{
-		ctx.moveTo( x, y + 3 ); ctx.lineTo( x, y - 3 ); ctx.lineTo( x + 2, y - 3 ); ctx.lineTo( x + 2, y + 3 ); ctx.lineTo( x + 4, y + 3 );
-		ctx.moveTo( x + 6, y + 3 ); ctx.lineTo( x + 11, y - 3 ); ctx.lineTo( x + 11, y + 3 );
-	}
-	else
-	{
-		ctx.moveTo( x, y + 3 ); ctx.lineTo( x + 5, y - 3 ); ctx.lineTo( x + 5, y + 3 ); ctx.lineTo( x + 10, y - 3 ); ctx.lineTo( x + 10, y + 3 );
-	}
-	ctx.stroke();
-}
-
-// 3 position VCO wave switch: up = square, middle = pulse + saw subs (PWM), down = saw
-var WAVE_POSITIONS = ["square", "pwm", "saw"];
-function waveSwitch( id, x, y, value, icons_left )
-{
-	var w = 14, h = 48;
-	var pos = Math.max( 0, WAVE_POSITIONS.indexOf( value ) );
-	var hover = !cable_drag && ui.active === null && hitRect( x - 18, y - 4, w + 36, h + 8 );
-	if(hover && ui.pressed)
-	{
-		ui.active = id;
-		pos = clamp( Math.floor( (ui.y - y) / (h / 3) ), 0, 2 );
-		value = WAVE_POSITIONS[ pos ];
-	}
-	if(hover)
-		ui.hot = id;
-
-	// hex nut + bat lever
-	ctx.fillStyle = "#050505";
-	ctx.beginPath(); ctx.roundRect( x, y, w, h, 3 ); ctx.fill();
-	var cx = x + w * 0.5, cy = y + h * 0.5;
-	var g = ctx.createRadialGradient( cx - 2, cy - 2, 1, cx, cy, 7 );
-	g.addColorStop( 0, "#e6e6e0" );
-	g.addColorStop( 1, "#7a7a74" );
-	ctx.fillStyle = g;
-	ctx.beginPath(); ctx.arc( cx, cy, 6, 0, Math.PI * 2 ); ctx.fill();
-	var ty = y + 5 + pos * (h - 10) / 2;
-	ctx.strokeStyle = "#d0d0ca";
-	ctx.lineWidth = 4;
-	ctx.lineCap = "round";
-	ctx.beginPath(); ctx.moveTo( cx, cy ); ctx.lineTo( cx, ty ); ctx.stroke();
-	ctx.lineCap = "butt";
-	ctx.fillStyle = "#f0f0ea";
-	ctx.beginPath(); ctx.arc( cx, ty, 3.5, 0, Math.PI * 2 ); ctx.fill();
-
-	ctx.lineWidth = 1.3;
-	for(var i = 0; i < 3; ++i)
-	{
-		ctx.strokeStyle = i == pos ? TEXT_COLOR : DIM_COLOR;
-		drawWaveIcon( WAVE_POSITIONS[i], icons_left ? x - 16 : x + w + 5, y + 8 + i * (h - 16) / 2 );
-	}
-	if(hover)
-		tooltips.push([ ["SQUARE", "PULSE + SAW SUBS (PWM)", "SAW"][pos], cx, y + h + 14 + OY ]);
-	return value;
-}
-
-// ---------------------------------------------------------------------------
-// patch bay
-
-function jackCompatible( drag, j )
-{
-	return (drag.type == "out" && j.type == "in") || (drag.type == "in" && j.type == "out") ||
-		(drag.type == "midiout" && j.type == "midiin") || (drag.type == "midiin" && j.type == "midiout");
-}
-
-function drawJack( id, x, y, label, type )
-{
-	jacks[id] = { x: x, y: y + OY, type: type, label: label };
-	var hover = hitCircle( x, y, 17 );
-
-	drawLabel( label, x, y - 24, 10, type == "out" || type == "midiout" );
-
-	if(cable_drag && cable_drag.from != id && jackCompatible( cable_drag, jacks[id] ))
-	{
-		ctx.strokeStyle = hover ? "#fff" : "rgba(255,255,255,0.25)";
-		ctx.lineWidth = 2;
-		ctx.beginPath(); ctx.arc( x, y, 18, 0, Math.PI * 2 ); ctx.stroke();
-	}
-
-	// hex nut
-	var g = ctx.createLinearGradient( x - 14, y - 14, x + 14, y + 14 );
-	g.addColorStop( 0, hover && !cable_drag ? "#e0e0da" : "#c9c9c3" );
-	g.addColorStop( 1, "#6d6d68" );
-	ctx.fillStyle = g;
-	ctx.beginPath();
-	for(var i = 0; i < 6; ++i)
-	{
-		var a = Math.PI / 6 + i * Math.PI / 3;
-		ctx.lineTo( x + Math.cos(a) * 13, y + Math.sin(a) * 13 );
-	}
-	ctx.closePath();
-	ctx.fill();
-	ctx.fillStyle = "#2a2a28";
-	ctx.beginPath(); ctx.arc( x, y, 8, 0, Math.PI * 2 ); ctx.fill();
-	ctx.fillStyle = "#000";
-	ctx.beginPath(); ctx.arc( x, y, 5.5, 0, Math.PI * 2 ); ctx.fill();
-
-	if(type == "midiin")
-	{
-		// lights with incoming MIDI while the MIDI cable is plugged in
-		var cabled = synth.settings.patches.some(function(p){ return p[1] == id; });
-		var active = cabled && synth.midi.access && (performance.now() - synth.midi.activity) < 120;
-		drawLed( x - 27, y - 24, 2.5, active, "#3bd16f" );
-	}
-}
-
-function jackAt( x, y )
-{
-	for(var id in jacks)
-	{
-		var j = jacks[id];
-		if((x - j.x) * (x - j.x) + (y - j.y) * (y - j.y) < 18 * 18)
-			return id;
-	}
-	return null;
-}
-
-function updateCables()
-{
-	var patches = synth.settings.patches;
-	if(ui.rpressed)
-	{
-		var id = jackAt( ui.x, ui.y );
-		if(id)
-			synth.disconnect( id );
-	}
-	if(ui.pressed && ui.active === null && !cable_drag)
-	{
-		var id = jackAt( ui.x, ui.y );
-		if(id)
-		{
-			ui.active = "jack";
-			var j = jacks[id];
-			if(ui.dbl)
-				synth.disconnect( id );
-			else if(j.type == "in" || j.type == "midiin")
-			{
-				// grab the cable plugged here, or start a new one
-				var idx = patches.findIndex(function(p){ return p[1] == id; });
-				if(idx != -1)
-				{
-					var p = patches.splice( idx, 1 )[0];
-					cable_drag = { from: p[0], type: jacks[ p[0] ].type, color: p[2] };
-				}
-				else
-					cable_drag = { from: id, type: j.type, color: next_color++ % CABLE_COLORS.length };
-			}
-			else
-				cable_drag = { from: id, type: j.type, color: next_color++ % CABLE_COLORS.length };
-		}
-	}
-	if(cable_drag && !ui.down)
-	{
-		var target = jackAt( ui.x, ui.y );
-		if(target && jackCompatible( cable_drag, jacks[target] ))
-		{
-			if(cable_drag.type == "out" || cable_drag.type == "midiout")
-				synth.connect( cable_drag.from, target, cable_drag.color );
-			else
-				synth.connect( target, cable_drag.from, cable_drag.color );
-		}
-		cable_drag = null;
-	}
-}
-
-// plugs_only: just the plugs on the jacks (toolbar "Wires" hidden)
-function drawCable( x1, y1, x2, y2, color, alpha, plugs_only )
-{
-	var d = Math.hypot( x2 - x1, y2 - y1 );
-	var sag = Math.min( 20 + d * 0.3, 90 ); // long cables between rows would hang off the panel
-	// quadratic curve: the lowest point hangs `sag` below the midpoint
-	var mx = (x1 + x2) * 0.5, my = (y1 + y2) * 0.5 + sag;
-	ctx.save();
-	ctx.globalAlpha = alpha || 0.92;
-	if(!plugs_only)
-	{
-		ctx.lineCap = "round";
-		ctx.strokeStyle = "rgba(0,0,0,0.35)";
-		ctx.lineWidth = 8;
-		ctx.beginPath(); ctx.moveTo( x1 + 3, y1 + 6 ); ctx.quadraticCurveTo( mx + 3, my + sag + 6, x2 + 3, y2 + 6 ); ctx.stroke();
-		ctx.strokeStyle = color;
-		ctx.lineWidth = 6;
-		ctx.beginPath(); ctx.moveTo( x1, y1 ); ctx.quadraticCurveTo( mx, my + sag, x2, y2 ); ctx.stroke();
-		ctx.strokeStyle = "rgba(255,255,255,0.3)";
-		ctx.lineWidth = 1.5;
-		ctx.beginPath(); ctx.moveTo( x1 - 1, y1 - 1.5 ); ctx.quadraticCurveTo( mx - 1, my + sag - 1.5, x2 - 1, y2 - 1.5 ); ctx.stroke();
-	}
-	[[x1,y1],[x2,y2]].forEach(function(p){
-		ctx.fillStyle = "#111";
-		ctx.beginPath(); ctx.arc( p[0], p[1], 9.5, 0, Math.PI * 2 ); ctx.fill();
-		ctx.fillStyle = color;
-		ctx.beginPath(); ctx.arc( p[0], p[1], 7.5, 0, Math.PI * 2 ); ctx.fill();
-		ctx.fillStyle = "rgba(255,255,255,0.35)";
-		ctx.beginPath(); ctx.arc( p[0] - 2, p[1] - 2, 2.5, 0, Math.PI * 2 ); ctx.fill();
-	});
-	ctx.restore();
-}
-
-function drawCables()
-{
-	synth.settings.patches.forEach(function(p){
-		var a = jacks[p[0]], b = jacks[p[1]];
-		if(a && b)
-			drawCable( a.x, a.y, b.x, b.y, CABLE_COLORS[ p[2] % CABLE_COLORS.length ], 0.92, !show_wires );
-	});
-	if(cable_drag)
-	{
-		var a = jacks[ cable_drag.from ];
-		drawCable( a.x, a.y, ui.x, ui.y, CABLE_COLORS[ cable_drag.color ], 0.8 );
-	}
-}
-
-// ---------------------------------------------------------------------------
-// formatting
-
-function fmtHz( f ) { return f >= 1000 ? (f / 1000).toFixed(2) + " kHz" : f.toFixed(f < 100 ? 1 : 0) + " Hz"; }
-function fmtTime( t ) { return t >= 1 ? t.toFixed(2) + " s" : (t * 1000).toFixed(t < 0.01 ? 1 : 0) + " ms"; }
-function fmtPct( v ) { return Math.round( v * 100 ) + "%"; }
-function fmtSigned( v ) { return (v > 0 ? "+" : "") + Math.round( v * 100 ) + "%"; }
-function fmtDiv( v ) { return "÷" + v; }
-
-// ---------------------------------------------------------------------------
-// panel, laid out like the hardware (60HP Eurorack panel between wood cheeks):
-// sequencers / polyrhythm / transport | VCO 1 | SEQ OCT + QUANTIZE | VCO 2 | VCF + EGs | patch bay
-
-var SEQ_COLS = [100, 180, 260, 340];
-var VCO_COLS = [[455, 545, 635], [785, 875, 965]]; // SUB 1, VCO, SUB 2 columns
-var CENTER_X = 710;
-var FILTER_COLS = [1082, 1192];
-var FILTER_ROWS = [100, 228, 356, 484];
-var JACK_COLS = [1292, 1357, 1422, 1487];
-
-function drawPanelBackground()
-{
-	drawCasing( 0, 0, PANEL_W, MAIN_H );
-
-	drawScrew( 36, 12 ); drawScrew( PANEL_W - 36, 12 );
-	drawScrew( 36, MAIN_H - 12 ); drawScrew( PANEL_W - 36, MAIN_H - 12 );
-	drawScrew( 690, MAIN_H - 12 ); drawScrew( 690, 12 );
-
-	// name, bottom left
-	ctx.textAlign = "left";
-	ctx.textBaseline = "alphabetic";
-	ctx.font = "bold 30px " + FONT;
-	ctx.fillStyle = TEXT_COLOR;
-	ctx.fillText( "SUBHARM", 46, 560 );
-	var w = ctx.measureText( "SUBHARM" ).width;
-	ctx.fillRect( 54 + w, 534, 1.5, 28 );
-	ctx.font = "11px " + FONT;
-	ctx.fillText( "SEMI-MODULAR ANALOG", 62 + w, 546 );
-	ctx.fillText( "POLYRHYTHMIC SYNTHESIZER", 62 + w, 559 );
-}
-
-function drawSequencers()
-{
-	var s = synth.settings;
-	var st = synth.state;
-	for(var i = 0; i < 2; ++i)
-	{
-		var y = 72 + i * 100;
-		drawLabel( "SEQUENCER " + (i + 1), 220, y - 50, 13 );
-		var assign = s.seq_assign[i];
-		for(var k = 0; k < 4; ++k)
-		{
-			var cx = SEQ_COLS[k];
-			s.seq[i][k] = knob( "seq" + i + "_" + k, cx, y, 13, s.seq[i][k], -1, 1, {
-				label: "STEP " + (k + 1), style: "small", ticks: 9, bipolar: true, def: 0, labelSize: 10,
-				format: (function(a){ return function(v){
-					var semis = v * s.seq_oct * 12;
-					var txt = (semis > 0 ? "+" : "") + semis.toFixed(1) + " st";
-					if(a.sub1 || a.sub2)
-					{
-						var d = Math.round( v * s.seq_oct * 3 );
-						txt += "  ÷" + (d >= 0 ? "+" : "") + d;
-					}
-					return txt;
-				}; })( assign )
-			});
-			drawLed( cx, y + 30, 4.5, st.step[i] == k );
-		}
-	}
-}
-
-function drawPolyrhythm()
-{
-	var s = synth.settings;
-	drawLabel( "POLYRHYTHM", 220, 228, 13 );
-	for(var i = 0; i < 4; ++i)
-	{
-		var cx = SEQ_COLS[i];
-		ctx.strokeStyle = "#8a877f";
-		ctx.lineWidth = 1;
-		ctx.beginPath(); ctx.moveTo( cx, 272 ); ctx.lineTo( cx, 330 ); ctx.stroke();
-		s.rhythm[i] = knob( "rhythm" + i, cx, 272, 14, s.rhythm[i], 1, 16, {
-			label: "RHYTHM " + (i + 1), style: "ring", step: 1, def: 1, labelSize: 10, format: fmtDiv
-		});
-		if(button( "r" + i + "s1", cx - 24, 300, 48, 20, "SEQ 1", s.rhythm_seq1[i] ).clicked)
-			s.rhythm_seq1[i] = !s.rhythm_seq1[i];
-		if(button( "r" + i + "s2", cx - 24, 326, 48, 20, "SEQ 2", s.rhythm_seq2[i] ).clicked)
-			s.rhythm_seq2[i] = !s.rhythm_seq2[i];
-	}
-}
-
-function drawTransport()
-{
-	var s = synth.settings;
-	var st = synth.state;
-
-	s.tempo = knob( "tempo", 84, 446, 38, s.tempo, Harm.TEMPO_MIN, Harm.TEMPO_MAX, {
-		label: "TEMPO", labelSize: 13, style: "ring", exp: true, def: 120,
-		format: function(v){
-			if(st.clock_source == "midi") return "MIDI CLOCK";
-			if(st.clock_source == "patch") return "EXT CLOCK";
-			return Math.round(v) + " BPM";
-		}
-	});
-
-	if(button( "reset", 160, 410, 54, 26, "RESET" ).clicked)
-		act(function(){ synth.reset(); });
-	// EG is lit normally and blinks while the envelopes are held open
-	var blink = (performance.now() % 600) < 300;
-	if(button( "eg", 222, 410, 54, 26, "EG", s.eg_hold ? blink : true ).clicked)
-		s.eg_hold = !s.eg_hold;
-	if(button( "next", 284, 410, 54, 26, "NEXT" ).clicked)
-		act(function(){ synth.next(); });
-
-	if(button( "play", 160, 450, 84, 28, "PLAY", st.playing ).clicked)
-		act(function(){ synth.play(); });
-	var trig = button( "trigger", 254, 450, 84, 28, "TRIGGER", trigger_held );
-	if(trig.clicked)
-		act(function(){ synth.trigger(true); });
-	if((trigger_held || trig.clicked) && !trig.held)
-		act(function(){ synth.trigger(false); });
-	trigger_held = trig.held;
-}
-
-function drawOscillators()
-{
-	var s = synth.settings;
-	var st = synth.state;
-
-	// OSCILLATORS header with the 1 / 2 boxes
-	var x1 = VCO_COLS[0][0] - 45, x2 = VCO_COLS[1][2] + 45;
-	drawSection( "OSCILLATORS", x1 + 30, x2 - 30, 26 );
-	[[x1, "1"], [x2 - 22, "2"]].forEach(function(b){
-		ctx.strokeStyle = TEXT_COLOR;
-		ctx.lineWidth = 1.2;
-		ctx.strokeRect( b[0], 17, 22, 18 );
-		drawLabel( b[1], b[0] + 11, 26, 12 );
-	});
-
-	for(var i = 0; i < 2; ++i)
-	{
-		var osc = s.vco[i];
-		var n = i + 1;
-		var cols = VCO_COLS[i];
-		var assign = s.seq_assign[i];
-
-		osc.freq = knob( "vco" + n + "_freq", cols[1], 100, 38, osc.freq, Harm.VCO_MIN_FREQ, Harm.VCO_MAX_FREQ, {
-			label: "VCO " + n + " FREQ", labelSize: 12, style: "ring", exp: true, def: i == 0 ? 261.63 : 392,
-			format: (function(i){ return function(){ return freqToNoteName( st.freq[i] ) + "  " + fmtHz( st.freq[i] ); }; })(i)
-		});
-		var wx = i == 0 ? cols[0] - 7 : cols[2] - 7;
-		drawLabel( "VCO " + n + " WAVE", wx + 7, 57, 10 );
-		osc.wave = waveSwitch( "vco" + n + "_wave", wx, 74, osc.wave, i == 0 );
-
-		[["sub1", "SUB 1 FREQ", cols[0], 0], ["sub2", "SUB 2 FREQ", cols[2], 1]].forEach(function(sub){
-			osc[ sub[0] ] = knob( "vco" + n + "_" + sub[0], sub[2], 200, 28, osc[ sub[0] ], 1, 16, {
-				label: sub[1], style: "ring", step: 1, reverse: true, def: sub[3] ? 4 : 2,
-				format: (function(i, k){ return function(v){
-					var div = st.div[i][k] || v;
-					return "÷" + div + "  " + fmtHz( st.freq[i] / div );
-				}; })(i, sub[3])
-			});
-		});
-
-		// SEQ ASSIGN bracket with the three buttons
-		ctx.strokeStyle = "#a9a69e";
-		ctx.lineWidth = 1;
-		ctx.strokeRect( cols[0] - 2, 252, cols[2] - cols[0] + 4, 30 );
-		ctx.fillStyle = "#1a1a19";
-		ctx.fillRect( cols[1] - 46, 246, 92, 12 );
-		drawLabel( "SEQ " + n + " ASSIGN", cols[1], 252, 10 );
-		[["osc", "OSC " + n, cols[0]], ["sub1", "SUB 1", cols[1]], ["sub2", "SUB 2", cols[2]]].forEach(function(b){
-			if(button( "assign" + n + b[0], b[2] - 26, 270, 52, 22, b[1], assign[ b[0] ] ).clicked)
-				assign[ b[0] ] = !assign[ b[0] ];
-		});
-
-		// mixer: VCO level above, sub levels below, in the same columns
-		osc.level = knob( "vco" + n + "_level", cols[1], 362, 26, osc.level, 0, 1, {
-			label: "VCO " + n + " LEVEL", def: 0, format: fmtPct
-		});
-		osc.sub1_level = knob( "vco" + n + "_sub1_level", cols[0], 462, 26, osc.sub1_level, 0, 1, {
-			label: "SUB 1 LEVEL", def: 0, format: fmtPct
-		});
-		osc.sub2_level = knob( "vco" + n + "_sub2_level", cols[2], 462, 26, osc.sub2_level, 0, 1, {
-			label: "SUB 2 LEVEL", def: 0, format: fmtPct
-		});
-	}
-}
-
-function drawCenterStrip()
-{
-	var s = synth.settings;
-	var x = CENTER_X;
-	ctx.strokeStyle = "#a9a69e";
-	ctx.lineWidth = 1;
-	ctx.beginPath();
-	ctx.moveTo( x, 34 ); ctx.lineTo( x, 62 );
-	ctx.moveTo( x, 170 ); ctx.lineTo( x, 232 );
-	ctx.moveTo( x, 424 ); ctx.lineTo( x, MAIN_H - 40 );
-	ctx.stroke();
-
-	[[5, "±5"], [2, "±2"], [1, "±1"]].forEach(function(o, k){
-		drawLed( x - 8, 78 + k * 22, 4.5, s.seq_oct == o[0] );
-		drawLabel( o[1], x + 12, 78 + k * 22, 11 );
-	});
-	if(button( "seq_oct", x - 30, 142, 60, 24, "SEQ OCT" ).clicked)
-		synth.cycleSeqOct();
-
-	var modes = [["12-ET","12-ET"], ["8-ET","8-ET"], ["12-JI","12-JI"], ["8-JI","8-JI"], ["SCL","SCALA"]];
-	modes.forEach(function(m, k){
-		var y = 248 + k * 22;
-		var available = m[0] != "SCL" || synth.custom_scale;
-		drawLed( x - 16, y, 4.5, s.quantize == m[0] );
-		ctx.textAlign = "left";
-		ctx.font = "11px " + FONT;
-		ctx.fillStyle = available ? TEXT_COLOR : "#55534e";
-		ctx.fillText( m[1], x - 6, y + 1 );
-	});
-	if(button( "quantize", x - 34, 364, 68, 24, "QUANTIZE" ).clicked)
-		synth.cycleQuantize();
-	if(s.quantize == "SCL" && synth.custom_scale)
-	{
-		var name = synth.custom_scale.file.replace(/\.scl$/, "");
-		drawLabel( name.length > 14 ? name.substr(0, 13) + "…" : name, x, 404, 10, false, DIM_COLOR );
-	}
-}
-
-function drawFilterSection()
-{
-	var s = synth.settings;
-	var A = FILTER_COLS[0], B = FILTER_COLS[1], R = FILTER_ROWS;
-
-	s.cutoff = knob( "cutoff", A, R[0], 38, s.cutoff, 20, 20000, {
-		label: "CUTOFF", labelSize: 13, exp: true, def: 900, format: fmtHz
-	});
-	s.volume = knob( "volume", B, R[0], 38, s.volume, 0, 1, {
-		label: "VOLUME", labelSize: 13, def: 0.7, format: fmtPct
-	});
-	s.resonance = knob( "resonance", A, R[1], 38, s.resonance, 0, 1, {
-		label: "RESONANCE", labelSize: 13, def: 0, format: fmtPct
-	});
-	s.vcf_eg_amt = knob( "vcf_eg_amt", B, R[1], 38, s.vcf_eg_amt, -1, 1, {
-		label: "VCF EG AMT", labelSize: 13, bipolar: true, def: 0, format: fmtSigned
-	});
-	s.vcf_attack = knob( "vcf_attack", A, R[2], 38, s.vcf_attack, 0.001, 10, {
-		label: "VCF ATTACK", labelSize: 13, style: "ring", exp: true, def: 0.001, format: fmtTime
-	});
-	s.vcf_decay = knob( "vcf_decay", B, R[2], 38, s.vcf_decay, 0.01, 10, {
-		label: "VCF DECAY", labelSize: 13, style: "ring", exp: true, def: 0.3, format: fmtTime
-	});
-	s.vca_attack = knob( "vca_attack", A, R[3], 38, s.vca_attack, 0.001, 10, {
-		label: "VCA ATTACK", labelSize: 13, style: "ring", exp: true, def: 0.001, format: fmtTime
-	});
-	s.vca_decay = knob( "vca_decay", B, R[3], 38, s.vca_decay, 0.01, 10, {
-		label: "VCA DECAY", labelSize: 13, style: "ring", exp: true, def: 0.5, format: fmtTime
-	});
-}
-
-function drawPatchBay()
-{
-	var x = JACK_COLS[0] - 30;
-	ctx.fillStyle = "#1f1f1e";
-	ctx.beginPath(); ctx.roundRect( x, 14, JACK_COLS[3] - x + 30, MAIN_H - 28, 6 ); ctx.fill();
-	ctx.font = "13px " + FONT;
-	var w1 = ctx.measureText( "IN / " ).width, w2 = ctx.measureText( "OUT" ).width + 6;
-	var cx = (JACK_COLS[1] + JACK_COLS[2]) * 0.5;
-	ctx.textAlign = "left";
-	ctx.textBaseline = "middle";
-	ctx.fillStyle = TEXT_COLOR;
-	ctx.fillText( "IN / ", cx - (w1 + w2) * 0.5, 31 );
-	ctx.fillRect( cx - (w1 + w2) * 0.5 + w1, 23, w2, 16 );
-	ctx.fillStyle = "#111";
-	ctx.fillText( "OUT", cx - (w1 + w2) * 0.5 + w1 + 3, 32 );
-
-	for(var r = 0; r < Harm.JACKS.length; ++r)
-		for(var c = 0; c < 4; ++c)
-		{
-			var j = Harm.JACKS[r][c];
-			drawJack( j[2], JACK_COLS[c], 74 + r * 69, j[0], j[1] );
-		}
-}
-
-// ---------------------------------------------------------------------------
-// classic layout: the original compact arrangement of this replica (toolbar "Layout" button)
+// classic layout knob and button faces (toolbar "Layout" button)
 
 function classicDrawKnob( cx, cy, r, n, highlight, ticks, bipolar )
 {
@@ -1020,231 +605,284 @@ function classicButtonFace( x, y, w, h, text, lit, hover, held )
 	}
 }
 
-function classicBackground()
+function drawWaveIcon( kind, x, y )
 {
-	drawCasing( 0, 0, PANEL_W, MAIN_H );
-
-	// patch bay plate
-	ctx.fillStyle = "#222220";
-	ctx.beginPath(); ctx.roundRect( 1095, 14, 330, MAIN_H - 28, 8 ); ctx.fill();
-	ctx.strokeStyle = "#353532";
-	ctx.lineWidth = 1;
+	ctx.beginPath();
+	if(kind == "square")
+	{
+		ctx.moveTo( x, y + 3 ); ctx.lineTo( x, y - 3 ); ctx.lineTo( x + 5, y - 3 ); ctx.lineTo( x + 5, y + 3 ); ctx.lineTo( x + 10, y + 3 ); ctx.lineTo( x + 10, y - 3 );
+	}
+	else if(kind == "pwm")
+	{
+		ctx.moveTo( x, y + 3 ); ctx.lineTo( x, y - 3 ); ctx.lineTo( x + 2, y - 3 ); ctx.lineTo( x + 2, y + 3 ); ctx.lineTo( x + 4, y + 3 );
+		ctx.moveTo( x + 6, y + 3 ); ctx.lineTo( x + 11, y - 3 ); ctx.lineTo( x + 11, y + 3 );
+	}
+	else
+	{
+		ctx.moveTo( x, y + 3 ); ctx.lineTo( x + 5, y - 3 ); ctx.lineTo( x + 5, y + 3 ); ctx.lineTo( x + 10, y - 3 ); ctx.lineTo( x + 10, y + 3 );
+	}
 	ctx.stroke();
+}
 
-	drawScrew( 36, 14 ); drawScrew( PANEL_W - 36, 14 );
-	drawScrew( 36, MAIN_H - 14 ); drawScrew( PANEL_W - 36, MAIN_H - 14 );
+// 3 position VCO wave switch: up = square, middle = pulse + saw subs (PWM), down = saw
+var WAVE_POSITIONS = ["square", "pwm", "saw"];
+function waveSwitch( id, x, y, value, icons_left )
+{
+	id = id_prefix + id;
+	var w = 14, h = 48;
+	var pos = Math.max( 0, WAVE_POSITIONS.indexOf( value ) );
+	var hover = !cable_drag && ui.active === null && hitRect( x - 18, y - 4, w + 36, h + 8 );
+	if(hover && ui.pressed)
+	{
+		ui.active = id;
+		pos = clamp( Math.floor( (ui.y - y) / (h / 3) ), 0, 2 );
+		value = WAVE_POSITIONS[ pos ];
+	}
+	if(hover)
+		ui.hot = id;
 
-	ctx.font = "26px " + FONT;
+	// hex nut + bat lever
+	ctx.fillStyle = "#050505";
+	ctx.beginPath(); ctx.roundRect( x, y, w, h, 3 ); ctx.fill();
+	var cx = x + w * 0.5, cy = y + h * 0.5;
+	var g = ctx.createRadialGradient( cx - 2, cy - 2, 1, cx, cy, 7 );
+	g.addColorStop( 0, "#e6e6e0" );
+	g.addColorStop( 1, "#7a7a74" );
+	ctx.fillStyle = g;
+	ctx.beginPath(); ctx.arc( cx, cy, 6, 0, Math.PI * 2 ); ctx.fill();
+	var ty = y + 5 + pos * (h - 10) / 2;
+	ctx.strokeStyle = "#d0d0ca";
+	ctx.lineWidth = 4;
+	ctx.lineCap = "round";
+	ctx.beginPath(); ctx.moveTo( cx, cy ); ctx.lineTo( cx, ty ); ctx.stroke();
+	ctx.lineCap = "butt";
+	ctx.fillStyle = "#f0f0ea";
+	ctx.beginPath(); ctx.arc( cx, ty, 3.5, 0, Math.PI * 2 ); ctx.fill();
+
+	ctx.lineWidth = 1.3;
+	for(var i = 0; i < 3; ++i)
+	{
+		ctx.strokeStyle = i == pos ? TEXT_COLOR : DIM_COLOR;
+		drawWaveIcon( WAVE_POSITIONS[i], icons_left ? x - 16 : x + w + 5, y + 8 + i * (h - 16) / 2 );
+	}
+	if(hover)
+		tip( ["SQUARE", "PULSE + SAW SUBS (PWM)", "SAW"][pos], cx, y + h + 14 );
+	return value;
+}
+
+// toggle switch with 2 or 3 positions, top to bottom, labelled on its right. options: [[value, label], ...].
+// Clicking a position selects it. Returns the value
+function leverSwitch( id, x, y, value, options, label )
+{
+	id = id_prefix + id;
+	var n = options.length;
+	var w = 14, h = n == 3 ? 56 : 42;
+	var pos = Math.max( 0, options.findIndex(function(o){ return o[0] === value; }) );
+	var hover = !cable_drag && ui.active === null && hitRect( x - 6, y - 4, w + 62, h + 8 );
+	if(hover)
+		ui.hot = id;
+	if(hover && ui.pressed)
+	{
+		ui.active = id;
+		pos = clamp( Math.floor( (ui.y - y) / (h / n) ), 0, n - 1 );
+		value = options[ pos ][0];
+	}
+	if(label)
+		drawLabel( label, x + w * 0.5 + 18, y - 16, 11 );
+
+	ctx.fillStyle = "#050505";
+	ctx.beginPath(); ctx.roundRect( x, y, w, h, 3 ); ctx.fill();
+	var cx = x + w * 0.5, cy = y + h * 0.5;
+	var g = ctx.createRadialGradient( cx - 2, cy - 2, 1, cx, cy, 7 );
+	g.addColorStop( 0, "#e6e6e0" );
+	g.addColorStop( 1, "#7a7a74" );
+	ctx.fillStyle = g;
+	ctx.beginPath(); ctx.arc( cx, cy, 6, 0, Math.PI * 2 ); ctx.fill();
+	var py = function(i) { return y + 6 + i * (h - 12) / (n - 1); };
+	ctx.strokeStyle = "#d0d0ca";
+	ctx.lineWidth = 4;
+	ctx.lineCap = "round";
+	ctx.beginPath(); ctx.moveTo( cx, cy ); ctx.lineTo( cx, py( pos ) ); ctx.stroke();
+	ctx.lineCap = "butt";
+	ctx.fillStyle = "#f0f0ea";
+	ctx.beginPath(); ctx.arc( cx, py( pos ), 3.5, 0, Math.PI * 2 ); ctx.fill();
+
 	ctx.textAlign = "left";
 	ctx.textBaseline = "middle";
-	ctx.fillStyle = TEXT_COLOR;
-	ctx.fillText( "SUBHARM", 50, MAIN_H - 24 );
-	ctx.font = "12px " + FONT;
-	ctx.fillStyle = DIM_COLOR;
-	ctx.fillText( "POLYRHYTHMIC SUBHARMONIC SYNTHESIZER", 150, MAIN_H - 22 );
+	ctx.font = "10px " + FONT;
+	options.forEach(function(o, i){
+		ctx.fillStyle = i == pos ? TEXT_COLOR : DIM_COLOR;
+		ctx.fillText( o[1], x + w + 6, py( i ) + 1 );
+	});
+	return value;
 }
 
-function classicOscillatorGroup( i, gx )
+// ---------------------------------------------------------------------------
+// patch bay
+
+function jackCompatible( drag, j )
 {
-	var s = synth.settings;
-	var osc = s.vco[i];
-	var st = synth.state;
-	var n = i + 1;
+	return (drag.type == "out" && j.type == "in") || (drag.type == "in" && j.type == "out") ||
+		(drag.type == "midiout" && j.type == "midiin") || (drag.type == "midiin" && j.type == "midiout");
+}
 
-	drawSection( "VCO " + n, gx, gx + 340, 22 );
+function drawJack( id, x, y, label, type )
+{
+	id = id_prefix + id;
+	jacks[id] = { x: rackX( x ), y: rackY( y ), type: type, label: label };
+	var hover = hitCircle( x, y, 17 );
 
-	osc.freq = knob( "vco" + n + "_freq", gx + 70, 108, 42, osc.freq, Harm.VCO_MIN_FREQ, Harm.VCO_MAX_FREQ, {
-		label: "VCO " + n + " FREQ", labelSize: 13, exp: true, def: i == 0 ? 261.63 : 392,
-		format: function(){ return freqToNoteName( st.freq[i] ); }
-	});
-	drawLabel( fmtHz( st.freq[i] || osc.freq ), gx + 70, 166, 11, false, DIM_COLOR );
+	drawLabel( label, x, y - 24, 10, type == "out" || type == "midiout" );
 
-	var subs = [["sub1", "SUB 1 FREQ", gx + 175], ["sub2", "SUB 2 FREQ", gx + 262]];
-	subs.forEach(function(sub, k){
-		osc[ sub[0] ] = knob( "vco" + n + "_" + sub[0], sub[2], 108, 29, osc[ sub[0] ], 1, 16, {
-			label: sub[1], step: 1, def: k == 0 ? 2 : 4, format: fmtDiv
-		});
-		var div = st.div[i][k] || osc[ sub[0] ];
-		drawLabel( fmtDiv( div ) + "  " + fmtHz( (st.freq[i] || osc.freq) / div ), sub[2], 166, 11, false, DIM_COLOR );
-	});
-
-	drawLabel( "WAVE", gx + 322, 62, 11 );
-	osc.wave = waveSwitch( "vco" + n + "_wave", gx + 314, 84, osc.wave );
-
-	// mixer + sequencer assign
-	drawSection( "MIXER", gx, gx + 340, 186 );
-	var levels = [["level", "VCO " + n + " LEVEL", gx + 70, "osc", "OSC " + n],
-	              ["sub1_level", "SUB 1 LEVEL", gx + 175, "sub1", "SUB 1"],
-	              ["sub2_level", "SUB 2 LEVEL", gx + 262, "sub2", "SUB 2"]];
-	var assign = s.seq_assign[i];
-	levels.forEach(function(l){
-		osc[ l[0] ] = knob( "vco" + n + "_" + l[0], l[2], 248, 24, osc[ l[0] ], 0, 1, {
-			label: l[1], def: 0, format: fmtPct
-		});
-		if(button( "assign" + n + l[3], l[2] - 25, 287, 50, 20, l[4], assign[ l[3] ] ).clicked)
-			assign[ l[3] ] = !assign[ l[3] ];
-	});
-	drawLabel( "SEQ " + n + " ASSIGN", gx + 166, 318, 11, false, DIM_COLOR );
-
-	// sequencer
-	drawSection( "SEQUENCER " + n, gx, gx + 340, 334 );
-	var steps = s.seq[i];
-	for(var k = 0; k < 4; ++k)
+	if(cable_drag && cable_drag.from != id && jackCompatible( cable_drag, jacks[id] ))
 	{
-		var cx = gx + 40 + k * 86;
-		steps[k] = knob( "seq" + n + "_" + k, cx, 390, 22, steps[k], -1, 1, {
-			label: "STEP " + (k + 1), bipolar: true, def: 0,
-			format: function(v){
-				var semis = v * s.seq_oct * 12;
-				var txt = (semis > 0 ? "+" : "") + semis.toFixed(1) + " st";
-				if(assign.sub1 || assign.sub2)
-				{
-					var d = Math.round( v * s.seq_oct * 3 );
-					txt += "  ÷" + (d >= 0 ? "+" : "") + d;
-				}
-				return txt;
-			}
-		});
-		drawLed( cx, 424, 4.5, st.step[i] == k );
+		ctx.strokeStyle = hover ? "#fff" : "rgba(255,255,255,0.25)";
+		ctx.lineWidth = 2;
+		ctx.beginPath(); ctx.arc( x, y, 18, 0, Math.PI * 2 ); ctx.stroke();
+	}
+
+	// hex nut
+	var g = ctx.createLinearGradient( x - 14, y - 14, x + 14, y + 14 );
+	g.addColorStop( 0, hover && !cable_drag ? "#e0e0da" : "#c9c9c3" );
+	g.addColorStop( 1, "#6d6d68" );
+	ctx.fillStyle = g;
+	ctx.beginPath();
+	for(var i = 0; i < 6; ++i)
+	{
+		var a = Math.PI / 6 + i * Math.PI / 3;
+		ctx.lineTo( x + Math.cos(a) * 13, y + Math.sin(a) * 13 );
+	}
+	ctx.closePath();
+	ctx.fill();
+	ctx.fillStyle = "#2a2a28";
+	ctx.beginPath(); ctx.arc( x, y, 8, 0, Math.PI * 2 ); ctx.fill();
+	ctx.fillStyle = "#000";
+	ctx.beginPath(); ctx.arc( x, y, 5.5, 0, Math.PI * 2 ); ctx.fill();
+
+	if(type == "midiin")
+	{
+		// lights with incoming MIDI while the MIDI cable is plugged in
+		var cabled = rack.settings.patches.some(function(p){ return p[1] == id; });
+		var active = cabled && rack.midi.access && (performance.now() - rack.midi.activity) < 120;
+		drawLed( x - 27, y - 24, 2.5, active, "#3bd16f" );
 	}
 }
 
-function classicClockSection( gx )
+function jackAt( x, y )
 {
-	var s = synth.settings;
-	var st = synth.state;
-
-	drawSection( "CLOCK", gx, gx + 340, 442 );
-	s.tempo = knob( "tempo", gx + 70, 510, 38, s.tempo, Harm.TEMPO_MIN, Harm.TEMPO_MAX, {
-		label: "TEMPO", labelSize: 13, exp: true, def: 120,
-		format: function(v){ return Math.round(v) + " BPM"; }
-	});
-	drawLed( gx + 122, 468, 4, st.clock && st.playing, "#ffb02f" );
-	var src = st.clock_source == "internal" ? Math.round( s.tempo ) + " BPM" : (st.clock_source == "midi" ? "MIDI CLOCK" : "EXT CLOCK");
-	drawLabel( src, gx + 70, 566, 11, false, DIM_COLOR );
-
-	var bx = gx + 148, bw = 58, bh = 26;
-	if(button( "play", bx, 476, bw, bh, "PLAY", st.playing ).clicked)
-		act(function(){ synth.play(); });
-	if(button( "reset", bx + 68, 476, bw, bh, "RESET" ).clicked)
-		act(function(){ synth.reset(); });
-	var trig = button( "trigger", bx + 136, 476, bw, bh, "TRIGGER" );
-	if(trig.clicked)
-		act(function(){ synth.trigger(true); });
-	if((trigger_held || trig.clicked) && !trig.held)
-		act(function(){ synth.trigger(false); });
-	trigger_held = trig.held;
-
-	if(button( "next", bx, 520, bw, bh, "NEXT" ).clicked)
-		act(function(){ synth.next(); });
-	if(button( "eg", bx + 68, 520, bw, bh, "EG HOLD", s.eg_hold ).clicked)
-		s.eg_hold = !s.eg_hold;
-	drawLabel( "HOLD = DRONE", bx + 97, 558, 10, false, DIM_COLOR );
-}
-
-function classicPolyrhythm( gx )
-{
-	var s = synth.settings;
-	var st = synth.state;
-
-	drawSection( "POLYRHYTHM", gx, gx + 340, 442 );
-	for(var i = 0; i < 4; ++i)
+	for(var id in jacks)
 	{
-		var cx = gx + 40 + i * 86;
-		s.rhythm[i] = knob( "rhythm" + i, cx, 496, 24, s.rhythm[i], 1, 16, {
-			label: "RHYTHM " + (i + 1), step: 1, def: 1, format: fmtDiv
-		});
-		drawLed( cx + 36, 456, 3.5, st.rhythm[i] && st.playing, "#ffb02f" );
-		if(button( "r" + i + "s1", cx - 25, 534, 50, 20, "SEQ 1", s.rhythm_seq1[i] ).clicked)
-			s.rhythm_seq1[i] = !s.rhythm_seq1[i];
-		if(button( "r" + i + "s2", cx - 25, 560, 50, 20, "SEQ 2", s.rhythm_seq2[i] ).clicked)
-			s.rhythm_seq2[i] = !s.rhythm_seq2[i];
+		var j = jacks[id];
+		if((x - j.x) * (x - j.x) + (y - j.y) * (y - j.y) < 18 * 18)
+			return id;
 	}
+	return null;
 }
 
-function classicFilterSection( gx )
+function updateCables()
 {
-	var s = synth.settings;
-	var st = synth.state;
-
-	drawSection( "VCF", gx, gx + 310, 22 );
-	s.cutoff = knob( "cutoff", gx + 70, 108, 42, s.cutoff, 20, 20000, {
-		label: "CUTOFF", labelSize: 13, exp: true, def: 900, format: fmtHz
-	});
-	s.resonance = knob( "resonance", gx + 215, 108, 34, s.resonance, 0, 1, {
-		label: "RESONANCE", labelSize: 13, def: 0, format: fmtPct
-	});
-
-	drawSection( "VCF EG", gx, gx + 310, 186 );
-	s.vcf_eg_amt = knob( "vcf_eg_amt", gx + 50, 248, 25, s.vcf_eg_amt, -1, 1, {
-		label: "VCF EG AMT", bipolar: true, def: 0, format: fmtSigned
-	});
-	s.vcf_attack = knob( "vcf_attack", gx + 155, 248, 25, s.vcf_attack, 0.001, 10, {
-		label: "VCF ATTACK", exp: true, def: 0.001, format: fmtTime
-	});
-	s.vcf_decay = knob( "vcf_decay", gx + 260, 248, 25, s.vcf_decay, 0.01, 10, {
-		label: "VCF DECAY", exp: true, def: 0.3, format: fmtTime
-	});
-	drawLed( gx + 302, 207, 3.5, st.vcf_eg > 0.05, "#ffb02f" );
-
-	drawSection( "VCA", gx, gx + 310, 334 );
-	s.vca_attack = knob( "vca_attack", gx + 50, 390, 25, s.vca_attack, 0.001, 10, {
-		label: "VCA ATTACK", exp: true, def: 0.001, format: fmtTime
-	});
-	s.vca_decay = knob( "vca_decay", gx + 155, 390, 25, s.vca_decay, 0.01, 10, {
-		label: "VCA DECAY", exp: true, def: 0.5, format: fmtTime
-	});
-	s.volume = knob( "volume", gx + 260, 392, 29, s.volume, 0, 1, {
-		label: "VOLUME", def: 0.7, format: fmtPct
-	});
-	drawLed( gx + 197, 349, 3.5, st.vca_eg > 0.05, "#ffb02f" );
-
-	drawSection( "SEQ / QUANTIZE", gx, gx + 310, 442 );
-	[[5,"±5"],[2,"±2"],[1,"±1"]].forEach(function(o, k){
-		drawLed( gx + 50, 478 + k * 22, 4.5, s.seq_oct == o[0] );
-		drawLabel( o[1], gx + 72, 478 + k * 22, 12 );
-	});
-	if(button( "seq_oct", gx + 20, 552, 70, 24, "SEQ OCT" ).clicked)
-		synth.cycleSeqOct();
-
-	var modes = [["12-ET","12-ET"],["8-ET","8-ET"],["12-JI","12-JI"],["8-JI","8-JI"],["SCL","SCALA"]];
-	modes.forEach(function(m, k){
-		var y = 464 + k * 20;
-		var available = m[0] != "SCL" || synth.custom_scale;
-		drawLed( gx + 170, y, 4.5, s.quantize == m[0] );
-		drawLabel( m[1], gx + 200, y, 12, false, available ? TEXT_COLOR : "#55534e" );
-	});
-	if(button( "quantize", gx + 150, 566, 80, 24, "QUANTIZE" ).clicked)
-		synth.cycleQuantize();
-	if(s.quantize == "SCL" && synth.custom_scale)
+	var patches = rack.settings.patches;
+	if(ui.rpressed)
 	{
-		var name = synth.custom_scale.file.replace(/\.scl$/, "");
-		drawLabel( name.length > 22 ? name.substr(0, 21) + "…" : name, gx + 190, 604, 11, false, DIM_COLOR );
+		var id = jackAt( ui.x, ui.y );
+		if(id)
+			rack.disconnect( id );
 	}
-	else if(s.quantize == "OFF")
-		drawLabel( "OFF (NO QUANTIZE)", gx + 190, 604, 11, false, DIM_COLOR );
-}
-
-function classicPatchBay()
-{
-	for(var r = 0; r < Harm.JACKS.length; ++r)
-		for(var c = 0; c < 4; ++c)
+	if(ui.pressed && ui.active === null && !cable_drag)
+	{
+		var id = jackAt( ui.x, ui.y );
+		if(id)
 		{
-			var j = Harm.JACKS[r][c];
-			drawJack( j[2], 1158 + c * 68, 62 + r * 70, j[0], j[1] );
+			ui.active = "jack";
+			var j = jacks[id];
+			if(ui.dbl)
+				rack.disconnect( id );
+			else if(j.type == "in" || j.type == "midiin")
+			{
+				// grab the cable plugged here, or start a new one
+				var idx = patches.findIndex(function(p){ return p[1] == id; });
+				if(idx != -1)
+				{
+					var p = patches.splice( idx, 1 )[0];
+					cable_drag = { from: p[0], type: jacks[ p[0] ].type, color: p[2] };
+				}
+				else
+					cable_drag = { from: id, type: j.type, color: next_color++ % CABLE_COLORS.length };
+			}
+			else
+				cable_drag = { from: id, type: j.type, color: next_color++ % CABLE_COLORS.length };
 		}
+	}
+	if(cable_drag && !ui.down)
+	{
+		var target = jackAt( ui.x, ui.y );
+		if(target && jackCompatible( cable_drag, jacks[target] ))
+		{
+			if(cable_drag.type == "out" || cable_drag.type == "midiout")
+				rack.connect( cable_drag.from, target, cable_drag.color );
+			else
+				rack.connect( target, cable_drag.from, cable_drag.color );
+		}
+		cable_drag = null;
+	}
 }
 
-function drawClassicPanel()
+// plugs_only: just the plugs on the jacks (toolbar "Wires" hidden)
+function drawCable( x1, y1, x2, y2, color, alpha, plugs_only )
 {
-	classicBackground();
-	classicOscillatorGroup( 0, 40 );
-	classicOscillatorGroup( 1, 400 );
-	classicClockSection( 40 );
-	classicPolyrhythm( 400 );
-	classicFilterSection( 765 );
-	classicPatchBay();
+	var d = Math.hypot( x2 - x1, y2 - y1 );
+	var sag = Math.min( 20 + d * 0.3, 90 ); // long cables between rows would hang off the panel
+	// quadratic curve: the lowest point hangs `sag` below the midpoint
+	var mx = (x1 + x2) * 0.5, my = (y1 + y2) * 0.5 + sag;
+	ctx.save();
+	ctx.globalAlpha = alpha || 0.92;
+	if(!plugs_only)
+	{
+		ctx.lineCap = "round";
+		ctx.strokeStyle = "rgba(0,0,0,0.35)";
+		ctx.lineWidth = 8;
+		ctx.beginPath(); ctx.moveTo( x1 + 3, y1 + 6 ); ctx.quadraticCurveTo( mx + 3, my + sag + 6, x2 + 3, y2 + 6 ); ctx.stroke();
+		ctx.strokeStyle = color;
+		ctx.lineWidth = 6;
+		ctx.beginPath(); ctx.moveTo( x1, y1 ); ctx.quadraticCurveTo( mx, my + sag, x2, y2 ); ctx.stroke();
+		ctx.strokeStyle = "rgba(255,255,255,0.3)";
+		ctx.lineWidth = 1.5;
+		ctx.beginPath(); ctx.moveTo( x1 - 1, y1 - 1.5 ); ctx.quadraticCurveTo( mx - 1, my + sag - 1.5, x2 - 1, y2 - 1.5 ); ctx.stroke();
+	}
+	[[x1,y1],[x2,y2]].forEach(function(p){
+		ctx.fillStyle = "#111";
+		ctx.beginPath(); ctx.arc( p[0], p[1], 9.5, 0, Math.PI * 2 ); ctx.fill();
+		ctx.fillStyle = color;
+		ctx.beginPath(); ctx.arc( p[0], p[1], 7.5, 0, Math.PI * 2 ); ctx.fill();
+		ctx.fillStyle = "rgba(255,255,255,0.35)";
+		ctx.beginPath(); ctx.arc( p[0] - 2, p[1] - 2, 2.5, 0, Math.PI * 2 ); ctx.fill();
+	});
+	ctx.restore();
 }
+
+function drawCables()
+{
+	rack.settings.patches.forEach(function(p){
+		var a = jacks[p[0]], b = jacks[p[1]];
+		if(a && b)
+			drawCable( a.x, a.y, b.x, b.y, CABLE_COLORS[ p[2] % CABLE_COLORS.length ], 0.92, !show_wires );
+	});
+	if(cable_drag)
+	{
+		var a = jacks[ cable_drag.from ];
+		drawCable( a.x, a.y, ui.x, ui.y, CABLE_COLORS[ cable_drag.color ], 0.8 );
+	}
+}
+
+// ---------------------------------------------------------------------------
+// formatting
+
+function fmtHz( f ) { return f >= 1000 ? (f / 1000).toFixed(2) + " kHz" : f.toFixed(f < 100 ? 1 : 0) + " Hz"; }
+function fmtTime( t ) { return t >= 1 ? t.toFixed(2) + " s" : (t * 1000).toFixed(t < 0.01 ? 1 : 0) + " ms"; }
+function fmtPct( v ) { return Math.round( v * 100 ) + "%"; }
+function fmtSigned( v ) { return (v > 0 ? "+" : "") + Math.round( v * 100 ) + "%"; }
+function fmtDiv( v ) { return "÷" + v; }
+
 
 // ---------------------------------------------------------------------------
 // extra devices, in a row below the main panel: dual LFO and compressor
@@ -1332,10 +970,10 @@ function drawLedColumn( x, y, labels, lit, colors )
 
 function drawLfoDevice( x, y, w, h )
 {
-	var s = synth.settings;
-	var st = synth.state;
+	var s = rack.settings;
+	var st = rack.state;
 	drawDevicePanel( x, y, w, h, "DUAL LFO", ["LOW FREQUENCY", "OSCILLATORS"] );
-	var px = drawDeviceJacks( x, y, w, h, Harm.LFO_JACKS );
+	var px = drawDeviceJacks( x, y, w, h, WR.LFO_JACKS );
 	var sw = (px - 10 - (x + 40)) / 2; // section width
 
 	for(var i = 0; i < 2; ++i)
@@ -1351,10 +989,10 @@ function drawLfoDevice( x, y, w, h )
 		lfo.level = knob( "lfo" + i + "_level", gx + 118, y + 96, 20, lfo.level, 0, 1, {
 			label: "LEVEL", def: 1, format: function(v){ return fmtPct(v) + "  (\u00b1" + (v * 5).toFixed(1) + " V)"; }
 		});
-		drawLedColumn( gx + sw - 70, y + 40, Harm.LFO_SHAPES.map(function(sh){ return LFO_SHAPE_LABELS[sh]; }),
-			function(k){ return lfo.shape == Harm.LFO_SHAPES[k]; } );
+		drawLedColumn( gx + sw - 70, y + 40, WR.LFO_SHAPES.map(function(sh){ return LFO_SHAPE_LABELS[sh]; }),
+			function(k){ return lfo.shape == WR.LFO_SHAPES[k]; } );
 		if(button( "lfo" + i + "_shape", gx + sw - 80, y + 136, 58, 22, "SHAPE" ).clicked)
-			lfo.shape = Harm.LFO_SHAPES[ (Harm.LFO_SHAPES.indexOf( lfo.shape ) + 1) % Harm.LFO_SHAPES.length ];
+			lfo.shape = WR.LFO_SHAPES[ (WR.LFO_SHAPES.indexOf( lfo.shape ) + 1) % WR.LFO_SHAPES.length ];
 	}
 }
 
@@ -1364,17 +1002,17 @@ function fmtScopeTime( t ) { return t >= 1 ? t + " s" : Math.round( t * 1000 ) +
 
 function drawScope( x, y, w, h, data )
 {
-	var scope = synth.settings.scope;
+	var scope = rack.settings.scope;
 	var hover = !cable_drag && (ui.active === null || ui.active === "scope") && hitRect( x, y, w, h );
 	if(hover)
 	{
 		ui.hot = "scope";
-		tooltips.push([ "CLICK: TIME BASE (" + fmtScopeTime( scope.time ) + ")", x + w * 0.5, y + h + 12 + OY ]);
+		tip( "CLICK: TIME BASE (" + fmtScopeTime( scope.time ) + ")", x + w * 0.5, y + h + 12 );
 	}
 	if(hover && ui.pressed && ui.active === null)
 	{
 		ui.active = "scope";
-		var times = Harm.SCOPE_TIMES;
+		var times = WR.SCOPE_TIMES;
 		scope.time = times[ (times.indexOf( scope.time ) + 1) % times.length ];
 	}
 
@@ -1450,10 +1088,10 @@ function drawScope( x, y, w, h, data )
 
 function drawCompressor( x, y, w, h )
 {
-	var c = synth.settings.comp;
-	var st = synth.state;
+	var c = rack.settings.comp;
+	var st = rack.state;
 	drawDevicePanel( x, y, w, h, "COMPRESSOR", ["MASTER BUS", "DYNAMICS PROCESSOR"] );
-	var px = drawDeviceJacks( x, y, w, h, Harm.COMP_JACKS );
+	var px = drawDeviceJacks( x, y, w, h, WR.COMP_JACKS );
 	drawScope( px + 12, y + 80, 146, h - 100, st.scope );
 
 	// six knobs in a row, then the gain reduction meter and the ON button
@@ -1483,7 +1121,7 @@ function drawCompressor( x, y, w, h )
 		c.on = !c.on;
 }
 
-// rows below the synth (in the synth's coordinates): LFO + compressor, then the post FX
+// rows below the synths: LFO + compressor, then the post FX
 function deviceRowsH()
 {
 	return [ Math.max( deviceH( "lfo", DEVICE_H ), deviceH( "comp", DEVICE_H ) ),
@@ -1494,9 +1132,9 @@ function drawDevices()
 {
 	var rows = deviceRowsH();
 	var w = (PANEL_W - DEVICE_GAP) * 0.5;
-	var y = MAIN_H + DEVICE_GAP;
-	drawDevice( "lfo", 0, y, w, DEVICE_H, "DUAL LFO", Harm.LFO_JACKS, drawLfoDevice );
-	drawDevice( "comp", w + DEVICE_GAP, y, w, DEVICE_H, "COMPRESSOR", Harm.COMP_JACKS, drawCompressor );
+	var y = 0;
+	drawDevice( "lfo", 0, y, w, DEVICE_H, "DUAL LFO", WR.LFO_JACKS, drawLfoDevice );
+	drawDevice( "comp", w + DEVICE_GAP, y, w, DEVICE_H, "COMPRESSOR", WR.COMP_JACKS, drawCompressor );
 	y += rows[0] + DEVICE_GAP;
 	drawDevice( "reverb", 0, y, w, FX_H, "REVERB", null, drawReverbDevice );
 	drawDevice( "delay", w + DEVICE_GAP, y, w, FX_H, "DELAY", null, drawDelayDevice );
@@ -1519,10 +1157,16 @@ var DEVICE_ROWS = [["keys"], ["lfo", "comp"], ["reverb", "delay"]];
 function toggleCollapsed( id )
 {
 	var state = !collapsed[id];
+	collapsed[id] = state; // synth modules have a row each
 	DEVICE_ROWS.forEach(function(row){
 		if(row.indexOf( id ) != -1)
 			row.forEach(function(other){ collapsed[other] = state; });
 	});
+	saveCollapsed();
+}
+
+function saveCollapsed()
+{
 	try { localStorage.setItem( "SUBHARM_collapsed", JSON.stringify( collapsed ) ); } catch(err) {}
 }
 
@@ -1532,7 +1176,7 @@ function collapseButton( id, cx, cy )
 	if(hover)
 	{
 		ui.hot = "collapse_" + id;
-		tooltips.push([ collapsed[id] ? "EXPAND" : "COLLAPSE", cx + 30, cy + OY + 2 ]);
+		tip( collapsed[id] ? "EXPAND" : "COLLAPSE", cx + 30, cy + 2 );
 	}
 	if(hover && ui.pressed)
 	{
@@ -1551,10 +1195,11 @@ function collapseButton( id, cx, cy )
 
 function drawMiniJack( id, x, y, label, type )
 {
-	jacks[id] = { x: x, y: y + OY, type: type, label: label };
+	id = id_prefix + id;
+	jacks[id] = { x: rackX( x ), y: rackY( y ), type: type, label: label };
 	var hover = hitCircle( x, y, 9 );
 	if(hover)
-		tooltips.push([ label, x, y + OY - 16 ]);
+		tip( label, x, y - 16 );
 	if(cable_drag && cable_drag.from != id && jackCompatible( cable_drag, jacks[id] ))
 	{
 		ctx.strokeStyle = hover ? "#fff" : "rgba(255,255,255,0.3)";
@@ -1567,24 +1212,32 @@ function drawMiniJack( id, x, y, label, type )
 	ctx.beginPath(); ctx.arc( x, y, 3.5, 0, Math.PI * 2 ); ctx.fill();
 }
 
+// a device folded into a slim bar: name and its jacks as small sockets. Returns the x after the name
+function drawCollapsedBar( id, x, y, w, name, jack_rows )
+{
+	drawCasing( x, y, w, DEVICE_COLLAPSED_H );
+	var cy = y + DEVICE_COLLAPSED_H * 0.5;
+	collapseButton( id, x + 36, cy );
+	ctx.textAlign = "left";
+	ctx.textBaseline = "middle";
+	ctx.font = "bold 14px " + FONT;
+	ctx.fillStyle = TEXT_COLOR;
+	ctx.fillText( name, x + 52, cy + 1 );
+	var end = x + 52 + ctx.measureText( name ).width;
+	var all = [];
+	(jack_rows || []).forEach(function(row){ all = all.concat( row ); });
+	all.forEach(function(j, k){
+		drawMiniJack( j[2], x + w - 22 - 20 - (all.length - 1 - k) * 24, cy, j[0], j[1] );
+	});
+	return end;
+}
+
 // draws a device, or its collapsed bar. draw(x, y, w, h) draws the expanded device
 function drawDevice( id, x, y, w, h, name, jack_rows, draw )
 {
 	if(collapsed[id])
 	{
-		drawCasing( x, y, w, DEVICE_COLLAPSED_H );
-		var cy = y + DEVICE_COLLAPSED_H * 0.5;
-		collapseButton( id, x + 36, cy );
-		ctx.textAlign = "left";
-		ctx.textBaseline = "middle";
-		ctx.font = "bold 14px " + FONT;
-		ctx.fillStyle = TEXT_COLOR;
-		ctx.fillText( name, x + 52, cy + 1 );
-		var all = [];
-		(jack_rows || []).forEach(function(row){ all = all.concat( row ); });
-		all.forEach(function(j, k){
-			drawMiniJack( j[2], x + w - 22 - 20 - (all.length - 1 - k) * 24, cy, j[0], j[1] );
-		});
+		drawCollapsedBar( id, x, y, w, name, jack_rows );
 		return;
 	}
 	draw( x, y, w, h );
@@ -1592,12 +1245,142 @@ function drawDevice( id, x, y, w, h, name, jack_rows, draw )
 }
 
 // ---------------------------------------------------------------------------
+// synth modules, a row each between the keys and the device rows, scaled to the rack's width
+
+var EMPTY_RACK_H = 60;
+
+// panel size in its own coordinates and the scale that fits it in the rack
+function moduleFit( def )
+{
+	var size = def.size( layout );
+	return { w: size[0], h: size[1], k: PANEL_W / size[0] };
+}
+
+function moduleRowH( m )
+{
+	if(collapsed[ m.id ])
+		return DEVICE_COLLAPSED_H;
+	var fit = moduleFit( WR.types[ m.type ] );
+	return fit.h * fit.k;
+}
+
+function modulesH()
+{
+	var mods = rack.settings.modules;
+	if(!mods.length)
+		return EMPTY_RACK_H + KB_GAP;
+	return mods.reduce(function(h, m){ return h + moduleRowH( m ) + KB_GAP; }, 0);
+}
+
+// small round button of the rack (move / remove a module). kind: "up", "down", "remove"
+function rackButton( id, cx, cy, kind, text, enabled )
+{
+	var hover = enabled && !cable_drag && ui.active === null && hitCircle( cx, cy, 9 );
+	if(hover)
+	{
+		ui.hot = id;
+		tip( text, cx - 12 - text.length * 3.5, cy + 1 );
+	}
+	var clicked = hover && ui.pressed;
+	if(clicked)
+		ui.active = id;
+	ctx.save();
+	ctx.globalAlpha = enabled ? 1 : 0.35;
+	ctx.fillStyle = hover ? (kind == "remove" ? "#8a2c24" : "#4a4a46") : "#2c2c2a";
+	ctx.beginPath(); ctx.arc( cx, cy, 8, 0, Math.PI * 2 ); ctx.fill();
+	ctx.strokeStyle = TEXT_COLOR;
+	ctx.lineWidth = 1.6;
+	ctx.beginPath();
+	if(kind == "up") { ctx.moveTo( cx - 4, cy + 2 ); ctx.lineTo( cx, cy - 2.5 ); ctx.lineTo( cx + 4, cy + 2 ); }
+	else if(kind == "down") { ctx.moveTo( cx - 4, cy - 2 ); ctx.lineTo( cx, cy + 2.5 ); ctx.lineTo( cx + 4, cy - 2 ); }
+	else { ctx.moveTo( cx - 3, cy - 3 ); ctx.lineTo( cx + 3, cy + 3 ); ctx.moveTo( cx + 3, cy - 3 ); ctx.lineTo( cx - 3, cy + 3 ); }
+	ctx.stroke();
+	ctx.restore();
+	return clicked;
+}
+
+// move up / move down / remove. pos(k) gives the centre of the k-th button
+function moduleButtons( m, index, count, pos )
+{
+	var p = pos(0);
+	if(rackButton( "mod_up_" + m.id, p[0], p[1], "up", "MOVE UP", index > 0 ))
+		rack.moveModule( m.id, -1 );
+	p = pos(1);
+	if(rackButton( "mod_down_" + m.id, p[0], p[1], "down", "MOVE DOWN", index < count - 1 ))
+		rack.moveModule( m.id, 1 );
+	p = pos(2);
+	if(rackButton( "mod_remove_" + m.id, p[0], p[1], "remove", "REMOVE FROM RACK", true ))
+		askRemoveModule( m );
+}
+
+function askRemoveModule( m )
+{
+	// after this frame: a dialog in the middle of the draw loop would lose the pointer release
+	setTimeout(function(){
+		ui.down = false;
+		ui.active = null;
+		var cables = rack.settings.patches.filter(function(p){ return p[0].indexOf( m.id + "." ) == 0 || p[1].indexOf( m.id + "." ) == 0; }).length;
+		if(!window.confirm( "Remove " + m.def.title + " (" + m.id + ") from the rack?" + (cables ? " Its " + cables + " cable" + (cables > 1 ? "s" : "") + " will be unplugged." : "") ))
+			return;
+		rack.removeModule( m.id );
+		delete collapsed[ m.id ];
+		saveCollapsed();
+		setStatus( "Removed " + m.def.title + " from the rack" );
+	}, 0);
+}
+
+function drawEmptyRack( w )
+{
+	drawCasing( 0, 0, w, EMPTY_RACK_H );
+	drawLabel( "THE RACK HAS NO SYNTHS: INSERT ONE WITH \u201cADD SYNTH\u201d IN THE TOOLBAR", w * 0.5, EMPTY_RACK_H * 0.5, 14, false, DIM_COLOR );
+}
+
+// draws the modules from y down; returns the height used
+function drawModules( y0 )
+{
+	var mods = rack.modules();
+	if(!mods.length)
+	{
+		beginFrame( 0, y0, 1 );
+		drawEmptyRack( PANEL_W );
+		endFrame();
+		return EMPTY_RACK_H + KB_GAP;
+	}
+	var y = y0;
+	mods.forEach(function(m, i){
+		if(collapsed[ m.id ])
+		{
+			beginFrame( 0, y, 1 );
+			id_prefix = m.id + ".";
+			var end = drawCollapsedBar( m.id, 0, 0, PANEL_W, m.def.title, m.def.jacks );
+			id_prefix = "";
+			moduleButtons( m, i, mods.length, function(k){ return [ end + 22 + k * 22, DEVICE_COLLAPSED_H * 0.5 ]; } );
+			endFrame();
+		}
+		else
+		{
+			var fit = moduleFit( m.def );
+			beginFrame( 0, y, fit.k );
+			id_prefix = m.id + ".";
+			m.def.draw( m );
+			id_prefix = "";
+			collapseButton( m.id, 36, 11 );
+			// on the right wood cheek
+			moduleButtons( m, i, mods.length, function(k){ return [ fit.w - 11, 20 + k * 22 ]; } );
+			endFrame();
+		}
+		y += moduleRowH( m ) + KB_GAP;
+	});
+	return y - y0;
+}
+
+// ---------------------------------------------------------------------------
 // post FX devices (bottom row): reverb and delay on the master output
 
 function drawReverbDevice( x, y, w, h )
 {
-	var fx = synth.settings.fx;
-	var s = synth.settings;
+	var fx = rack.settings.fx;
+	var s = rack.settings;
 	drawDevicePanel( x, y, w, h, "REVERB", ["CONVOLUTION", "SEND EFFECT"] );
 	s.reverb = knob( "fx_reverb_mix", x + 100, y + 70, 28, s.reverb, 0, 1, {
 		label: "MIX", def: 0.15, format: fmtPct
@@ -1609,7 +1392,7 @@ function drawReverbDevice( x, y, w, h )
 		label: "TONE", exp: true, def: 12000, format: fmtHz
 	});
 	// ROOM: name display with previous / next buttons
-	var rooms = Harm.REVERB_ROOMS, ri = Harm.reverbRoomIndex( fx.reverb_room );
+	var rooms = WR.REVERB_ROOMS, ri = WR.reverbRoomIndex( fx.reverb_room );
 	drawLabel( "ROOM", x + 476, y + 30, 11 );
 	var lx = x + 392, lw = 168, ly = y + 42;
 	ctx.fillStyle = "#050505";
@@ -1620,7 +1403,7 @@ function drawReverbDevice( x, y, w, h )
 	ctx.textAlign = "center";
 	ctx.textBaseline = "middle";
 	ctx.fillStyle = "#b6f06a";
-	ctx.fillText( (ri + 1) + "/" + rooms.length + " " + fx.reverb_room + (synth.reverbLoading() ? " \u2026" : ""), lx + lw * 0.5, ly + 13 );
+	ctx.fillText( (ri + 1) + "/" + rooms.length + " " + fx.reverb_room + (rack.reverbLoading() ? " \u2026" : ""), lx + lw * 0.5, ly + 13 );
 	if(button( "fx_reverb_prev", lx, y + 84, 36, 22, "\u25c0" ).clicked)
 		fx.reverb_room = rooms[ (ri - 1 + rooms.length) % rooms.length ][0];
 	if(button( "fx_reverb_next", lx + 42, y + 84, 36, 22, "\u25b6" ).clicked)
@@ -1631,12 +1414,12 @@ function drawReverbDevice( x, y, w, h )
 
 function drawDelayDevice( x, y, w, h )
 {
-	var fx = synth.settings.fx;
+	var fx = rack.settings.fx;
 	drawDevicePanel( x, y, w, h, "DELAY", ["STEREO", "PING-PONG ECHO"] );
 	if(fx.delay_sync)
-		fx.delay_div = knob( "fx_delay_div", x + 100, y + 70, 28, fx.delay_div, 0, Harm.DELAY_DIVS.length - 1, {
+		fx.delay_div = knob( "fx_delay_div", x + 100, y + 70, 28, fx.delay_div, 0, WR.DELAY_DIVS.length - 1, {
 			label: "TIME", step: 1, def: 3, style: "ring",
-			format: function(v){ return Harm.DELAY_DIVS[v][0] + "  " + Math.round( synth.delayTime() * 1000 ) + " ms"; }
+			format: function(v){ return WR.DELAY_DIVS[v][0] + "  " + Math.round( rack.delayTime() * 1000 ) + " ms"; }
 		});
 	else
 		fx.delay_time = knob( "fx_delay_time", x + 100, y + 70, 28, fx.delay_time, 0.01, 2, {
@@ -1673,14 +1456,14 @@ var NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
 
 function noteName( n ) { return NOTE_NAMES[ ((n % 12) + 12) % 12 ] + (Math.floor( n / 12 ) - 1); }
 
-function kbNoteOn( note ) { act(function(){ synth.noteOn( note ); }); }
-function kbNoteOff( note ) { act(function(){ synth.noteOff( note ); }); }
+function kbNoteOn( note ) { act(function(){ rack.noteOn( note ); }); }
+function kbNoteOff( note ) { act(function(){ rack.noteOff( note ); }); }
 
 function drawKeysDevice( x, y, w, h )
 {
-	var s = synth.settings;
+	var s = rack.settings;
 	var kb = s.kb;
-	var midi = synth.midi;
+	var midi = rack.midi;
 	drawCasing( x, y, w, h );
 	drawScrew( x + 36, y + 10 ); drawScrew( x + w - 36, y + 10 );
 	drawScrew( x + 36, y + h - 10 ); drawScrew( x + w - 36, y + h - 10 );
@@ -1692,8 +1475,8 @@ function drawKeysDevice( x, y, w, h )
 	ctx.beginPath(); ctx.roundRect( lx - 3, ly - 3, lw + 6, lh + 6, 5 ); ctx.fill();
 	ctx.fillStyle = "#16240f";
 	ctx.beginPath(); ctx.roundRect( lx, ly, lw, lh, 3 ); ctx.fill();
-	var held = Object.keys( synth.keys.held ).map(Number).sort(function(a,b){ return a - b; });
-	var text = held.length ? held.slice(-5).map( noteName ).join(" ") : synth.midiInputName();
+	var held = Object.keys( rack.keys.held ).map(Number).sort(function(a,b){ return a - b; });
+	var text = held.length ? held.slice(-5).map( noteName ).join(" ") : rack.midiInputName();
 	ctx.font = "bold 13px 'Courier New', monospace";
 	ctx.textAlign = "left";
 	ctx.textBaseline = "middle";
@@ -1703,11 +1486,11 @@ function drawKeysDevice( x, y, w, h )
 
 	var by = y + 62;
 	if(button( "midi_prev", lx, by, 36, 22, "\u25c0" ).clicked && midi.access)
-		synth.cycleMIDIInput( -1 );
+		rack.cycleMIDIInput( -1 );
 	if(button( "midi_next", lx + 42, by, 36, 22, "\u25b6" ).clicked && midi.access)
-		synth.cycleMIDIInput( 1 );
+		rack.cycleMIDIInput( 1 );
 	if(button( "midi_enable", lx + 84, by, 72, 22, midi.access ? "MIDI ON" : "ENABLE", !!midi.access ).clicked && !midi.access)
-		synth.initMIDI().then(function(ok){ if(!ok) setStatus( synth.midi.status ); });
+		rack.initMIDI().then(function(ok){ if(!ok) setStatus( rack.midi.status ); });
 	ctx.textAlign = "right";
 	ctx.textBaseline = "middle";
 	ctx.font = "bold 20px " + FONT;
@@ -1725,7 +1508,7 @@ function drawKeysDevice( x, y, w, h )
 		setPiano( !piano.enabled );
 	if(button( "kb_split", cx + 64, y + 56, 56, 22, "SPLIT", kb.split ).clicked)
 	{
-		synth.allNotesOff();
+		rack.allNotesOff();
 		kb.split = !kb.split;
 	}
 	var first = 48 + kb.octave * 12;
@@ -1733,11 +1516,11 @@ function drawKeysDevice( x, y, w, h )
 		cx + 60, y + 89, 10, false, DIM_COLOR );
 
 	// outputs
-	var njacks = Harm.KB_JACKS[0].length;
+	var njacks = WR.KB_JACKS[0].length;
 	var pw = njacks * 58 + 24, px = x + w - 22 - 10 - pw;
 	ctx.fillStyle = "#1f1f1e";
 	ctx.beginPath(); ctx.roundRect( px, y + 8, pw, h - 16, 6 ); ctx.fill();
-	Harm.KB_JACKS[0].forEach(function(j, c){
+	WR.KB_JACKS[0].forEach(function(j, c){
 		var jx = px + 41 + c * 58, jy = y + 58;
 		drawJack( j[2], jx, jy, j[0], j[1] );
 		if(c < 4 && kb.split) // zone colour under the jack
@@ -1752,7 +1535,7 @@ function drawKeysDevice( x, y, w, h )
 
 function setKbOctave( octave )
 {
-	var kb = synth.settings.kb;
+	var kb = rack.settings.kb;
 	octave = clamp( octave, -2, 2 );
 	if(octave == kb.octave)
 		return;
@@ -1766,7 +1549,7 @@ function setKbOctave( octave )
 
 function drawKeyboard( x, y, w, h )
 {
-	var kb = synth.settings.kb;
+	var kb = rack.settings.kb;
 	var first = 48 + kb.octave * 12;
 	var WHITE = [0, 2, 4, 5, 7, 9, 11];
 	var whites = KB_OCTAVES * 7 + 1;
@@ -1809,11 +1592,11 @@ function drawKeyboard( x, y, w, h )
 		var n = keyAt( clamp( ui.x, x + 1, x + w - 1 ), y + h - 2 );
 		if(n !== null && n != kb.split_note)
 		{
-			synth.allNotesOff();
+			rack.allNotesOff();
 			kb_mouse_note = null;
 			kb.split_note = n;
 		}
-		tooltips.push([ "SPLIT AT " + noteName( kb.split_note ), sx, y + OY - 22 ]);
+		tip( "SPLIT AT " + noteName( kb.split_note ), sx, y - 22 );
 	}
 
 	// playing with the pointer, sliding across keys glides between notes
@@ -1843,7 +1626,7 @@ function drawKeyboard( x, y, w, h )
 		kb_mouse_note = null;
 	}
 
-	var held = synth.keys.held;
+	var held = rack.keys.held;
 	var zoneColor = function( note ) { return KB_ZONE_COLORS[ kb.split && note >= kb.split_note ? 1 : 0 ]; };
 	ctx.fillStyle = "#050505";
 	ctx.fillRect( x - 2, y - 2, w + 4, h + 4 );
@@ -1874,17 +1657,6 @@ function drawKeyboard( x, y, w, h )
 	}
 }
 
-function drawHardwarePanel()
-{
-	drawPanelBackground();
-	drawSequencers();
-	drawPolyrhythm();
-	drawTransport();
-	drawOscillators();
-	drawCenterStrip();
-	drawFilterSection();
-	drawPatchBay();
-}
 
 function drawTooltips()
 {
@@ -1912,9 +1684,27 @@ function draw()
 	}
 	view.dpr = dpr;
 	updatePanelHeight();
-	view.scale = Math.min( w / PANEL_W, h / PANEL_H );
-	view.ox = (w - PANEL_W * view.scale) * 0.5;
-	view.oy = (h - PANEL_H * view.scale) * 0.5;
+	// scale from the width alone (minus the vertical scrollbar when there is one)
+	view.scale = w / PANEL_W * view.zoom;
+	if(PANEL_H * view.scale > h)
+		view.scale = (w - SCROLLBAR_W) / PANEL_W * view.zoom;
+	var vw = w - (PANEL_H * view.scale > h ? SCROLLBAR_W : 0);
+	var vh = h - (PANEL_W * view.scale > vw + 0.5 ? SCROLLBAR_W : 0);
+	view.vw = vw;
+	view.vh = vh;
+	view.max_sx = Math.max( 0, PANEL_W * view.scale - vw );
+	view.max_sy = Math.max( 0, PANEL_H * view.scale - vh );
+	// dragging a cable near an edge scrolls
+	if(cable_drag && ui.cx !== undefined)
+		setScroll( view.sx + (ui.cx < 40 ? -12 : (ui.cx > vw - 40 ? 12 : 0)), view.sy + (ui.cy < 40 ? -12 : (ui.cy > vh - 40 ? 12 : 0)) );
+	setScroll( view.sx, view.sy );
+	view.ox = view.max_sx ? -view.sx : (vw - PANEL_W * view.scale) * 0.5;
+	view.oy = view.max_sy ? -view.sy : 0;
+	if(ui.cx !== undefined)
+	{
+		ui.x = ui.px = (ui.cx - view.ox) / view.scale;
+		ui.y = ui.py = (ui.cy - view.oy) / view.scale;
+	}
 
 	ctx.setTransform( 1, 0, 0, 1, 0, 0 );
 	ctx.fillStyle = "#0b0b0b";
@@ -1923,37 +1713,73 @@ function draw()
 
 	ui.hot = null;
 	jacks = {}; // filled again by every row as it draws its jacks
-	var kb_h = deviceH( "keys", KB_H );
-	drawDevice( "keys", 0, 0, PANEL_W, KB_H, "KEYS", Harm.KB_JACKS, drawKeysDevice );
-	// synth panel and the device row below it, drawn in their own coordinates
-	OY = kb_h + KB_GAP;
-	ctx.save();
-	ctx.translate( 0, OY );
-	ui.y -= OY;
-	if(layout == "classic")
-		drawClassicPanel();
-	else
-		drawHardwarePanel();
+	beginFrame( 0, 0, 1 );
+	drawDevice( "keys", 0, 0, PANEL_W, KB_H, "KEYS", WR.KB_JACKS, drawKeysDevice );
+	endFrame();
+	var y = deviceH( "keys", KB_H ) + KB_GAP;
+	y += drawModules( y );
+	beginFrame( 0, y, 1 );
 	drawDevices();
-	ctx.restore();
-	ui.y += OY;
-	OY = 0;
+	endFrame();
 	updateCables();
 	drawCables();
 	drawTooltips();
+	drawScrollbars( w, h );
+	// wheel steps no knob took scroll the rack (shift + wheel sideways)
+	if(ui.wheel && ui.shift && view.max_sx)
+		setScroll( view.sx + ui.wheel * 90, view.sy );
+	else if(ui.wheel || ui.wheel_x)
+		setScroll( view.sx + ui.wheel_x * 90, view.sy + ui.wheel * 90 );
 
 	canvas.style.cursor = cable_drag ? "grabbing" : (ui.hot || jackAt( ui.x, ui.y ) ? "pointer" : "default");
+}
+
+function drawScrollbars( w, h )
+{
+	ctx.setTransform( view.dpr, 0, 0, view.dpr, 0, 0 );
+	var vw = view.vw, vh = view.vh;
+	if(view.max_sy)
+	{
+		var th = Math.max( 30, vh * vh / (view.max_sy + vh) ), ty = (view.sy / view.max_sy) * (vh - th);
+		ctx.fillStyle = "#151514";
+		ctx.fillRect( w - SCROLLBAR_W, 0, SCROLLBAR_W, h );
+		ctx.fillStyle = view.drag && view.drag.axis == "y" ? "#77756f" : "#4a4945";
+		ctx.beginPath(); ctx.roundRect( w - SCROLLBAR_W + 2, ty + 2, SCROLLBAR_W - 4, th - 4, 4 ); ctx.fill();
+	}
+	if(view.max_sx)
+	{
+		var tw = Math.max( 30, vw * vw / (view.max_sx + vw) ), tx = (view.sx / view.max_sx) * (vw - tw);
+		ctx.fillStyle = "#151514";
+		ctx.fillRect( 0, h - SCROLLBAR_W, vw, SCROLLBAR_W );
+		ctx.fillStyle = view.drag && view.drag.axis == "x" ? "#77756f" : "#4a4945";
+		ctx.beginPath(); ctx.roundRect( tx + 2, h - SCROLLBAR_W + 2, tw - 4, SCROLLBAR_W - 4, 4 ); ctx.fill();
+	}
+}
+
+// zoom from the toolbar, keeping the middle of the window in place
+function setZoom( z )
+{
+	z = clamp( z, ZOOM_MIN, ZOOM_MAX );
+	if(Math.abs( z - 1 ) < 0.02)
+		z = 1;
+	var ratio = z / view.zoom;
+	var w = canvas.clientWidth, h = canvas.clientHeight;
+	view.zoom = z;
+	view.max_sx = view.max_sy = Infinity; // the next draw clamps the scroll
+	setScroll( (view.sx + w * 0.5) * ratio - w * 0.5, (view.sy + h * 0.5) * ratio - h * 0.5 );
+	$("zoom-reset").textContent = Math.round( z * 100 ) + "%";
+	try { localStorage.setItem( "SUBHARM_zoom", String( z ) ); } catch(err) {}
 }
 
 function loop()
 {
 	requestAnimationFrame( loop );
 	draw();
-	synth.sync();
+	rack.sync();
 	updateToolbarFrame();
 
 	ui.pressed = ui.released = ui.rpressed = ui.dbl = false;
-	ui.wheel = 0;
+	ui.wheel = ui.wheel_x = 0;
 	if(!ui.down && ui.active !== null)
 		ui.active = null;
 }
@@ -2009,10 +1835,10 @@ window.addEventListener("keydown", function(e){
 		if(e.code == "KeyZ" || e.code == "KeyX")
 		{
 			pianoAllOff();
-			setKbOctave( synth.settings.kb.octave + (e.code == "KeyX" ? 1 : -1) );
+			setKbOctave( rack.settings.kb.octave + (e.code == "KeyX" ? 1 : -1) );
 			return;
 		}
-		var note = 60 + synth.settings.kb.octave * 12 + PIANO_KEYS[ e.code ];
+		var note = 60 + rack.settings.kb.octave * 12 + PIANO_KEYS[ e.code ];
 		piano.down[ e.code ] = note;
 		kbNoteOn( note );
 		return;
@@ -2025,10 +1851,10 @@ window.addEventListener("keydown", function(e){
 	}
 	switch(e.code)
 	{
-		case "Space": act(function(){ synth.play(); }); break;
-		case "KeyR": act(function(){ synth.reset(); }); break;
-		case "KeyN": act(function(){ synth.next(); }); break;
-		case "KeyT": act(function(){ synth.trigger(true); }); break;
+		case "Space": act(function(){ rack.transport( "play" ); }); break;
+		case "KeyR": act(function(){ rack.transport( "reset" ); }); break;
+		case "KeyN": act(function(){ rack.transport( "next" ); }); break;
+		case "KeyT": act(function(){ rack.transport( "trigger", true ); }); break;
 		default: return;
 	}
 	e.preventDefault();
@@ -2039,7 +1865,7 @@ window.addEventListener("keyup", function(e){
 	if(piano.down[ e.code ] !== undefined)
 		pianoNoteOff( e.code );
 	else if(e.code == "KeyT")
-		act(function(){ synth.trigger(false); });
+		act(function(){ rack.transport( "trigger", false ); });
 });
 // keys released while the window is not focused never send keyup
 window.addEventListener("blur", pianoAllOff);
@@ -2060,7 +1886,7 @@ function setStatus( text, sticky )
 
 function updateToolbar()
 {
-	var running = synth.context && synth.context.state == "running";
+	var running = rack.context && rack.context.state == "running";
 	$("power").textContent = running ? "Audio on" : "Audio off";
 	$("power").classList.toggle( "on", !!running );
 }
@@ -2070,24 +1896,23 @@ function updateToolbarFrame()
 }
 
 $("power").addEventListener("click", function(){
-	if(!synth.context)
+	if(!rack.context)
 		ensureAudio();
-	else if(synth.context.state == "running")
-		synth.context.suspend().then( updateToolbar );
+	else if(rack.context.state == "running")
+		rack.context.suspend().then( updateToolbar );
 	else
-		synth.context.resume().then( updateToolbar );
+		rack.context.resume().then( updateToolbar );
 });
 function updatePanelHeight()
 {
 	var rows = deviceRowsH();
-	PANEL_H = deviceH( "keys", KB_H ) + KB_GAP + MAIN_H + DEVICE_GAP + rows[0] + DEVICE_GAP + rows[1];
+	PANEL_H = deviceH( "keys", KB_H ) + KB_GAP + modulesH() + rows[0] + DEVICE_GAP + rows[1];
 }
 
 function setLayout( name )
 {
 	layout = name;
 	PANEL_W = LAYOUTS[name].w;
-	MAIN_H = LAYOUTS[name].h;
 	updatePanelHeight();
 	jacks = {};
 	cable_drag = null;
@@ -2107,6 +1932,11 @@ $("wires").addEventListener("click", function(){
 	setShowWires( !show_wires );
 });
 
+$("zoom-out").addEventListener("click", function(){ setZoom( view.zoom / ZOOM_STEP ); });
+$("zoom-in").addEventListener("click", function(){ setZoom( view.zoom * ZOOM_STEP ); });
+$("zoom-reset").addEventListener("click", function(){ setZoom( 1 ); });
+$("zoom-reset").textContent = Math.round( view.zoom * 100 ) + "%";
+
 $("layout").addEventListener("click", function(){
 	setLayout( layout == "hardware" ? "classic" : "hardware" );
 });
@@ -2118,10 +1948,16 @@ function refreshPatchList( selected )
 {
 	var sel = $("patch-select");
 	var esc = function(t){ return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;"); };
-	var html = '<option value="" disabled>Choose a patch\u2026</option><optgroup label="Factory">';
-	factory_patches.forEach(function(p, i){ html += '<option value="f:' + i + '">' + esc(p.name) + '</option>'; });
-	html += '</optgroup>';
-	var user = Object.keys( synth.getUserPatches() ).sort();
+	var html = '<option value="" disabled>Choose a patch\u2026</option>';
+	// factory patches grouped by their "group" (the synths in the rack)
+	var groups = [];
+	factory_patches.forEach(function(p){ if(groups.indexOf( p.group ) == -1) groups.push( p.group ); });
+	groups.forEach(function(g){
+		html += '<optgroup label="' + esc(g) + '">';
+		factory_patches.forEach(function(p, i){ if(p.group == g) html += '<option value="f:' + i + '">' + esc(p.name) + '</option>'; });
+		html += '</optgroup>';
+	});
+	var user = Object.keys( rack.getUserPatches() ).sort();
 	if(user.length)
 	{
 		html += '<optgroup label="My patches">';
@@ -2154,7 +1990,11 @@ function afterPatchLoad( name )
 
 fetch("data/patches.json")
 	.then(function(r){ return r.json(); })
-	.then(function(list){ factory_patches = list; refreshPatchList(); })
+	.then(function(list){
+		factory_patches = list;
+		list.forEach(function(p){ p.group = p.group || "Factory"; });
+		refreshPatchList();
+	})
 	.catch(function(){ refreshPatchList(); });
 
 $("patch-select").addEventListener("change", function(e){
@@ -2162,13 +2002,13 @@ $("patch-select").addEventListener("change", function(e){
 	if(v.substr(0, 2) == "f:")
 	{
 		var p = factory_patches[ v.substr(2) ];
-		synth.setSettings( p.settings );
+		rack.setSettings( p.settings );
 		afterPatchLoad( p.name );
 	}
 	else if(v.substr(0, 2) == "u:")
 	{
 		var name = v.substr(2);
-		synth.setSettings( synth.getUserPatches()[ name ] );
+		rack.setSettings( rack.getUserPatches()[ name ] );
 		afterPatchLoad( name );
 	}
 	$("patch-delete").hidden = v.substr(0, 2) != "u:";
@@ -2176,9 +2016,30 @@ $("patch-select").addEventListener("change", function(e){
 });
 
 $("randomize").addEventListener("click", function(){
-	synth.randomize();
+	rack.randomize();
 	refreshPatchList();
-	setStatus( "Random patch: " + synth.settings.quantize + ", " + Math.round( synth.settings.tempo ) + " BPM (Save as\u2026 to keep it)" );
+	setStatus( "Random sound on every synth in the rack (Save as\u2026 to keep it)" );
+});
+
+// inserts a new synth at the bottom of the rack
+function refreshAddSynth()
+{
+	var html = '<option value="">Add synth\u2026</option>';
+	WR.order.forEach(function(type){
+		var def = WR.types[ type ];
+		html += '<option value="' + type + '" title="' + def.description + '">' + def.title + '</option>';
+	});
+	$("add-synth").innerHTML = html;
+}
+refreshAddSynth();
+$("add-synth").addEventListener("change", function(e){
+	var type = e.target.value;
+	e.target.value = "";
+	e.target.blur();
+	if(!WR.types[ type ])
+		return;
+	var m = rack.addModule( type );
+	setStatus( "Added " + WR.types[ type ].title + " (" + m.id + ") at the bottom of the rack" + (WR.types[ type ].midi_in ? ", MIDI cabled from the keys" : "") );
 });
 
 $("patch-save").addEventListener("click", function(){
@@ -2188,9 +2049,9 @@ $("patch-save").addEventListener("click", function(){
 	name = name.trim();
 	if(!name)
 		return;
-	if(synth.getUserPatches()[ name ] && !window.confirm( "Replace the saved patch \"" + name + "\"?" ))
+	if(rack.getUserPatches()[ name ] && !window.confirm( "Replace the saved patch \"" + name + "\"?" ))
 		return;
-	if(synth.saveUserPatch( name ))
+	if(rack.saveUserPatch( name ))
 	{
 		refreshPatchList( "u:" + name );
 		setStatus( "Saved patch: " + name );
@@ -2203,14 +2064,14 @@ $("patch-delete").addEventListener("click", function(){
 	var name = currentPatchName();
 	if(!name || !window.confirm( "Delete the saved patch \"" + name + "\"?" ))
 		return;
-	synth.deleteUserPatch( name );
+	rack.deleteUserPatch( name );
 	refreshPatchList();
 	setStatus( "Deleted patch: " + name );
 });
 
 $("patch-export").addEventListener("click", function(){
 	var name = currentPatchName() || "subharm-patch";
-	var blob = new Blob([ synth.exportPatch( name ) ], { type: "application/json" });
+	var blob = new Blob([ rack.exportPatch( name ) ], { type: "application/json" });
 	var a = document.createElement("a");
 	a.href = URL.createObjectURL( blob );
 	a.download = name.replace(/[^\w\- ]+/g, "_") + ".json";
@@ -2229,7 +2090,7 @@ $("patch-file").addEventListener("change", function(e){
 	if(!file)
 		return;
 	file.text().then(function(text){
-		var name = synth.importPatch( text ) || file.name.replace(/\.json$/i, "");
+		var name = rack.importPatch( text ) || file.name.replace(/\.json$/i, "");
 		refreshPatchList();
 		afterPatchLoad( name + " (from file, use Save as\u2026 to keep it)" );
 	}).catch(function(err){
@@ -2239,7 +2100,7 @@ $("patch-file").addEventListener("change", function(e){
 
 
 // MIDI is selected on the keys device; only problems are reported here
-synth.onmidichange = function( midi ){
+rack.onmidichange = function( midi ){
 	if(!midi.access)
 		setStatus( midi.status, true );
 	else if(!midi.inputs.length)
@@ -2251,7 +2112,7 @@ var scale_index = null;
 
 function syncScaleInput()
 {
-	$("scale").value = synth.settings.scale_file || "";
+	$("scale").value = rack.settings.scale_file || "";
 }
 
 fetch("data/scales/index.json")
@@ -2272,7 +2133,7 @@ $("scale").addEventListener("change", function(e){
 	var file = e.target.value.trim();
 	if(!file)
 	{
-		synth.clearScale();
+		rack.clearScale();
 		return;
 	}
 	if(scale_index && !(file in scale_index))
@@ -2280,7 +2141,7 @@ $("scale").addEventListener("change", function(e){
 		setStatus( "Unknown scale: " + file );
 		return;
 	}
-	synth.loadScale( file ).then(function(scale){
+	rack.loadScale( file ).then(function(scale){
 		setStatus( "Scale: " + (scale.description || file) + " (" + (scale.degrees.length) + " notes)" );
 		e.target.blur();
 	}, function(err){
@@ -2288,7 +2149,7 @@ $("scale").addEventListener("change", function(e){
 	});
 });
 $("scale-clear").addEventListener("click", function(){
-	synth.clearScale();
+	rack.clearScale();
 	syncScaleInput();
 });
 

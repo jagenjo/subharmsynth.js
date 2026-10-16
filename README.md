@@ -1,8 +1,8 @@
 # subharmsynth.js
 
-A browser replica of the Moog Subharmonicon semi-modular polyrhythmic synthesizer, built on the WebAudio API.
+A browser rack of semi-modular synthesizers built on the WebAudio API: replicas of the Moog Subharmonicon (polyrhythmic synthesizer) and the Moog DFAM (percussion synthesizer), plus shared keys, LFO, compressor, reverb and delay devices, all patchable with each other.
 
-All sound is generated in real time by an `AudioWorkletProcessor` (`harm-worklet.js`). That covers the oscillators, subharmonic dividers, ladder filter, envelopes, clock, polyrhythm dividers, sequencers and patch-cable routing, all computed per sample. The only extra node is a `ConvolverNode` for the optional reverb.
+All synthesis runs in real time in one `AudioWorkletProcessor` (`rack-worklet.js`), which hosts each synth's DSP and copies the patch cables between them every sample. Oscillators, filters, envelopes, clocks, sequencers and the cables are all computed per sample, so patching between synths is sample-accurate. The reverb and delay are native WebAudio nodes after it.
 
 Needs a browser with AudioWorklet support, served over `https://` or `localhost`. Web MIDI works in Chromium-based browsers.
 
@@ -11,15 +11,67 @@ Needs a browser with AudioWorklet support, served over `https://` or `localhost`
 | file | what |
 |---|---|
 | `index.html` | page and toolbar |
-| `code.js` | the panel: canvas drawing, knobs, buttons, patch bay cables, keyboard shortcuts |
-| `harm.js` | controller: settings, jack table, audio graph, Scala parser, Web MIDI |
-| `harm-worklet.js` | the DSP engine |
+| `webrack.js` | the rack controller: synth registry, settings and patches, audio graph, post FX, Scala parser, Web MIDI, keys |
+| `rack-worklet.js` | the audio processor: hosts the synths' DSP, routes the cables, runs the keys outputs, LFOs, compressor and scope |
+| `code.js` | the rack UI: canvas widgets (knobs, buttons, switches, jacks), cables, shared devices, scrolling and zoom, toolbar, keyboard shortcuts |
+| `synths/subharm.js`, `synths/subharm-worklet.js` | the Subharmonicon: panel, jacks and settings; DSP |
+| `synths/dfam.js`, `synths/dfam-worklet.js` | the DFAM: panel, jacks and settings; DSP |
 | `data/patches.json` | factory patches |
 | `old/` | the original version of this replica, as in the first commit |
 | `data/impulses/` | reverb impulse responses from Voxengo's free "IM Reverbs" pack, redistributed unaltered under its `license.txt` (© Aleksey Vaneev) |
 | `data/scales/` | Scala `.scl` scales, plus `index.json` used by the scale picker |
 
-## What it emulates
+## The rack
+
+The page is a rack. From the top:
+
+1. The **KEYS** device.
+2. The synths, one row each.
+3. A row with the **LFO** and the **compressor**.
+4. A row with the **reverb** and the **delay**.
+
+One patch bay spans all of them: any output can be cabled to any input of any device.
+
+- **Add synth** (toolbar) inserts a new Subharm or DFAM at the bottom of the rack. A synth with a MIDI IN gets the keys' MIDI cable. You can have several of the same kind (`dfam`, `dfam2`, …).
+- Each synth has three buttons on its right wood cheek: **move up**, **move down** and **remove**. Removing asks first and unplugs that synth's cables.
+- The chevron on the top left folds a synth into a slim bar like the other devices. Its jacks stay on the bar, so cables stay connected.
+- **Scale:** the rack fills the window width; more devices make it taller and it scrolls vertically.
+  - Zoom **−** / **+** (toolbar) change the scale; the percentage button goes back to 100%. The zoom is remembered in the browser.
+  - Zoomed past the width, the rack also scrolls sideways.
+  - The mouse wheel scrolls when it's not over a knob; Shift + wheel scrolls sideways. You can also drag the scrollbars.
+  - Dragging a cable near the edge of the window scrolls toward it.
+- **Space** starts every synth when none is running, otherwise stops them all. **R**, **N** and **T** reset, step (NEXT / ADVANCE) and trigger every synth.
+- **Adding another synth:** register it from a pair of files in `synths/`:
+  - The main thread file calls `WR.registerSynth(type, { title, worklet, jacks, defaults, size, draw, … })`. The fields are documented in `webrack.js`.
+  - The worklet file sets `globalThis.WR_DSP[type]` to a class with `outs` / `ins` / `patched` arrays, plus `setSettings`, `message`, `beginBlock`, `tick` and `state`.
+  - Add both files to `index.html`.
+
+## DFAM
+
+A replica of the Moog DFAM ("Drummer From Another Mother"):
+
+- **Two VCOs**, 10 Hz to 10 kHz, each with a triangle / square switch.
+  - A shared decay-only **VCO EG**, set by VCO DECAY. It goes to each VCO through a bipolar EG AMOUNT (±5 octaves).
+  - **1→2 FM AMOUNT** and **HARD SYNC** (VCO 2 to VCO 1).
+- **Mixer:** VCO 1, VCO 2 and white noise. Patching EXT AUDIO replaces the noise.
+- **Filter:** a ladder filter with a **LP / HP** switch.
+  - CUTOFF, RESONANCE, VCF DECAY, and a bipolar VCF EG AMOUNT.
+  - NOISE / VCF MOD modulates the cutoff with the noise, or with the VCF MOD input when it's patched.
+- **VCA:** a VCA EG with a **FAST / SLOW** attack switch, VCA DECAY, and VOLUME.
+- **8-step sequencer** with a PITCH and a VELOCITY knob per step.
+  - PITCH is ±5 V at 1 V/oct. SEQ PITCH MOD sends it to VCO 1 & 2, to VCO 2 only, or to neither.
+  - VELOCITY (0 to 5 V) scales the VCA and VCF envelopes, so a step at zero velocity is a rest.
+  - TEMPO goes from 10 to 10,000 BPM, one step per 16th.
+  - RUN / STOP, ADVANCE (steps and triggers) and TRIGGER (plays the current step).
+- **24-point patch bay**, 15 inputs and 9 outputs.
+  - Inputs: TRIGGER, VCA CV, VELOCITY, VCA DECAY, EXT AUDIO, VCF DECAY, NOISE LEVEL, VCO DECAY, VCF MOD, VCO 1 CV, 1→2 FM AMT, VCO 2 CV, TEMPO, RUN / STOP, ADV / CLOCK.
+  - Outputs: VCA, VCA EG, VCF EG, VCO EG, VCO 1, VCO 2, TRIGGER, VELOCITY, PITCH.
+  - A cable in ADV / CLOCK replaces the internal clock: each pulse advances a step. To sync the DFAM to the Subharm, patch the Subharm's CLOCK output there.
+  - A cable in VCA CV replaces the envelope on the VCA.
+  - The decay inputs stretch their decay time by one octave of time per volt.
+- Like the hardware, it has no MIDI. Play it from the keys device with cables, e.g. KEY 1 → VCO 1 CV and TRIG → TRIGGER.
+
+## Subharmonicon
 
 - **2 VCOs, each with 2 subharmonics.** VCO FREQ spans C4 to C8. The subs are true frequency dividers (÷1 fully clockwise to ÷16) of their VCO, so they stay phase-locked. The 3-position wave switch sets all square (up), pulse VCO with saw subs and SUB 1 normalled to the PWM input (middle), or all saw (down). Oscillators are band-limited (polyBLEP) and have a little analog drift.
 - **Mixer** with 6 levels, driving a **4-pole ladder low-pass filter** with input saturation. The filter self-oscillates at the top of the resonance range.
@@ -51,7 +103,12 @@ As on the hardware, MIDI reaches the synth only through its MIDI IN jack, so the
 ## Beyond the hardware
 
 - **Scala scales.** Type a scale name in the toolbar to add a fifth quantize mode, SCALA. It uses the selected `.scl` file, rooted at C.
-- **Patches**: a toolbar menu with 8 factory patches (in `data/patches.json`) and your own. *Save as…* stores the whole panel and its cables under a name in the browser. *Export* / *Import* write and read `.json` patch files, so patches can be shared or added to the repo. A patch only needs the fields that differ from Init; anything missing or invalid falls back to the Init value.
+- **Patches**: a patch is the whole rack, meaning its synths, all their settings, the shared devices and the cables.
+  - The toolbar menu has 15 factory patches (in `data/patches.json`), grouped as SUBHARM, DFAM and RACK (both synths patched together), plus your own.
+  - *Save as…* stores the rack under a name in the browser.
+  - *Export* / *Import* write and read `.json` files, so patches can be shared or added to the repo.
+  - Patches saved before the rack existed load as a rack with one Subharm.
+  - A patch only needs the fields that differ from the defaults; anything missing or invalid falls back to the default.
 - **Post FX row** at the bottom, on the master output after the compressor:
   - **Reverb** (send): MIX, PRE-DELAY, TONE (lowpass on the tail), ON and ROOM with 12 spaces from short to long: drum rooms, cave, salon, a plate generated in code, opera hall, silo, two big halls, parking garage, echo hall and a church. Impulses load the first time their room is selected.
   - **Delay**: TIME (free 10 ms – 2 s, or tempo divisions 1/16 – 1/1 with SYNC), FEEDBACK, TONE (lowpass in the feedback), MIX, PING-PONG and ON. Off by default.
@@ -60,19 +117,20 @@ As on the hardware, MIDI reaches the synth only through its MIDI IN jack, so the
   - **Dual LFO**: per LFO RATE (0.01–100 Hz), SHAPE (sine, triangle, saw, ramp, square, sample & hold), LEVEL (an attenuator, since the Subharmonicon has none), RATE CV inputs (1 V/oct) and SYNC inputs (a gate restarts the cycle). Outputs are ±5 V.
   - **Compressor** on the master output, before the reverb: THRESHOLD, RATIO, ATTACK, RELEASE, MAKEUP, MIX (parallel), ON, a gain reduction meter, a SIDECHAIN input (the detector rectifies, so use envelopes or gates for ducking) and a GR output (gain reduction as CV, 4 dB per volt). A small green CRT oscilloscope under its jacks shows the signal patched into its SCOPE input (±5 V full scale) or, with nothing patched, the master output. Click the screen to cycle the time base (5 ms, 20 ms, 100 ms: triggered; 500 ms, 2 s: scrolling roll mode).
 - **Wires** (toolbar) hides the patch cables and leaves only their coloured plugs on the jacks.
-- **Randomize** (toolbar) rolls a new playable sound, keeping volume, compressor, reverb, cables and the loaded scale.
-- **Two panel layouts**, switched with the *Layout* toolbar button: *Hardware* places every control where it is on the real front panel; *Classic* is the original compact layout of this replica, grouped by section.
+- **Randomize** (toolbar) rolls a new playable sound on every synth and the LFOs. It keeps the volumes, compressor, reverb, cables and the loaded scale.
+- **Two panel layouts** for the Subharm, switched with the *Layout* toolbar button. *Hardware* places every control where it is on the real front panel; *Classic* is the original compact layout of this replica, grouped by section. The rest of the rack follows its width.
 
 ## Controls
 
 - Drag knobs vertically; hold Shift for fine control. The mouse wheel also works, and double-clicking a knob resets it.
 - Drag from a jack to patch. Drag a cable off an input to move or remove it. Double-click or right-click a jack to unplug it.
-- Keys: `Space` play/stop, `R` reset, `N` next step, `T` trigger.
+- Keys: `Space` play/stop, `R` reset, `N` next step, `T` trigger (on every synth in the rack).
 
 ## Approximations
 
 Some details are educated guesses, not measurements of the hardware:
 
+- DFAM: the order of the patch bay jacks within their rows, the envelope curves and ranges, the FM depth and the HP filter (a 4-pole high pass from the same ladder)
 - how strongly the SUB and RHYTHM CV inputs (and sequencers assigned to a sub) shift the division: 3 steps per volt
 - the envelope curves
 - the exact 12-JI ratio table

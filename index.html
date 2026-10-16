@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>SUBHARM</title>
+<title>SUBHARM rack</title>
 <meta name="description" content="A browser replica of the Moog Subharmonicon polyrhythmic synthesizer, built with the WebAudio API: subharmonic oscillators, polyrhythmic sequencers, patch bay, LFOs, compressor and MIDI." />
 <!-- link previews (Open Graph / Twitter); image URLs must be absolute -->
 <meta property="og:type" content="website" />
@@ -56,7 +56,14 @@
 		<button id="patch-import" title="Load a patch from a .json file">Import</button>
 		<input id="patch-file" type="file" accept=".json,application/json" hidden />
 	</div>
+	<select id="add-synth" title="Insert another synth at the bottom of the rack"></select>
 	<button id="wires" title="Show or hide the patch cables (the plugs stay on the jacks)">Wires: shown</button>
+	<div class="group" title="Scale of the rack: 100% fills the window width">
+		Zoom
+		<button id="zoom-out" title="Smaller">&minus;</button>
+		<button id="zoom-reset" title="Back to the window width">100%</button>
+		<button id="zoom-in" title="Bigger">+</button>
+	</div>
 	<button id="layout" title="Switch between the hardware panel layout and the classic layout">Layout</button>
 	<div class="group">
 		Scale
@@ -64,11 +71,14 @@
 		<datalist id="scale-list"></datalist>
 		<button id="scale-clear" title="Remove the custom scale">&times;</button>
 	</div>
-	<span id="help" title="Drag knobs vertically (Shift = fine), double-click resets. Drag from a jack to patch, double-click or right-click a jack to unplug. Keys: Space play, R reset, N next, T trigger (when QWERTY is on in the keys device, T plays F#).">? help</span>
+	<span id="help" title="Drag knobs vertically (Shift = fine), double-click resets. Drag from a jack to patch, double-click or right-click a jack to unplug. The mouse wheel off a knob scrolls the rack (Shift + wheel: sideways). Keys: Space play / stop every synth, R reset, N next, T trigger (when QWERTY is on in the keys device, T plays F#).">? help</span>
 	<span id="status"></span>
 </header>
 <canvas id="panel"></canvas>
-<script src="harm.js?v=20261016f"></script>
-<script src="code.js?v=20261016f"></script>
+<script src="webrack.js?v=20261016g"></script>
+<!-- synths: each registers itself in the rack (panel here, DSP in its -worklet.js) -->
+<script src="synths/subharm.js?v=20261016g"></script>
+<script src="synths/dfam.js?v=20261016g"></script>
+<script src="code.js?v=20261016g"></script>
 </body>
 </html>
