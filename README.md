@@ -223,9 +223,13 @@ As on the hardware, MIDI reaches the synth only through its MIDI IN jack, so the
 - **Device row** below the synth, in the same style, patchable from and to the main patch bay:
   - **Dual LFO**: per LFO RATE (0.01–100 Hz), SHAPE (sine, triangle, saw, ramp, square, sample & hold), LEVEL (an attenuator, since the Subharmonicon has none), RATE CV inputs (1 V/oct) and SYNC inputs (a gate restarts the cycle). Outputs are ±5 V.
   - **Compressor** on the master output, before the reverb: THRESHOLD, RATIO, ATTACK, RELEASE, MAKEUP, MIX (parallel), ON, a gain reduction meter, a SIDECHAIN input (the detector rectifies, so use envelopes or gates for ducking) and a GR output (gain reduction as CV, 4 dB per volt). A small green CRT oscilloscope under its jacks shows the signal patched into its SCOPE input (±5 V full scale) or, with nothing patched, the master output. Click the screen to cycle the time base (5 ms, 20 ms, 100 ms: triggered; 500 ms, 2 s: scrolling roll mode).
-- **Wires** (toolbar) hides the patch cables and leaves only their coloured plugs on the jacks.
+- **Options** (toolbar) opens a small panel:
+  - **Layout:** Hardware or Classic, for the Subharm (see below).
+  - **Show wires:** off hides the patch cables and leaves only their coloured plugs on the jacks.
+  - **Mouse wheel turns the knob under the cursor:** off, the wheel always scrolls the rack, so scrolling over the panels can't move a knob or fader by accident.
+  - The choices are remembered in the browser.
 - **Randomize** (toolbar) rolls a new playable sound on every synth and the LFOs. It keeps the volumes, compressor, reverb, cables and the loaded scale.
-- **Two panel layouts** for the Subharm, switched with the *Layout* toolbar button. *Hardware* places every control where it is on the real front panel; *Classic* is the original compact layout of this replica, grouped by section. The rest of the rack follows its width.
+- **Two panel layouts** for the Subharm, switched in *Options*. *Hardware* places every control where it is on the real front panel; *Classic* is the original compact layout of this replica, grouped by section. The rest of the rack follows its width.
 
 ## Controls
 

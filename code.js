@@ -42,6 +42,9 @@ var cable_drag = null;   // { from: jack id, type: "out"|"in", color }
 var next_color = 0;
 var show_wires = true;
 try { show_wires = localStorage.getItem("SUBHARM_wires") != "hidden"; } catch(err) {}
+// Options: the mouse wheel turns the knob (or fader) under the cursor; off, it always scrolls the rack
+var wheel_knobs = true;
+try { wheel_knobs = localStorage.getItem("SUBHARM_wheel") != "scroll"; } catch(err) {}
 
 // every row (the keys, each synth, the device rows) is drawn in its own coordinates: a frame
 // is its offset and scale in the rack. Jacks and tooltips are stored in rack coordinates
@@ -300,7 +303,7 @@ function knob( id, cx, cy, r, value, min, max, o )
 		var travel = (o.step ? 260 : 220) * (ui.shift ? 5 : 1);
 		value = fromN( clamp( ui.startN + (ui.startY - ui.y) / travel, 0, 1 ) );
 	}
-	if(hover && ui.wheel && ui.active === null)
+	if(hover && ui.wheel && ui.active === null && wheel_knobs)
 	{
 		var dn = -ui.wheel * (o.step ? o.step / (max - min) : (ui.shift ? 0.005 : 0.025));
 		value = fromN( clamp( toN(value) + dn, 0, 1 ) );
@@ -746,7 +749,7 @@ function fader( id, x, y, h, value, o )
 		}
 		value = clamp( ui.startN + (ui.startY - ui.y) / (h * (ui.shift ? 5 : 1)), 0, 1 );
 	}
-	if(hover && ui.wheel && ui.active === null)
+	if(hover && ui.wheel && ui.active === null && wheel_knobs)
 	{
 		value = clamp( value - ui.wheel * (ui.shift ? 0.005 : 0.02), 0, 1 );
 		ui.wheel = 0;
@@ -2177,7 +2180,7 @@ function setLayout( name )
 	updatePanelHeight();
 	jacks = {};
 	cable_drag = null;
-	$("layout").textContent = "Layout: " + LAYOUTS[name].name;
+	document.querySelectorAll('input[name="opt-layout"]').forEach(function(r){ r.checked = r.value == name; });
 	try { localStorage.setItem( "SUBHARM_layout", name ); } catch(err) {}
 }
 setLayout( layout );
@@ -2185,21 +2188,37 @@ setLayout( layout );
 function setShowWires( show )
 {
 	show_wires = show;
-	$("wires").textContent = show ? "Wires: shown" : "Wires: hidden";
+	$("opt-wires").checked = show;
 	try { localStorage.setItem( "SUBHARM_wires", show ? "shown" : "hidden" ); } catch(err) {}
 }
 setShowWires( show_wires );
-$("wires").addEventListener("click", function(){
-	setShowWires( !show_wires );
+$("opt-wires").addEventListener("change", function(e){ setShowWires( e.target.checked ); });
+
+function setWheelKnobs( on )
+{
+	wheel_knobs = on;
+	$("opt-wheel").checked = on;
+	try { localStorage.setItem( "SUBHARM_wheel", on ? "knobs" : "scroll" ); } catch(err) {}
+}
+setWheelKnobs( wheel_knobs );
+$("opt-wheel").addEventListener("change", function(e){ setWheelKnobs( e.target.checked ); });
+
+// the Options panel opens under its button and closes on a click anywhere else
+$("options").addEventListener("click", function(e){
+	$("options-panel").hidden = !$("options-panel").hidden;
+	e.stopPropagation();
 });
+$("options-panel").addEventListener("click", function(e){ e.stopPropagation(); });
+document.addEventListener("click", function(){ $("options-panel").hidden = true; });
+canvas.addEventListener("pointerdown", function(){ $("options-panel").hidden = true; });
 
 $("zoom-out").addEventListener("click", function(){ setZoom( view.zoom / ZOOM_STEP ); });
 $("zoom-in").addEventListener("click", function(){ setZoom( view.zoom * ZOOM_STEP ); });
 $("zoom-reset").addEventListener("click", function(){ setZoom( 1 ); });
 $("zoom-reset").textContent = Math.round( view.zoom * 100 ) + "%";
 
-$("layout").addEventListener("click", function(){
-	setLayout( layout == "hardware" ? "classic" : "hardware" );
+document.querySelectorAll('input[name="opt-layout"]').forEach(function(r){
+	r.addEventListener("change", function(){ if(r.checked) setLayout( r.value ); });
 });
 
 // patches: factory ones from data/patches.json plus the user's, saved in this browser
