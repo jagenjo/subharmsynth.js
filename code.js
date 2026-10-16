@@ -834,9 +834,23 @@ function loop()
 // ---------------------------------------------------------------------------
 // keyboard
 
+function isTextField( el )
+{
+	return el && el.closest && !!el.closest("input:not([type=range]),select,textarea");
+}
+
 window.addEventListener("keydown", function(e){
-	if(e.target.closest && e.target.closest("input,select,textarea,button") || e.repeat || e.ctrlKey || e.metaKey)
+	if(isTextField( e.target ) || e.ctrlKey || e.metaKey || e.altKey)
 		return;
+	// a focused toolbar button would otherwise swallow Space as a click
+	if(e.target.closest && e.target.closest("button,input"))
+		e.target.blur();
+	if(e.repeat)
+	{
+		if(e.code == "Space")
+			e.preventDefault();
+		return;
+	}
 	switch(e.code)
 	{
 		case "Space": act(function(){ synth.play(); }); break;
@@ -848,6 +862,8 @@ window.addEventListener("keydown", function(e){
 	e.preventDefault();
 });
 window.addEventListener("keyup", function(e){
+	if(e.code == "Space" && !isTextField( e.target ))
+		e.preventDefault();
 	if(e.code == "KeyT")
 		act(function(){ synth.trigger(false); });
 });
