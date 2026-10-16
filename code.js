@@ -1483,13 +1483,162 @@ function drawCompressor( x, y, w, h )
 		c.on = !c.on;
 }
 
+// rows below the synth (in the synth's coordinates): LFO + compressor, then the post FX
+function deviceRowsH()
+{
+	return [ Math.max( deviceH( "lfo", DEVICE_H ), deviceH( "comp", DEVICE_H ) ),
+	         Math.max( deviceH( "reverb", FX_H ), deviceH( "delay", FX_H ) ) ];
+}
+
 function drawDevices()
 {
-	var y = MAIN_H + DEVICE_GAP;
+	var rows = deviceRowsH();
 	var w = (PANEL_W - DEVICE_GAP) * 0.5;
-	drawLfoDevice( 0, y, w, DEVICE_H );
-	drawCompressor( w + DEVICE_GAP, y, w, DEVICE_H );
+	var y = MAIN_H + DEVICE_GAP;
+	drawDevice( "lfo", 0, y, w, DEVICE_H, "DUAL LFO", Harm.LFO_JACKS, drawLfoDevice );
+	drawDevice( "comp", w + DEVICE_GAP, y, w, DEVICE_H, "COMPRESSOR", Harm.COMP_JACKS, drawCompressor );
+	y += rows[0] + DEVICE_GAP;
+	drawDevice( "reverb", 0, y, w, FX_H, "REVERB", null, drawReverbDevice );
+	drawDevice( "delay", w + DEVICE_GAP, y, w, FX_H, "DELAY", null, drawDelayDevice );
 }
+
+// ---------------------------------------------------------------------------
+// collapsible devices: a chevron button on the top left corner folds a device into a slim bar.
+// Its jacks stay on the bar as small sockets so cables keep their ends and can still be patched.
+
+var DEVICE_COLLAPSED_H = 26;
+var FX_H = 150;
+var collapsed = {};
+try { collapsed = JSON.parse( localStorage.getItem("SUBHARM_collapsed") || "{}" ) || {}; } catch(err) {}
+
+function deviceH( id, h ) { return collapsed[id] ? DEVICE_COLLAPSED_H : h; }
+
+function toggleCollapsed( id )
+{
+	collapsed[id] = !collapsed[id];
+	try { localStorage.setItem( "SUBHARM_collapsed", JSON.stringify( collapsed ) ); } catch(err) {}
+}
+
+function collapseButton( id, cx, cy )
+{
+	var hover = !cable_drag && ui.active === null && hitCircle( cx, cy, 9 );
+	if(hover)
+	{
+		ui.hot = "collapse_" + id;
+		tooltips.push([ collapsed[id] ? "EXPAND" : "COLLAPSE", cx + 30, cy + OY + 2 ]);
+	}
+	if(hover && ui.pressed)
+	{
+		ui.active = "collapse_" + id;
+		toggleCollapsed( id );
+	}
+	ctx.fillStyle = hover ? "#4a4a46" : "#2c2c2a";
+	ctx.beginPath(); ctx.arc( cx, cy, 8, 0, Math.PI * 2 ); ctx.fill();
+	ctx.strokeStyle = TEXT_COLOR;
+	ctx.lineWidth = 1.6;
+	ctx.beginPath();
+	if(collapsed[id]) { ctx.moveTo( cx - 2, cy - 4 ); ctx.lineTo( cx + 2.5, cy ); ctx.lineTo( cx - 2, cy + 4 ); } // ▸
+	else { ctx.moveTo( cx - 4, cy - 2 ); ctx.lineTo( cx, cy + 2.5 ); ctx.lineTo( cx + 4, cy - 2 ); }           // ▾
+	ctx.stroke();
+}
+
+function drawMiniJack( id, x, y, label, type )
+{
+	jacks[id] = { x: x, y: y + OY, type: type, label: label };
+	var hover = hitCircle( x, y, 9 );
+	if(hover)
+		tooltips.push([ label, x, y + OY - 16 ]);
+	if(cable_drag && cable_drag.from != id && jackCompatible( cable_drag, jacks[id] ))
+	{
+		ctx.strokeStyle = hover ? "#fff" : "rgba(255,255,255,0.3)";
+		ctx.lineWidth = 1.5;
+		ctx.beginPath(); ctx.arc( x, y, 9, 0, Math.PI * 2 ); ctx.stroke();
+	}
+	ctx.fillStyle = hover ? "#d8d8d2" : "#9a9a94";
+	ctx.beginPath(); ctx.arc( x, y, 6.5, 0, Math.PI * 2 ); ctx.fill();
+	ctx.fillStyle = "#000";
+	ctx.beginPath(); ctx.arc( x, y, 3.5, 0, Math.PI * 2 ); ctx.fill();
+}
+
+// draws a device, or its collapsed bar. draw(x, y, w, h) draws the expanded device
+function drawDevice( id, x, y, w, h, name, jack_rows, draw )
+{
+	if(collapsed[id])
+	{
+		drawCasing( x, y, w, DEVICE_COLLAPSED_H );
+		var cy = y + DEVICE_COLLAPSED_H * 0.5;
+		collapseButton( id, x + 36, cy );
+		ctx.textAlign = "left";
+		ctx.textBaseline = "middle";
+		ctx.font = "bold 14px " + FONT;
+		ctx.fillStyle = TEXT_COLOR;
+		ctx.fillText( name, x + 52, cy + 1 );
+		var all = [];
+		(jack_rows || []).forEach(function(row){ all = all.concat( row ); });
+		all.forEach(function(j, k){
+			drawMiniJack( j[2], x + w - 22 - 20 - (all.length - 1 - k) * 24, cy, j[0], j[1] );
+		});
+		return;
+	}
+	draw( x, y, w, h );
+	collapseButton( id, x + 36, y + 11 );
+}
+
+// ---------------------------------------------------------------------------
+// post FX devices (bottom row): reverb and delay on the master output
+
+function drawReverbDevice( x, y, w, h )
+{
+	var fx = synth.settings.fx;
+	var s = synth.settings;
+	drawDevicePanel( x, y, w, h, "REVERB", ["CONVOLUTION", "SEND EFFECT"] );
+	s.reverb = knob( "fx_reverb_mix", x + 100, y + 70, 28, s.reverb, 0, 1, {
+		label: "MIX", def: 0.15, format: fmtPct
+	});
+	fx.reverb_predelay = knob( "fx_reverb_predelay", x + 210, y + 70, 24, fx.reverb_predelay, 0, 0.25, {
+		label: "PRE-DELAY", style: "ring", def: 0.02, format: fmtTime
+	});
+	fx.reverb_tone = knob( "fx_reverb_tone", x + 310, y + 70, 24, fx.reverb_tone, 500, 16000, {
+		label: "TONE", exp: true, def: 12000, format: fmtHz
+	});
+	drawLabel( "ROOM", x + 430, y + 48, 11 );
+	if(button( "fx_reverb_room", x + 392, y + 58, 76, 22, Harm.REVERB_ROOMS[ fx.reverb_room ][0] ).clicked)
+		fx.reverb_room = (fx.reverb_room + 1) % Harm.REVERB_ROOMS.length;
+	if(button( "fx_reverb_on", x + 392, y + 92, 76, 22, "ON", fx.reverb_on ).clicked)
+		fx.reverb_on = !fx.reverb_on;
+}
+
+function drawDelayDevice( x, y, w, h )
+{
+	var fx = synth.settings.fx;
+	drawDevicePanel( x, y, w, h, "DELAY", ["STEREO", "PING-PONG ECHO"] );
+	if(fx.delay_sync)
+		fx.delay_div = knob( "fx_delay_div", x + 100, y + 70, 28, fx.delay_div, 0, Harm.DELAY_DIVS.length - 1, {
+			label: "TIME", step: 1, def: 3, style: "ring",
+			format: function(v){ return Harm.DELAY_DIVS[v][0] + "  " + Math.round( synth.delayTime() * 1000 ) + " ms"; }
+		});
+	else
+		fx.delay_time = knob( "fx_delay_time", x + 100, y + 70, 28, fx.delay_time, 0.01, 2, {
+			label: "TIME", exp: true, def: 0.3, style: "ring", format: fmtTime
+		});
+	fx.delay_feedback = knob( "fx_delay_feedback", x + 200, y + 70, 24, fx.delay_feedback, 0, 0.95, {
+		label: "FEEDBACK", def: 0.4, format: fmtPct
+	});
+	fx.delay_tone = knob( "fx_delay_tone", x + 290, y + 70, 24, fx.delay_tone, 500, 16000, {
+		label: "TONE", exp: true, def: 5000, format: fmtHz
+	});
+	fx.delay_mix = knob( "fx_delay_mix", x + 380, y + 70, 24, fx.delay_mix, 0, 1, {
+		label: "MIX", def: 0.3, format: fmtPct
+	});
+	if(button( "fx_delay_sync", x + 448, y + 40, 84, 22, "SYNC", fx.delay_sync ).clicked)
+		fx.delay_sync = !fx.delay_sync;
+	if(button( "fx_delay_pingpong", x + 448, y + 68, 84, 22, "PING-PONG", fx.delay_pingpong ).clicked)
+		fx.delay_pingpong = !fx.delay_pingpong;
+	if(button( "fx_delay_on", x + 448, y + 96, 84, 22, "ON", fx.delay_on ).clicked)
+		fx.delay_on = !fx.delay_on;
+}
+
+
 
 // ---------------------------------------------------------------------------
 // keys device, in a row above the main panel: MIDI input selection, on-screen keyboard,
@@ -1741,6 +1890,7 @@ function draw()
 		canvas.height = Math.round( h * dpr );
 	}
 	view.dpr = dpr;
+	updatePanelHeight();
 	view.scale = Math.min( w / PANEL_W, h / PANEL_H );
 	view.ox = (w - PANEL_W * view.scale) * 0.5;
 	view.oy = (h - PANEL_H * view.scale) * 0.5;
@@ -1752,9 +1902,10 @@ function draw()
 
 	ui.hot = null;
 	jacks = {}; // filled again by every row as it draws its jacks
-	drawKeysDevice( 0, 0, PANEL_W, KB_H );
+	var kb_h = deviceH( "keys", KB_H );
+	drawDevice( "keys", 0, 0, PANEL_W, KB_H, "KEYS", Harm.KB_JACKS, drawKeysDevice );
 	// synth panel and the device row below it, drawn in their own coordinates
-	OY = KB_H + KB_GAP;
+	OY = kb_h + KB_GAP;
 	ctx.save();
 	ctx.translate( 0, OY );
 	ui.y -= OY;
@@ -1895,8 +2046,6 @@ function updateToolbar()
 
 function updateToolbarFrame()
 {
-	if(document.activeElement != $("reverb"))
-		$("reverb").value = synth.settings.reverb;
 }
 
 $("power").addEventListener("click", function(){
@@ -1907,12 +2056,18 @@ $("power").addEventListener("click", function(){
 	else
 		synth.context.resume().then( updateToolbar );
 });
+function updatePanelHeight()
+{
+	var rows = deviceRowsH();
+	PANEL_H = deviceH( "keys", KB_H ) + KB_GAP + MAIN_H + DEVICE_GAP + rows[0] + DEVICE_GAP + rows[1];
+}
+
 function setLayout( name )
 {
 	layout = name;
 	PANEL_W = LAYOUTS[name].w;
 	MAIN_H = LAYOUTS[name].h;
-	PANEL_H = KB_H + KB_GAP + MAIN_H + DEVICE_GAP + DEVICE_H;
+	updatePanelHeight();
 	jacks = {};
 	cable_drag = null;
 	$("layout").textContent = "Layout: " + LAYOUTS[name].name;
@@ -2061,9 +2216,6 @@ $("patch-file").addEventListener("change", function(e){
 	});
 });
 
-$("reverb").addEventListener("input", function(e){
-	synth.settings.reverb = parseFloat( e.target.value );
-});
 
 // MIDI is selected on the keys device; only problems are reported here
 synth.onmidichange = function( midi ){

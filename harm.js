@@ -22,7 +22,7 @@ function Harm()
 }
 
 Harm.STORAGE_KEY = "SUBHARM_state_v2";
-Harm.VERSION = "20261016c"; // bump together with the ?v= in index.html so browsers reload the scripts
+Harm.VERSION = "20261016d"; // bump together with the ?v= in index.html so browsers reload the scripts
 
 Harm.defaultSettings = function()
 {
@@ -56,7 +56,10 @@ Harm.defaultSettings = function()
 		vca_decay: 0.6,
 		volume: 0.7,
 		eg_hold: false,     // EG button: envelopes locked at maximum (drone)
-		reverb: 0.15,
+		reverb: 0.15,       // reverb MIX
+		// post FX devices: delay (off by default) and reverb settings
+		fx: { reverb_on: true, reverb_room: 1, reverb_predelay: 0.02, reverb_tone: 12000,
+			delay_on: false, delay_sync: true, delay_div: 3, delay_time: 0.3, delay_feedback: 0.4, delay_tone: 5000, delay_mix: 0.3, delay_pingpong: true },
 		scale_file: null,
 		// extra devices below the panel
 		lfo: [
@@ -128,22 +131,7 @@ Harm.prototype.init = function()
 				that.state = e.data;
 		};
 
-		that.dry_gain = ctx.createGain();
-		node.connect( that.dry_gain );
-		that.dry_gain.connect( ctx.destination );
-
-		// reverb is not part of the hardware, it is an extra send effect
-		that.reverb = ctx.createConvolver();
-		that.reverb_gain = ctx.createGain();
-		that.reverb_gain.gain.value = 0;
-		node.connect( that.reverb );
-		that.reverb.connect( that.reverb_gain );
-		that.reverb_gain.connect( ctx.destination );
-		fetch("data/BIG HALL E003 M2S.wav")
-			.then(function(r){ return r.arrayBuffer(); })
-			.then(function(b){ return ctx.decodeAudioData(b); })
-			.then(function(buffer){ that.reverb.buffer = buffer; })
-			.catch(function(err){ console.warn("reverb impulse not loaded", err); });
+		that.buildPostFx( ctx, node );
 
 		that._sent = null;
 		that.sync();
@@ -168,8 +156,111 @@ Harm.prototype.sync = function()
 		return;
 	this._sent = json;
 	this.post({ type: "settings", settings: this.settings });
-	var reverb = this.settings.reverb;
-	this.reverb_gain.gain.setTargetAtTime( reverb * reverb * 0.8, this.context.currentTime, 0.02 );
+	this.updatePostFx();
+}
+
+// ---- post FX (not on the hardware): delay inserted on the master, reverb as a send ----
+//   synth -> bus -> speakers
+//   synth -> delay (two lines, normal or ping-pong, lowpass in the feedback) -> bus
+//   bus -> pre-delay -> convolver -> tone -> reverb mix -> speakers
+
+Harm.REVERB_ROOMS = [["HALL A", "data/BIG HALL E002 M2S.wav"], ["HALL B", "data/BIG HALL E003 M2S.wav"]];
+Harm.DELAY_DIVS = [["1/16", 0.25], ["1/8T", 1/3], ["1/8", 0.5], ["1/8D", 0.75], ["1/4T", 2/3], ["1/4", 1], ["1/4D", 1.5], ["1/2", 2], ["1/1", 4]];
+
+Harm.prototype.buildPostFx = function( ctx, node )
+{
+	var that = this;
+	var bus = this.bus = ctx.createGain();
+	node.connect( bus );
+	bus.connect( ctx.destination );
+
+	// delay: two delay lines feeding back into themselves (normal) or into each other (ping-pong)
+	var d = this.delay = {
+		inL: ctx.createGain(), inR: ctx.createGain(),
+		lineL: ctx.createDelay( 5 ), lineR: ctx.createDelay( 5 ),
+		toneL: ctx.createBiquadFilter(), toneR: ctx.createBiquadFilter(),
+		selfL: ctx.createGain(), selfR: ctx.createGain(), crossLR: ctx.createGain(), crossRL: ctx.createGain(),
+		merger: ctx.createChannelMerger( 2 ), wet: ctx.createGain()
+	};
+	var mono = ctx.createGain();
+	mono.channelCount = 1;
+	mono.channelCountMode = "explicit"; // downmix the synth to mono before the delay lines
+	node.connect( mono );
+	mono.connect( d.inL ); mono.connect( d.inR );
+	d.inL.connect( d.lineL ); d.inR.connect( d.lineR );
+	d.lineL.connect( d.toneL ); d.lineR.connect( d.toneR );
+	d.toneL.connect( d.selfL ); d.selfL.connect( d.lineL );
+	d.toneR.connect( d.selfR ); d.selfR.connect( d.lineR );
+	d.toneL.connect( d.crossLR ); d.crossLR.connect( d.lineR );
+	d.toneR.connect( d.crossRL ); d.crossRL.connect( d.lineL );
+	d.toneL.connect( d.merger, 0, 0 ); d.toneR.connect( d.merger, 0, 1 );
+	d.merger.connect( d.wet );
+	d.wet.connect( bus );
+	[d.toneL, d.toneR].forEach(function(f){ f.type = "lowpass"; f.Q.value = 0.5; });
+	[d.wet, d.inL, d.inR, d.selfL, d.selfR, d.crossLR, d.crossRL].forEach(function(g){ g.gain.value = 0; });
+
+	// reverb send
+	var r = this.reverb = {
+		predelay: ctx.createDelay( 1 ), convolver: ctx.createConvolver(),
+		tone: ctx.createBiquadFilter(), wet: ctx.createGain(), buffers: [], room: -1
+	};
+	r.tone.type = "lowpass";
+	r.wet.gain.value = 0;
+	bus.connect( r.predelay );
+	r.predelay.connect( r.convolver );
+	r.convolver.connect( r.tone );
+	r.tone.connect( r.wet );
+	r.wet.connect( ctx.destination );
+	Harm.REVERB_ROOMS.forEach(function(room, i){
+		fetch( room[1] )
+			.then(function(res){ return res.arrayBuffer(); })
+			.then(function(b){ return ctx.decodeAudioData(b); })
+			.then(function(buffer){ r.buffers[i] = buffer; r.room = -1; that.updatePostFx(); })
+			.catch(function(err){ console.warn("reverb impulse not loaded", room[1], err); });
+	});
+}
+
+Harm.prototype.delayTime = function()
+{
+	var fx = this.settings.fx;
+	if(fx.delay_sync)
+		return Math.min( 4.9, (60 / this.settings.tempo) * Harm.DELAY_DIVS[ fx.delay_div ][1] );
+	return fx.delay_time;
+}
+
+Harm.prototype.updatePostFx = function()
+{
+	if(!this.bus)
+		return;
+	var fx = this.settings.fx;
+	var t = this.context.currentTime;
+	var set = function(param, v, tc) { param.setTargetAtTime( v, t, tc || 0.03 ); };
+
+	var d = this.delay;
+	var time = this.delayTime();
+	set( d.lineL.delayTime, time, 0.05 );
+	set( d.lineR.delayTime, time, 0.05 );
+	set( d.toneL.frequency, fx.delay_tone );
+	set( d.toneR.frequency, fx.delay_tone );
+	var on = fx.delay_on ? 1 : 0, fb = fx.delay_feedback;
+	set( d.inL.gain, on );
+	set( d.inR.gain, fx.delay_pingpong ? 0 : on ); // ping-pong starts on the left only
+	set( d.selfL.gain, fx.delay_pingpong ? 0 : fb );
+	set( d.selfR.gain, fx.delay_pingpong ? 0 : fb );
+	set( d.crossLR.gain, fx.delay_pingpong ? fb : 0 );
+	set( d.crossRL.gain, fx.delay_pingpong ? fb : 0 );
+	set( d.wet.gain, on * fx.delay_mix );
+
+	var r = this.reverb;
+	if(r.room != fx.reverb_room && r.buffers[ fx.reverb_room ])
+	{
+		r.convolver.buffer = r.buffers[ fx.reverb_room ];
+		r.room = fx.reverb_room;
+	}
+	var mix = this.settings.reverb;
+	set( r.predelay.delayTime, fx.reverb_predelay );
+	set( r.tone.frequency, fx.reverb_tone );
+	set( r.wet.gain, fx.reverb_on ? mix * mix * 0.8 : 0 );
 }
 
 Harm.prototype.play = function() { this.post({ type: "play" }); }
@@ -249,6 +340,9 @@ Harm.prototype.setSettings = function( data )
 		s.seq_oct = 1;
 	s.scale_file = typeof data.scale_file == "string" ? data.scale_file : null;
 	var jack_ids = Harm.jackTypes();
+	s.fx.reverb_room = Math.min( Harm.REVERB_ROOMS.length - 1, Math.max( 0, Math.round( s.fx.reverb_room ) ) );
+	s.fx.delay_div = Math.min( Harm.DELAY_DIVS.length - 1, Math.max( 0, Math.round( s.fx.delay_div ) ) );
+	s.fx.delay_feedback = Math.min( 0.95, Math.max( 0, s.fx.delay_feedback ) );
 	if(Harm.SCOPE_TIMES.indexOf( s.scope.time ) == -1)
 		s.scope.time = 0.02;
 	s.lfo.forEach(function(l){
