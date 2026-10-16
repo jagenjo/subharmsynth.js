@@ -1,5 +1,5 @@
-// devices/labyrinth-worklet.js
-// Labyrinth (Moog) DSP, hosted by the rack processor (rack-worklet.js): a parallel generative voice
+// devices/maze-worklet.js
+// Maze DSP (a replica of the Moog Labyrinth), hosted by the rack processor (rack-worklet.js): a parallel generative voice
 // and two generative 8 bit sequencers.
 //   voice: sine VCO and triangle MOD VCO (MOD VCO -> VCO FM, ring modulation, MOD VCO sync), a
 //   saturating mixer with tone-adjustable noise, then two paths, a wavefolder (VCW) and a 2-pole
@@ -16,7 +16,7 @@
 
 const C4 = 261.6255653005986;
 
-// must match the jack ids in devices/labyrinth.js ("audio" is the AUDIO OUT socket on the back)
+// must match the jack ids in devices/maze.js ("audio" is the AUDIO OUT socket on the back)
 const IN_IDS = ["vco_pitch","mvco_sync","mvco_pitch","blend_in","vcw_in","fold_in","vcw_vca","vcf_in","cutoff_in","vcf_vca",
 	"umix1","umix2","eg2_trig","clock1","bit_flip1","clock2","bit_flip2","trigger_in","reset_in"];
 const OUT_IDS = ["vca","mvco","noise","mixer","eg1","eg2","umix_out","seq1_cv","seq1_trig","seq2_cv","seq2_trig","clock_out","audio"];
@@ -52,7 +52,7 @@ function fastTanh(x) {
 
 function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
 
-class LabyrinthDSP {
+class MazeDSP {
 	constructor() {
 		this.s = null;
 		this.outs = new Float32Array(OUT_IDS.length);
@@ -369,11 +369,11 @@ class LabyrinthDSP {
 		};
 	}
 }
-LabyrinthDSP.OUT_IDS = OUT_IDS;
-LabyrinthDSP.IN_IDS = IN_IDS;
-LabyrinthDSP.MIDI_IN = "midi_in";
+MazeDSP.OUT_IDS = OUT_IDS;
+MazeDSP.IN_IDS = IN_IDS;
+MazeDSP.MIDI_IN = "midi_in";
 
 globalThis.WR_DSP = globalThis.WR_DSP || {};
-globalThis.WR_DSP.labyrinth = LabyrinthDSP;
+globalThis.WR_DSP.maze = MazeDSP;
 
 })();

@@ -1,8 +1,8 @@
-// devices/labyrinth.js
-// Labyrinth (Moog) module: settings, the 32 point patch bay and the panel: two rows of voice controls
+// devices/maze.js
+// Maze module, a replica of the Moog Labyrinth: settings, the 32 point patch bay and the panel: two rows of voice controls
 // (oscillators, mixer, wavefolder, filter, blend and envelopes), the two generative bit sequencers
 // below with their buttons, CORRUPT and CV RANGE, and the transport, quantizer and ORDER switch.
-// Bits can also be clicked directly to flip them. DSP in labyrinth-worklet.js.
+// Bits can also be clicked directly to flip them. DSP in maze-worklet.js.
 
 (function(){
 
@@ -127,8 +127,8 @@ function drawBackground()
 	ctx.textBaseline = "alphabetic";
 	ctx.font = "bold 30px " + FONT;
 	ctx.fillStyle = TEXT_COLOR;
-	ctx.fillText( "LABYRINTH", 46, 560 );
-	var tw = ctx.measureText( "LABYRINTH" ).width;
+	ctx.fillText( "MAZE", 46, 560 );
+	var tw = ctx.measureText( "MAZE" ).width;
 	ctx.fillRect( 54 + tw, 534, 1.5, 28 );
 	ctx.font = "11px " + FONT;
 	ctx.fillText( "PARALLEL GENERATIVE", 62 + tw, 546 );
@@ -212,14 +212,14 @@ function drawSequencers()
 	{
 		s.buffer = clone( live.map(function(q){ return { bits: q.bits, cv: q.cv, length: q.length }; }) );
 		u.saved = now + 1200;
-		setStatus( "Labyrinth: pattern saved in the buffer (a short press on BUFFER recalls it)" );
+		setStatus( "Maze: pattern saved in the buffer (a short press on BUFFER recalls it)" );
 	}
 	if(u.buffer_down && !buf.held)
 	{
 		if(now - u.buffer_down <= 1000)
 		{
 			if(s.buffer) send({ type: "pattern", pattern: s.buffer });
-			else setStatus( "Labyrinth: the buffer is empty (hold BUFFER for a second to save the pattern)" );
+			else setStatus( "Maze: the buffer is empty (hold BUFFER for a second to save the pattern)" );
 		}
 		u.buffer_down = 0;
 	}
@@ -317,11 +317,11 @@ function drawPatchBay()
 		}
 }
 
-WR.registerSynth( "labyrinth", {
-	title: "LABYRINTH",
-	description: "Labyrinth: parallel generative synthesizer with two bit sequencers",
+WR.registerSynth( "maze", {
+	title: "MAZE",
+	description: "Maze: parallel generative synthesizer with two bit sequencers",
 	category: "Synths",
-	worklet: "devices/labyrinth-worklet.js",
+	worklet: "devices/maze-worklet.js",
 	jacks: JACKS,
 	rear_jacks: [["AUDIO OUT", "aout", "audio"]],
 	audio_out: "audio",

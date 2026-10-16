@@ -1,6 +1,6 @@
 # subharmsynth.js
 
-A browser rack of semi-modular synthesizers built on the WebAudio API: replicas of the Moog Subharmonicon (polyrhythmic synthesizer), DFAM (percussion synthesizer, here called DRAM), Mother-32 (synthesizer with a 32 step sequencer, here called Brother-32) and Labyrinth (parallel generative synthesizer), with a mixer, LFOs, compressors, reverbs and delays, all patchable with each other.
+A browser rack of semi-modular synthesizers built on the WebAudio API: replicas of the Moog Subharmonicon (polyrhythmic synthesizer), DFAM (percussion synthesizer, here called DRAM), Mother-32 (synthesizer with a 32 step sequencer, here called Brother-32) and Labyrinth (parallel generative synthesizer, here called Maze), with a mixer, LFOs, compressors, reverbs and delays, all patchable with each other.
 
 All synthesis runs in real time in one `AudioWorkletProcessor` (`rack-worklet.js`), which hosts each synth's DSP and copies the patch cables between them every sample. Oscillators, filters, envelopes, clocks, sequencers and the cables are all computed per sample, so patching between synths is sample-accurate. The reverb and delay are native WebAudio nodes after it.
 
@@ -17,7 +17,7 @@ Needs a browser with AudioWorklet support, served over `https://` or `localhost`
 | `devices/subharm.js`, `devices/subharm-worklet.js` | the Subharmonicon: panel, jacks and settings; DSP |
 | `devices/dram.js`, `devices/dram-worklet.js` | the DRAM |
 | `devices/b32.js`, `devices/b32-worklet.js` | the Brother-32 |
-| `devices/labyrinth.js`, `devices/labyrinth-worklet.js` | the Labyrinth |
+| `devices/maze.js`, `devices/maze-worklet.js` | the Maze |
 | `devices/mixer.js`, `devices/mixer-worklet.js` | the 6 channel mixer |
 | `devices/lfo.js`, `devices/lfo-worklet.js` | the dual LFO |
 | `devices/comp.js`, `devices/comp-worklet.js` | the stereo compressor and its scope |
@@ -40,10 +40,10 @@ A new rack has a Subharm, an LFO and a compressor, then a reverb and a delay, ca
 
 One patch bay spans all of them: any output can be cabled to any input of any device. The front carries CV, gates and audio at ±5 V; the back carries the line-level audio between devices (see *Rear view*).
 
-- **Add device** (toolbar) inserts a new device at the bottom of the rack. The menu is grouped into synths (Subharm, DRAM, Brother-32, Labyrinth), modulation (dual LFO), mixing (mixer, compressor) and effects (reverb, delay).
+- **Add device** (toolbar) inserts a new device at the bottom of the rack. The menu is grouped into synths (Subharm, DRAM, Brother-32, Maze), modulation (dual LFO), mixing (mixer, compressor) and effects (reverb, delay).
   - You can have several of the same kind (`dram`, `dram2`, …). Reverbs are limited to 8, one per send / return slot of the audio engine.
   - A new LFO, compressor, reverb or delay arrives unpatched: patch its audio on the back (Tab).
-  - A synth with a MIDI IN (Subharm, Brother-32, Labyrinth) gets the keys' MIDI through **MASTER MIDI**, a tiny switch under its MIDI IN jack, instead of a long cable across the rack. While it is on, the jack shows a plug with no wire. Switching it on unplugs a MIDI IN cable; patching a cable into MIDI IN switches it off. It is saved with the patch; older patches keep their MIDI cables.
+  - A synth with a MIDI IN (Subharm, Brother-32, Maze) gets the keys' MIDI through **MASTER MIDI**, a tiny switch under its MIDI IN jack, instead of a long cable across the rack. While it is on, the jack shows a plug with no wire. Switching it on unplugs a MIDI IN cable; patching a cable into MIDI IN switches it off. It is saved with the patch; older patches keep their MIDI cables.
   - A new synth's audio goes to the first free mixer channel; with no mixer, to wherever the other synths go (or the compressor).
   - A new mixer takes over the synths that weren't on a mixer: they move onto its channels, and its MAIN L / R go where they went.
 - Each synth has three buttons on its right wood cheek: **move up**, **move down** and **remove**. Removing asks first and unplugs that synth's cables.
@@ -87,9 +87,9 @@ A 6 channel line mixer in the same panel style as the synths. Insert it from *Ad
 - **Back:** IN 1–6, AUX SEND, AUX RET L / R, MAIN L / R.
 - **Reverb on an aux:** patch AUX SEND → REVERB IN L, REVERB OUT L / R → AUX RET L / R, and turn the reverb's **DRY** button off so it returns only the effect. The delay has the same DRY button. The *Mixer & Aux Reverb* factory patch is set up this way.
 
-## Labyrinth
+## Maze
 
-A replica of the Moog Labyrinth, following its manual.
+A replica of the Moog Labyrinth, following its manual, named Maze here. Patches that still use the old `labyrinth` name load as Maze.
 
 - **Oscillators:**
   - A sine VCO (20 Hz–5 kHz) and a triangle MOD VCO (0.05 Hz–1.3 kHz).
@@ -211,7 +211,7 @@ As on the hardware, MIDI reaches the synth only through its MIDI IN jack, so the
 
 - **Scala scales.** Type a scale name in the toolbar to add a fifth quantize mode, SCALA. It uses the selected `.scl` file, rooted at C.
 - **Patches**: a patch is the whole rack, meaning its synths, all their settings, the shared devices and the cables.
-  - The toolbar menu has 21 factory patches (in `data/patches.json`), grouped as SUBHARM, DRAM, BROTHER-32, LABYRINTH and RACK (several devices patched together), plus your own.
+  - The toolbar menu has 21 factory patches (in `data/patches.json`), grouped as SUBHARM, DRAM, BROTHER-32, MAZE and RACK (several devices patched together), plus your own.
   - *Save as…* stores the rack under a name in the browser.
   - *Export* / *Import* write and read `.json` files, so patches can be shared or added to the repo.
   - Patches saved before the rack existed load as a rack with one Subharm.
@@ -237,7 +237,7 @@ As on the hardware, MIDI reaches the synth only through its MIDI IN jack, so the
 
 Some details are educated guesses, not measurements of the hardware:
 
-- Labyrinth: how much CORRUPT changes per pass, the ranges of the amounts, the wavefolder and filter curves, the scales after the ones the manual lists, how notes are handled over MIDI, and the panel layout (an arrangement of the manual's controls, not a copy of the panel)
+- Maze: how much CORRUPT changes per pass, the ranges of the amounts, the wavefolder and filter curves, the scales after the ones the manual lists, how notes are handled over MIDI, and the panel layout (an arrangement of the manual's controls, not a copy of the panel)
 - Brother-32: the placement of the patch bay jacks within the 4 × 8 grid, the ranges of the knobs, the ASSIGN choices, and the step editing (a step grid instead of the button modes)
 - DRAM: the order of the patch bay jacks within their rows, the envelope curves and ranges, the FM depth and the HP filter (a 4-pole high pass from the same ladder)
 - how strongly the SUB and RHYTHM CV inputs (and sequencers assigned to a sub) shift the division: 3 steps per volt

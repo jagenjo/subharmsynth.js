@@ -13,7 +13,7 @@ var WR = {
 	order: []
 };
 
-WR.VERSION = "20261016n"; // bump together with the ?v= in index.html so browsers reload the scripts
+WR.VERSION = "20261016o"; // bump together with the ?v= in index.html so browsers reload the scripts
 
 // def: {
 //   title, description,           names for menus and the panel
@@ -697,7 +697,7 @@ WR.migrateV4 = function( data )
 }
 
 // devices that were renamed: older saves have the old type, module ids ("dfam", "dfam2") and jacks
-WR.RENAMED_TYPES = { dfam: "dram", mother32: "brother32" };
+WR.RENAMED_TYPES = { dfam: "dram", mother32: "brother32", labyrinth: "maze" };
 
 WR.migrateRenamed = function( data )
 {
