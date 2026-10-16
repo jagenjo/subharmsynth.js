@@ -328,14 +328,32 @@ function drawKnob( cx, cy, r, n, highlight, ticks, bipolar, style )
 	ctx.stroke();
 	ctx.lineCap = "butt";
 
-	// machined aluminium cap: muted metal with concentric turning rings and a dark centre
+	// machined aluminium cap: a conic gradient fakes the anisotropic reflection of the circular
+	// turning marks (bright wedges facing the light), then a dark centre and edge on top
 	var cr = r * 0.62;
+	if(ctx.createConicGradient)
+	{
+		g = ctx.createConicGradient( -Math.PI * 0.25, cx, cy );
+		var lit = highlight ? 1.08 : 1;
+		var shade = function(v) { v = Math.min( 255, Math.round( v * lit ) ); return "rgb(" + v + "," + v + "," + Math.round( v * 0.96 ) + ")"; };
+		[[0, 150], [0.1, 104], [0.22, 82], [0.36, 112], [0.5, 156], [0.6, 106], [0.72, 84], [0.86, 116], [1, 150]].forEach(function(st){
+			g.addColorStop( st[0], shade( st[1] ) );
+		});
+	}
+	else
+	{
+		g = ctx.createRadialGradient( cx, cy, 0, cx, cy, cr );
+		g.addColorStop( 0, "#5c5c58" );
+		g.addColorStop( 1, highlight ? "#9a9a94" : "#8c8c86" );
+	}
+	ctx.fillStyle = g;
+	ctx.beginPath(); ctx.arc( cx, cy, cr, 0, Math.PI * 2 ); ctx.fill();
 	g = ctx.createRadialGradient( cx, cy, 0, cx, cy, cr );
-	g.addColorStop( 0, "#3a3a38" );
-	g.addColorStop( 0.18, "#5c5c58" );
-	g.addColorStop( 0.6, highlight ? "#8e8e88" : "#80807b" );
-	g.addColorStop( 0.92, highlight ? "#9a9a94" : "#8c8c86" );
-	g.addColorStop( 1, "#5a5a55" );
+	g.addColorStop( 0, "rgba(20,20,19,0.85)" );
+	g.addColorStop( 0.16, "rgba(20,20,19,0.35)" );
+	g.addColorStop( 0.3, "rgba(20,20,19,0)" );
+	g.addColorStop( 0.85, "rgba(0,0,0,0)" );
+	g.addColorStop( 1, "rgba(0,0,0,0.35)" );
 	ctx.fillStyle = g;
 	ctx.beginPath(); ctx.arc( cx, cy, cr, 0, Math.PI * 2 ); ctx.fill();
 	ctx.lineWidth = 0.6;
@@ -1287,7 +1305,7 @@ function drawDeviceJacks( x, y, w, h, rows )
 	ctx.fillStyle = "#1f1f1e";
 	ctx.beginPath(); ctx.roundRect( px, y + 10, 170, h - 20, 6 ); ctx.fill();
 	rows.forEach(function(row, r){
-		var spacing = row.length > 2 ? 56 : 80; // centred on the plate
+		var spacing = row.length > 2 ? 50 : 80; // centred on the plate
 		row.forEach(function(j, c){
 			drawJack( j[2], px + 85 + (c - (row.length - 1) * 0.5) * spacing, y + 50 + r * 58, j[0], j[1] );
 		});

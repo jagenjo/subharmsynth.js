@@ -22,6 +22,7 @@ function Harm()
 }
 
 Harm.STORAGE_KEY = "SUBHARM_state_v2";
+Harm.VERSION = "20261016c"; // bump together with the ?v= in index.html so browsers reload the scripts
 
 Harm.defaultSettings = function()
 {
@@ -118,7 +119,7 @@ Harm.prototype.init = function()
 		return this._initializing;
 	var that = this;
 	var ctx = this.context = new AudioContext({ latencyHint: "interactive" });
-	this._initializing = ctx.audioWorklet.addModule("harm-worklet.js").then(function(){
+	this._initializing = ctx.audioWorklet.addModule("harm-worklet.js?v=" + Harm.VERSION).then(function(){
 		var node = that.node = new AudioWorkletNode( ctx, "subharmonicon", {
 			numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2]
 		});
