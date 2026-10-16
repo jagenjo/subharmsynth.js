@@ -15,6 +15,7 @@ Needs a browser with AudioWorklet support, served over `https://` or `localhost`
 | `harm.js` | controller: settings, jack table, audio graph, Scala parser, Web MIDI |
 | `harm-worklet.js` | the DSP engine |
 | `data/patches.json` | factory patches |
+| `old/` | the original version of this replica, as in the first commit |
 | `data/scales/` | Scala `.scl` scales, plus `index.json` used by the scale picker |
 
 ## What it emulates
@@ -46,7 +47,7 @@ Click *Enable* in the toolbar.
 - **Reverb send.**
 - **Device row** below the synth, in the same style, patchable from and to the main patch bay:
   - **Dual LFO**: per LFO RATE (0.01–100 Hz), SHAPE (sine, triangle, saw, ramp, square, sample & hold), LEVEL (an attenuator, since the Subharmonicon has none), RATE CV inputs (1 V/oct) and SYNC inputs (a gate restarts the cycle). Outputs are ±5 V.
-  - **Compressor** on the master output, before the reverb: THRESHOLD, RATIO, ATTACK, RELEASE, MAKEUP, MIX (parallel), ON, a gain reduction meter, a SIDECHAIN input (the detector rectifies, so use envelopes or gates for ducking) and a GR output (gain reduction as CV, 4 dB per volt).
+  - **Compressor** on the master output, before the reverb: THRESHOLD, RATIO, ATTACK, RELEASE, MAKEUP, MIX (parallel), ON, a gain reduction meter, a SIDECHAIN input (the detector rectifies, so use envelopes or gates for ducking) and a GR output (gain reduction as CV, 4 dB per volt). A small green CRT oscilloscope under its jacks shows the master output, triggered on rising zero crossings.
 - **Randomize** (toolbar) rolls a new playable sound, keeping volume, compressor, reverb, cables and the loaded scale.
 - **Two panel layouts**, switched with the *Layout* toolbar button: *Hardware* places every control where it is on the real front panel; *Classic* is the original compact layout of this replica, grouped by section.
 

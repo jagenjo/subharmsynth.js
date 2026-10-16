@@ -1333,12 +1333,81 @@ function drawLfoDevice( x, y, w, h )
 	}
 }
 
+// small retro CRT oscilloscope: green phosphor trace of the master output
+function drawScope( x, y, w, h, data )
+{
+	// bezel and screen
+	ctx.fillStyle = "#050505";
+	ctx.beginPath(); ctx.roundRect( x - 3, y - 3, w + 6, h + 6, 8 ); ctx.fill();
+	var g = ctx.createRadialGradient( x + w * 0.5, y + h * 0.5, 4, x + w * 0.5, y + h * 0.5, w * 0.7 );
+	g.addColorStop( 0, "#0f2a14" );
+	g.addColorStop( 1, "#04100a" );
+	ctx.fillStyle = g;
+	ctx.beginPath(); ctx.roundRect( x, y, w, h, 6 ); ctx.fill();
+
+	ctx.save();
+	ctx.beginPath(); ctx.roundRect( x, y, w, h, 6 ); ctx.clip();
+
+	// graticule
+	ctx.strokeStyle = "rgba(80,255,120,0.12)";
+	ctx.lineWidth = 0.6;
+	ctx.beginPath();
+	for(var i = 1; i < 8; ++i) { ctx.moveTo( x + w * i / 8, y ); ctx.lineTo( x + w * i / 8, y + h ); }
+	for(var i = 1; i < 6; ++i) { ctx.moveTo( x, y + h * i / 6 ); ctx.lineTo( x + w, y + h * i / 6 ); }
+	ctx.stroke();
+	ctx.strokeStyle = "rgba(80,255,120,0.25)";
+	ctx.beginPath(); ctx.moveTo( x, y + h * 0.5 ); ctx.lineTo( x + w, y + h * 0.5 ); ctx.stroke();
+
+	// trace, drawn twice: a wide soft glow and a thin bright core
+	var mid = y + h * 0.5, amp = h * 0.45;
+	var n = data ? data.length : 0;
+	var trace = function(){
+		ctx.beginPath();
+		if(!n)
+		{
+			ctx.moveTo( x, mid ); ctx.lineTo( x + w, mid );
+			return;
+		}
+		for(var i = 0; i < n; ++i)
+		{
+			var px = x + (i / (n - 1)) * w;
+			var py = mid - clamp( data[i], -1.05, 1.05 ) * amp;
+			if(i) ctx.lineTo( px, py ); else ctx.moveTo( px, py );
+		}
+	};
+	ctx.lineJoin = "round";
+	ctx.strokeStyle = "rgba(60,255,110,0.18)";
+	ctx.lineWidth = 4;
+	trace(); ctx.stroke();
+	ctx.strokeStyle = "#7dff9a";
+	ctx.lineWidth = 1.2;
+	trace(); ctx.stroke();
+
+	// scanlines and glass reflection
+	ctx.fillStyle = "rgba(0,0,0,0.18)";
+	for(var yy = y; yy < y + h; yy += 3)
+		ctx.fillRect( x, yy, w, 1 );
+	g = ctx.createLinearGradient( x, y, x, y + h * 0.5 );
+	g.addColorStop( 0, "rgba(255,255,255,0.07)" );
+	g.addColorStop( 1, "rgba(255,255,255,0)" );
+	ctx.fillStyle = g;
+	ctx.fillRect( x, y, w, h * 0.5 );
+	ctx.restore();
+
+	ctx.textAlign = "left";
+	ctx.textBaseline = "middle";
+	ctx.font = "9px " + FONT;
+	ctx.fillStyle = "rgba(125,255,154,0.6)";
+	ctx.fillText( "OUT", x + 5, y + 8 );
+}
+
 function drawCompressor( x, y, w, h )
 {
 	var c = synth.settings.comp;
 	var st = synth.state;
 	drawDevicePanel( x, y, w, h, "COMPRESSOR", ["MASTER BUS", "DYNAMICS PROCESSOR"] );
 	var px = drawDeviceJacks( x, y, w, h, Harm.COMP_JACKS );
+	drawScope( px + 12, y + 80, 146, h - 100, st.scope );
 
 	// six knobs in a row, then the gain reduction meter and the ON button
 	var mx = px - 62;

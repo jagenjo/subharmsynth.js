@@ -34,6 +34,9 @@ const WAVE_MODES = { square: WAVE_SQUARE, pwm: WAVE_PWM, saw: WAVE_SAW };
 
 const GATE_V = 5;
 const DB_TO_LN = Math.LN10 / 20;
+const SCOPE_RING = 4096;   // power of two
+const SCOPE_SPAN = 1024;   // samples shown (~21ms at 48kHz)
+const SCOPE_POINTS = 256;
 const GATE_THRESHOLD = 1;
 const PULSE_TIME = 0.005;
 const SUB_DIV_PER_VOLT = 3;   // how many subharmonic divisions one volt of CV shifts
@@ -141,6 +144,10 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
 		this.lfoValue = [0, 0];
 		this.compEnv = 0;
 		this.compGrPeak = 0;
+
+		// oscilloscope on the compressor: ring buffer of the master output
+		this.scopeBuf = new Float32Array(SCOPE_RING);
+		this.scopePos = 0;
 
 		this.sampleCount = 0;
 		this.stateCounter = 0;
@@ -301,6 +308,21 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
 		const rising = high && !this.gateHigh[i];
 		this.gateHigh[i] = high;
 		return rising;
+	}
+
+	// latest SCOPE_SPAN samples, starting at a rising zero crossing when there is one
+	scopeSnapshot() {
+		const buf = this.scopeBuf, mask = SCOPE_RING - 1;
+		let start = (this.scopePos - SCOPE_SPAN * 2 + SCOPE_RING) & mask;
+		for (let k = 1; k < SCOPE_SPAN; k++) {
+			const i = (start + k) & mask;
+			if (buf[(i - 1) & mask] < 0 && buf[i] >= 0) { start = i; break; }
+		}
+		const out = new Float32Array(SCOPE_POINTS);
+		const step = SCOPE_SPAN / SCOPE_POINTS;
+		for (let k = 0; k < SCOPE_POINTS; k++)
+			out[k] = buf[(start + Math.floor(k * step)) & mask];
+		return out;
 	}
 
 	process(inputs, outputs) {
@@ -551,6 +573,8 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
 			else
 				outs[O_COMP_GR] = 0;
 			const y = fastTanh(master); // soft limiter on the output
+			this.scopeBuf[this.scopePos] = y;
+			this.scopePos = (this.scopePos + 1) & (SCOPE_RING - 1);
 			L[j] = y;
 			if (R) R[j] = y;
 		}
@@ -574,7 +598,8 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
 				vca_eg: this.vcaEg.level,
 				vcf_eg: this.vcfEg.level,
 				lfo: this.lfoValue.slice(),
-				comp_gr: this.compGrPeak
+				comp_gr: this.compGrPeak,
+				scope: this.scopeSnapshot()
 			});
 			this.compGrPeak = 0;
 		}
