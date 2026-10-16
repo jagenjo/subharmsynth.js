@@ -13,7 +13,7 @@ var WR = {
 	order: []
 };
 
-WR.VERSION = "20261016m"; // bump together with the ?v= in index.html so browsers reload the scripts
+WR.VERSION = "20261016n"; // bump together with the ?v= in index.html so browsers reload the scripts
 
 // def: {
 //   title, description,           names for menus and the panel
@@ -38,6 +38,12 @@ WR.VERSION = "20261016m"; // bump together with the ?v= in index.html so browser
 WR.registerSynth = function( type, def )
 {
 	def.type = type;
+	// a MIDI IN comes with the MASTER MIDI switch: the keys' MIDI without a cable
+	if(def.midi_in)
+	{
+		var defaults = def.defaults;
+		def.defaults = function() { var s = defaults(); s.midi_master = false; return s; };
+	}
 	WR.types[ type ] = def;
 	WR.order.push( type );
 }
@@ -124,8 +130,8 @@ WRContext.addModuleTo = function( s, type )
 		id = type + (++n);
 	var m = { id: id, type: type, settings: def.defaults() };
 	s.modules.push( m );
-	if(def.midi_in) // new synths with a MIDI IN get the keys' MIDI cable
-		s.patches.push([ "kb_midi", WR.jackId( id, def.midi_in ), 5 ]);
+	if(def.midi_in) // new synths with a MIDI IN get the keys' MIDI, through MASTER MIDI (no cable)
+		m.settings.midi_master = true;
 	WRContext.routeAudio( s, m );
 	return m;
 }
@@ -579,11 +585,29 @@ WRContext.prototype.cycleInput = function( dir )
 WRContext.prototype.connect = function( out_id, in_id, color )
 {
 	var patches = this.settings.patches;
-	var audio = WRContext.jackTypes( this.settings.modules )[ in_id ] == "ain";
+	var type = WRContext.jackTypes( this.settings.modules )[ in_id ];
+	var audio = type == "ain";
+	if(type == "midiin") // a MIDI cable takes over from MASTER MIDI
+		this.setMidiMaster( in_id.substr( 0, in_id.indexOf(".") ), false );
 	for(var i = patches.length - 1; i >= 0; --i)
 		if(patches[i][1] == in_id && (!audio || patches[i][0] == out_id))
 			patches.splice(i,1); // a CV input takes a single cable, an audio input adds them up
 	patches.push([ out_id, in_id, color || 0 ]);
+}
+
+// MASTER MIDI of a module: on, it gets the keys' MIDI without a cable (its MIDI IN cable is unplugged)
+WRContext.prototype.setMidiMaster = function( module_id, on )
+{
+	var m = this.settings.modules.find(function(m){ return m.id == module_id; });
+	var def = m && WR.types[ m.type ];
+	if(!def || !def.midi_in)
+		return;
+	m.settings.midi_master = !!on;
+	if(on)
+	{
+		var jack = WR.jackId( module_id, def.midi_in );
+		this.settings.patches = this.settings.patches.filter(function(p){ return p[1] != jack; });
+	}
 }
 
 WRContext.prototype.disconnect = function( jack_id )

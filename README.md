@@ -43,7 +43,7 @@ One patch bay spans all of them: any output can be cabled to any input of any de
 - **Add device** (toolbar) inserts a new device at the bottom of the rack. The menu is grouped into synths (Subharm, DRAM, Brother-32, Labyrinth), modulation (dual LFO), mixing (mixer, compressor) and effects (reverb, delay).
   - You can have several of the same kind (`dram`, `dram2`, …). Reverbs are limited to 8, one per send / return slot of the audio engine.
   - A new LFO, compressor, reverb or delay arrives unpatched: patch its audio on the back (Tab).
-  - A synth with a MIDI IN gets the keys' MIDI cable.
+  - A synth with a MIDI IN (Subharm, Brother-32, Labyrinth) gets the keys' MIDI through **MASTER MIDI**, a tiny switch under its MIDI IN jack, instead of a long cable across the rack. While it is on, the jack shows a plug with no wire. Switching it on unplugs a MIDI IN cable; patching a cable into MIDI IN switches it off. It is saved with the patch; older patches keep their MIDI cables.
   - A new synth's audio goes to the first free mixer channel; with no mixer, to wherever the other synths go (or the compressor).
   - A new mixer takes over the synths that weren't on a mixer: they move onto its channels, and its MAIN L / R go where they went.
 - Each synth has three buttons on its right wood cheek: **move up**, **move down** and **remove**. Removing asks first and unplugs that synth's cables.

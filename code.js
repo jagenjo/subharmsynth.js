@@ -833,11 +833,57 @@ function drawJack( id, x, y, label, type )
 
 	if(type == "midiin")
 	{
-		// lights with incoming MIDI while the MIDI cable is plugged in
+		// MASTER MIDI: a tiny switch under the jack; on, the keys' MIDI comes in without a cable and
+		// the jack shows a plug with no wire
+		var mid = id.substr( 0, id.indexOf(".") );
+		var mod = rack.settings.modules.find(function(m){ return m.id == mid; });
+		var master = !!(mod && mod.settings.midi_master);
+		if(mod)
+		{
+			if(midiMasterButton( "midi_master", x - 27, y + 15, 54, 13, master ))
+			{
+				rack.setMidiMaster( mid, !master );
+				master = !master;
+				setStatus( master ? "MASTER MIDI on: the keys' MIDI reaches it without a cable" : "MASTER MIDI off: cable the keys' MIDI output into MIDI IN" );
+			}
+			if(master)
+			{
+				ctx.fillStyle = "#111";
+				ctx.beginPath(); ctx.arc( x, y, 9.5, 0, Math.PI * 2 ); ctx.fill();
+				ctx.fillStyle = CABLE_COLORS[5];
+				ctx.beginPath(); ctx.arc( x, y, 7.5, 0, Math.PI * 2 ); ctx.fill();
+				ctx.fillStyle = "rgba(0,0,0,0.35)";
+				ctx.beginPath(); ctx.arc( x, y, 3, 0, Math.PI * 2 ); ctx.fill();
+			}
+		}
+		// lights with incoming MIDI while connected
 		var cabled = rack.settings.patches.some(function(p){ return p[1] == id; });
-		var active = cabled && rack.midi.access && (performance.now() - rack.midi.activity) < 120;
+		var active = (cabled || master) && rack.midi.access && (performance.now() - rack.midi.activity) < 120;
 		drawLed( x - 27, y - 24, 2.5, active, "#3bd16f" );
 	}
+}
+
+// the tiny MASTER MIDI switch under a MIDI IN jack; returns true when clicked
+function midiMasterButton( id, x, y, w, h, on )
+{
+	id = id_prefix + id;
+	var hover = !cable_drag && ui.active === null && hitRect( x, y, w, h );
+	if(hover)
+	{
+		ui.hot = id;
+		tip( on ? "CLICK: CABLE INSTEAD" : "CLICK: KEYS' MIDI WITHOUT A CABLE", x + w * 0.5, y + h + 10 );
+	}
+	var clicked = hover && ui.pressed;
+	if(clicked)
+		ui.active = id;
+	ctx.fillStyle = on ? "#c9483a" : (hover ? "#4a4a46" : "#2c2c2a");
+	ctx.beginPath(); ctx.roundRect( x, y, w, h, 3 ); ctx.fill();
+	ctx.font = "bold 8px " + FONT;
+	ctx.textAlign = "center";
+	ctx.textBaseline = "middle";
+	ctx.fillStyle = on ? "#fff" : TEXT_COLOR;
+	ctx.fillText( "MASTER MIDI", x + w * 0.5, y + h * 0.5 + 1 );
+	return clicked;
 }
 
 function jackAt( x, y )

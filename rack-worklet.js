@@ -10,7 +10,8 @@
 //
 // Jack ids: the rack's own jacks are plain ("kb_gate1", "io_main_l"), a module's are prefixed with
 // the module id ("subharm.vco1", "comp.in_l"). Cables are copied with one sample of delay. CV inputs
-// take one cable; audio inputs (rear sockets) sum all the cables plugged in.
+// take one cable; audio inputs (rear sockets) sum all the cables plugged in. MIDI reaches a module
+// through a cable from the keys' MIDI output into its MIDI IN, or with its MASTER MIDI switch on.
 
 const SLOTS = 8;
 const RACK_OUT_IDS = ["kb_gate1","kb_key1","kb_gate2","kb_key2","kb_trig","in_l","in_r","io_input_l","io_input_r"];
@@ -106,6 +107,7 @@ class RackProcessor extends AudioWorkletProcessor {
 			}
 			// native modules take the send / return slots in rack order (the main thread does the same)
 			mod.slot = Dsp.NATIVE && slot < SLOTS ? 1 + slot++ : -1;
+			mod.midiMaster = !!(m.settings && m.settings.midi_master); // MASTER MIDI: the keys' MIDI without a cable
 			if (mod.slot < 0) { mod.dsp.send = null; mod.dsp.ret = null; }
 			mod.dsp.setSettings(m.settings);
 			byId[m.id] = mod;
@@ -157,7 +159,7 @@ class RackProcessor extends AudioWorkletProcessor {
 		}
 		this.numCables = c;
 		this.numZero = z;
-		for (const mod of this.modules) mod.dsp.setMidiConnected(!!midi[mod.id]);
+		for (const mod of this.modules) mod.dsp.setMidiConnected(!!midi[mod.id] || mod.midiMaster);
 	}
 
 	process(inputs, outputs) {
