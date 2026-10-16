@@ -1,6 +1,6 @@
 # subharmsynth.js
 
-A browser rack of semi-modular synthesizers built on the WebAudio API: replicas of the Moog Subharmonicon (polyrhythmic synthesizer), DFAM (percussion synthesizer) and Mother-32 (synthesizer with a 32 step sequencer), with a mixer, LFOs, compressors, reverbs and delays, all patchable with each other.
+A browser rack of semi-modular synthesizers built on the WebAudio API: replicas of the Moog Subharmonicon (polyrhythmic synthesizer), DFAM (percussion synthesizer) and Mother-32 (synthesizer with a 32 step sequencer) and Labyrinth (parallel generative synthesizer), with a mixer, LFOs, compressors, reverbs and delays, all patchable with each other.
 
 All synthesis runs in real time in one `AudioWorkletProcessor` (`rack-worklet.js`), which hosts each synth's DSP and copies the patch cables between them every sample. Oscillators, filters, envelopes, clocks, sequencers and the cables are all computed per sample, so patching between synths is sample-accurate. The reverb and delay are native WebAudio nodes after it.
 
@@ -17,6 +17,7 @@ Needs a browser with AudioWorklet support, served over `https://` or `localhost`
 | `devices/subharm.js`, `devices/subharm-worklet.js` | the Subharmonicon: panel, jacks and settings; DSP |
 | `devices/dfam.js`, `devices/dfam-worklet.js` | the DFAM |
 | `devices/m32.js`, `devices/m32-worklet.js` | the Mother-32 |
+| `devices/labyrinth.js`, `devices/labyrinth-worklet.js` | the Labyrinth |
 | `devices/mixer.js`, `devices/mixer-worklet.js` | the 6 channel mixer |
 | `devices/lfo.js`, `devices/lfo-worklet.js` | the dual LFO |
 | `devices/comp.js`, `devices/comp-worklet.js` | the stereo compressor and its scope |
@@ -39,7 +40,7 @@ A new rack has a Subharm, an LFO and a compressor, then a reverb and a delay, ca
 
 One patch bay spans all of them: any output can be cabled to any input of any device. The front carries CV, gates and audio at ±5 V; the back carries the line-level audio between devices (see *Rear view*).
 
-- **Add device** (toolbar) inserts a new device at the bottom of the rack. The menu is grouped into synths (Subharm, DFAM, Mother-32), modulation (dual LFO), mixing (mixer, compressor) and effects (reverb, delay).
+- **Add device** (toolbar) inserts a new device at the bottom of the rack. The menu is grouped into synths (Subharm, DFAM, Mother-32, Labyrinth), modulation (dual LFO), mixing (mixer, compressor) and effects (reverb, delay).
   - You can have several of the same kind (`dfam`, `dfam2`, …). Reverbs are limited to 8, one per send / return slot of the audio engine.
   - A new LFO, compressor, reverb or delay arrives unpatched: patch its audio on the back (Tab).
   - A synth with a MIDI IN gets the keys' MIDI cable.
@@ -85,6 +86,35 @@ A 6 channel line mixer in the same panel style as the synths. Insert it from *Ad
 - **Front:** LEVEL CV 1–6 inputs act as a VCA on each channel (5 V = the fader's level), and a MIX output carries the mono mix at ±5 V, e.g. for the scope.
 - **Back:** IN 1–6, AUX SEND, AUX RET L / R, MAIN L / R.
 - **Reverb on an aux:** patch AUX SEND → REVERB IN L, REVERB OUT L / R → AUX RET L / R, and turn the reverb's **DRY** button off so it returns only the effect. The delay has the same DRY button. The *Mixer & Aux Reverb* factory patch is set up this way.
+
+## Labyrinth
+
+A replica of the Moog Labyrinth, following its manual.
+
+- **Oscillators:**
+  - A sine VCO (20 Hz–5 kHz) and a triangle MOD VCO (0.05 Hz–1.3 kHz).
+  - Each has an EG1 AMT (bipolar) and a sequencer amount: SEQ1 for the VCO, SEQ2 for the MOD VCO. At full (QTZ) the sequence plays in tune at 1 V/oct.
+  - M VCO FM AMT frequency-modulates the VCO with the MOD VCO.
+- **Mixer:** saturating, with VCO, MOD VCO, RING MOD and NOISE levels (each overdrives above 12 o'clock) and NOISE TONE.
+- **Two voice paths:**
+  - **VCW**, a wavefolder: FOLD, BIAS, EG1/CV AMT and a SEQ1 amount.
+  - **VCF**, a 2-pole state-variable filter: CUTOFF, RESONANCE, FILTER TYPE (low pass morphing into band pass), EG1/CV AMT and a SEQ2 amount.
+  - The ORDER switch puts them in parallel or in series either way. Each path has its own VCA, opened by EG2, and **BLEND** crossfades between them.
+- **Envelopes:** two decay-only envelopes, EG1 DECAY and EG2 (VCA) DECAY. **EG TRIG MIX** balances which sequencer's triggers fire them, and how strongly. Also VOLUME, and the U MIX utility mixer (U MIX 1 LVL).
+- **Generative sequencers:** two sequencers of 8 bits each.
+  - Each bit is on or off. Flipping a bit on stores a random voltage in it, and a bit that is on sends a trigger when the play head reaches it.
+  - Per sequencer: LENGTH (steps down from 8 to 1, then back to 8), BIT FLIP (the bit under the write head; you can also click any bit), BIT SHIFT (rotates the bits), **CORRUPT** and **CV RANGE**.
+  - CORRUPT left of 12 o'clock rewrites the voltages as the head passes but keeps the rhythm; right of 12 o'clock it also flips bits.
+  - CV RANGE scales the voltages before the **quantizer** (unquantized, chromatic, major, pentatonic, the minor scales, whole tone, Hirajoshi and others).
+  - **CHAIN SEQ** joins the two into one sequence of up to 16 steps.
+  - **BUFFER:** hold it for a second to save the pattern, short-press to bring it back. The live pattern, mutations included, is saved with the patch.
+  - Transport: TEMPO, RUN / STOP, RESET, ADVANCE (while stopped) and TRIGGER.
+- **32-point patch bay:**
+  - 20 inputs: VCO 1V/OCT, M VCO SYNC, M VCO 1V/OCT, BLEND, VCW IN, VCW FOLD, VCW VCA CV, VCF IN, CUTOFF, VCF VCA CV, U MIX 1 (RING), U MIX 2, EG2 TRIG, CLOCK 1, BIT FLIP 1, CLOCK 2, BIT FLIP 2, MIDI, TRIGGER, RESET.
+  - 12 outputs: VCA, M VCO, NOISE, MIXER, EG1, EG2, U MIX 1+2, SEQ1 CV, SEQ1 TRIG, SEQ2 CV, SEQ2 TRIG, CLOCK.
+  - Normalled connections, as on the hardware: EG1 into VCW FOLD and CUTOFF, EG2 into both VCA CVs, the mixer into VCW IN and VCF IN, the ring modulation into U MIX 1, the internal clock into CLOCK 1 and CLOCK 1 into CLOCK 2.
+- **MIDI** (cabled from the keys when it's added): notes transpose the VCO and fire the envelopes; MIDI clock and start / stop drive the sequencers.
+- **Factory patches:** *Alien Bells* and *Folded Bongos*.
 
 ## Mother-32
 
@@ -181,7 +211,7 @@ As on the hardware, MIDI reaches the synth only through its MIDI IN jack, so the
 
 - **Scala scales.** Type a scale name in the toolbar to add a fifth quantize mode, SCALA. It uses the selected `.scl` file, rooted at C.
 - **Patches**: a patch is the whole rack, meaning its synths, all their settings, the shared devices and the cables.
-  - The toolbar menu has 19 factory patches (in `data/patches.json`), grouped as SUBHARM, DFAM, MOTHER-32 and RACK (several devices patched together), plus your own.
+  - The toolbar menu has 21 factory patches (in `data/patches.json`), grouped as SUBHARM, DFAM, MOTHER-32, LABYRINTH and RACK (several devices patched together), plus your own.
   - *Save as…* stores the rack under a name in the browser.
   - *Export* / *Import* write and read `.json` files, so patches can be shared or added to the repo.
   - Patches saved before the rack existed load as a rack with one Subharm.
@@ -207,6 +237,7 @@ As on the hardware, MIDI reaches the synth only through its MIDI IN jack, so the
 
 Some details are educated guesses, not measurements of the hardware:
 
+- Labyrinth: how much CORRUPT changes per pass, the ranges of the amounts, the wavefolder and filter curves, the scales after the ones the manual lists, how notes are handled over MIDI, and the panel layout (an arrangement of the manual's controls, not a copy of the panel)
 - Mother-32: the placement of the patch bay jacks within the 4 × 8 grid, the ranges of the knobs, the ASSIGN choices, and the step editing (a step grid instead of the button modes)
 - DFAM: the order of the patch bay jacks within their rows, the envelope curves and ranges, the FM depth and the HP filter (a 4-pole high pass from the same ladder)
 - how strongly the SUB and RHYTHM CV inputs (and sequencers assigned to a sub) shift the division: 3 steps per volt

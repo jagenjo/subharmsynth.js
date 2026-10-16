@@ -56,7 +56,7 @@
 		<button id="patch-import" title="Load a patch from a .json file">Import</button>
 		<input id="patch-file" type="file" accept=".json,application/json" hidden />
 	</div>
-	<select id="add-synth" title="Insert a synth (Subharm, DFAM, Mother-32), mixer, LFO, compressor, reverb or delay at the bottom of the rack"></select>
+	<select id="add-synth" title="Insert a synth (Subharm, DFAM, Mother-32, Labyrinth), mixer, LFO, compressor, reverb or delay at the bottom of the rack"></select>
 	<button id="wires" title="Show or hide the patch cables (the plugs stay on the jacks)">Wires: shown</button>
 	<div class="group" title="Scale of the rack: 100% fills the window width">
 		Zoom
@@ -76,16 +76,17 @@
 	<span id="status"></span>
 </header>
 <canvas id="panel"></canvas>
-<script src="webrack.js?v=20261016k"></script>
+<script src="webrack.js?v=20261016l"></script>
 <!-- synths: each registers itself in the rack (panel here, DSP in its -worklet.js) -->
-<script src="devices/subharm.js?v=20261016k"></script>
-<script src="devices/dfam.js?v=20261016k"></script>
-<script src="devices/m32.js?v=20261016k"></script>
-<script src="devices/mixer.js?v=20261016k"></script>
-<script src="devices/lfo.js?v=20261016k"></script>
-<script src="devices/comp.js?v=20261016k"></script>
-<script src="devices/reverb.js?v=20261016k"></script>
-<script src="devices/delay.js?v=20261016k"></script>
-<script src="code.js?v=20261016k"></script>
+<script src="devices/subharm.js?v=20261016l"></script>
+<script src="devices/dfam.js?v=20261016l"></script>
+<script src="devices/m32.js?v=20261016l"></script>
+<script src="devices/labyrinth.js?v=20261016l"></script>
+<script src="devices/mixer.js?v=20261016l"></script>
+<script src="devices/lfo.js?v=20261016l"></script>
+<script src="devices/comp.js?v=20261016l"></script>
+<script src="devices/reverb.js?v=20261016l"></script>
+<script src="devices/delay.js?v=20261016l"></script>
+<script src="code.js?v=20261016l"></script>
 </body>
 </html>
