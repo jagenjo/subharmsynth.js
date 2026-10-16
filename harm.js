@@ -27,8 +27,9 @@ Harm.defaultSettings = function()
 	return {
 		version: 2,
 		vco: [
-			{ freq: 130.81, wave: "saw", sub1: 2, sub2: 3, level: 0.75, sub1_level: 0.55, sub2_level: 0.4 },
-			{ freq: 196.00, wave: "square", sub1: 4, sub2: 5, level: 0.45, sub1_level: 0.35, sub2_level: 0.3 }
+			// freq: VCO FREQ knob, C4 to C8. wave: "square" (up), "pwm" (middle), "saw" (down)
+			{ freq: 261.63, wave: "saw", sub1: 2, sub2: 4, level: 0.55, sub1_level: 0.6, sub2_level: 0.45 },
+			{ freq: 392.00, wave: "square", sub1: 4, sub2: 6, level: 0.35, sub1_level: 0.4, sub2_level: 0.3 }
 		],
 		seq: [
 			[0, 3/12, 5/12, 7/12],
@@ -52,7 +53,7 @@ Harm.defaultSettings = function()
 		vca_attack: 0.004,
 		vca_decay: 0.6,
 		volume: 0.7,
-		vca_eg: true,
+		eg_hold: false,     // EG button: envelopes locked at maximum (drone)
 		reverb: 0.15,
 		scale_file: null,
 		patches: []          // [output id, input id, color index]
@@ -70,6 +71,11 @@ Harm.JACKS = [
 	[["SEQ 1","out","seq1"], ["SEQ 1 CLK","out","seq1_clk"], ["SEQ 2","out","seq2"], ["SEQ 2 CLK","out","seq2_clk"]],
 	[["MIDI IN","midi","midi_in"], ["CLOCK","in","clock_in"], ["CLOCK","out","clock_out"], ["TRIGGER","out","trigger_out"]]
 ];
+
+Harm.VCO_MIN_FREQ = 261.63; // VCO FREQ knob range is C4..C8
+Harm.VCO_MAX_FREQ = 4186.0;
+Harm.TEMPO_MIN = 20;         // 0.333Hz..50Hz at 1 ppq
+Harm.TEMPO_MAX = 3000;
 
 Harm.QUANTIZE_MODES = ["OFF","12-ET","8-ET","12-JI","8-JI","SCL"];
 
@@ -213,6 +219,13 @@ Harm.prototype.setSettings = function( data )
 	s.patches = (Array.isArray(data.patches) ? data.patches : []).filter(function(p){
 		return Array.isArray(p) && jack_ids[ p[0] ] == "out" && jack_ids[ p[1] ] == "in";
 	}).map(function(p){ return [ p[0], p[1], (p[2] | 0) ]; });
+	// saves from before the hardware-accurate ranges
+	if(data.vca_eg === false && data.eg_hold === undefined)
+		s.eg_hold = true;
+	s.vco.forEach(function(v){
+		while(v.freq < Harm.VCO_MIN_FREQ - 0.01)
+			v.freq *= 2;
+	});
 	this.settings = s;
 
 	if(!s.scale_file)

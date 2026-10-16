@@ -23,6 +23,9 @@ const I_VCO_PITCH = [0, 4], I_VCO_SUB = [1, 5], I_VCO_PWM = [2, 6];
 const I_VCA = 3, I_CUTOFF = 7, I_PLAY = 8, I_RESET = 9, I_TRIG = 10, I_RHYTHM = 11, I_CLOCK = 15;
 const PULSE_OUTS = [O_SEQ_CLK[0], O_SEQ_CLK[1], O_CLOCK, O_TRIG];
 
+const WAVE_SQUARE = 0, WAVE_PWM = 1, WAVE_SAW = 2;
+const WAVE_MODES = { square: WAVE_SQUARE, pwm: WAVE_PWM, saw: WAVE_SAW };
+
 const GATE_V = 5;
 const GATE_THRESHOLD = 1;
 const PULSE_TIME = 0.005;
@@ -320,7 +323,8 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
 		const lv = sm.lv;
 		const fbk = sm.res * 4.6; // self-oscillates over the last ~15% of the knob
 		const comp = 1 + fbk * 0.3;
-		const square = [s.vco[0].wave === "square", s.vco[1].wave === "square"];
+		// wave switch: up = all square, middle = pulse VCO + saw subs (SUB 1 normalled to PWM), down = all saw
+		const waveMode = [WAVE_MODES[s.vco[0].wave] || 0, WAVE_MODES[s.vco[1].wave] || 0];
 		const vcaC = this.egCoefs(s.vca_attack, s.vca_decay);
 		const vcfC = this.egCoefs(s.vcf_attack, s.vcf_decay);
 		const egAmt = s.vcf_eg_amt * EG_CUTOFF_OCTAVES;
@@ -331,7 +335,8 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
 		const internal = !extClock && !midiClock;
 		if (midiClock) {
 			for (; this.midiTicks > 0; this.midiTicks--) {
-				if (this.playing && this.midiClockCount % 24 === 0) this.masterTick();
+				// MIDI clock is 24 ppqn, the master clock runs in 16ths (4 ppq)
+				if (this.playing && this.midiClockCount % 6 === 0) this.masterTick();
 				this.midiClockCount++;
 			}
 		}
@@ -400,12 +405,18 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
 				const sp2 = (v.cnt2 + ph) / d2, dt2 = dt / d2;
 
 				let o, o1, o2;
-				if (square[i]) {
+				if (waveMode[i] === WAVE_SQUARE) {
 					let pw = 0.5;
 					if (patched[I_VCO_PWM[i]]) pw = clamp(0.5 + ins[I_VCO_PWM[i]] * 0.09, 0.05, 0.95);
 					o = pulse(ph, dt, pw);
 					o1 = pulse(sp1, dt1, 0.5);
 					o2 = pulse(sp2, dt2, 0.5);
+				}
+				else if (waveMode[i] === WAVE_PWM) {
+					o1 = saw(sp1, dt1);
+					o2 = saw(sp2, dt2);
+					const pw = patched[I_VCO_PWM[i]] ? clamp(0.5 + ins[I_VCO_PWM[i]] * 0.09, 0.05, 0.95) : 0.5 + o1 * 0.4;
+					o = pulse(ph, dt, pw);
 				}
 				else {
 					o = saw(ph, dt);
@@ -423,6 +434,10 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
 			const hold = this.holdButton || this.holdMidi || this.holdInput;
 			this.stepEg(this.vcaEg, vcaC[0], vcaC[1], hold);
 			this.stepEg(this.vcfEg, vcfC[0], vcfC[1], hold);
+			if (s.eg_hold) { // EG button held until it blinks: both envelopes locked at maximum
+				this.vcaEg.level = 1;
+				this.vcfEg.level = 1;
+			}
 
 			// ---- 4-pole ladder filter, 2x oversampled ----
 			let cutOct = sm.cut + this.vcfEg.level * egAmt;
@@ -442,7 +457,7 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
 			// ---- VCA ----
 			let vca;
 			if (patched[I_VCA]) vca = clamp(ins[I_VCA] / 5, 0, 1.5);
-			else vca = s.vca_eg ? this.vcaEg.level : 1;
+			else vca = this.vcaEg.level;
 			const vcaOut = filtered * vca;
 
 			outs[O_VCA] = vcaOut * 5;
