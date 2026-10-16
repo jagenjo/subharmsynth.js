@@ -63,6 +63,7 @@ Harm.defaultSettings = function()
 			{ rate: 4, shape: "tri", level: 0.5 }
 		],
 		comp: { on: true, threshold: -12, ratio: 3, attack: 0.005, release: 0.12, makeup: 0, mix: 1 }, // dB / s
+		scope: { time: 0.02 }, // oscilloscope window in seconds, one of Harm.SCOPE_TIMES
 		kb: { split: false, split_note: 60, octave: 0 }, // keys device; split_note starts the upper zone
 		patches: [["kb_midi", "midi_in", 5]] // [output id, input id, color index]
 	};
@@ -92,11 +93,12 @@ Harm.LFO_JACKS = [
 	[["LFO 1","out","lfo1"], ["LFO 2","out","lfo2"]]
 ];
 Harm.COMP_JACKS = [
-	[["SIDECHAIN","in","comp_sc"], ["GR","out","comp_gr"]]
+	[["SIDECHAIN","in","comp_sc"], ["GR","out","comp_gr"], ["SCOPE","in","scope_in"]]
 ];
 Harm.KB_JACKS = [
-	[["GATE 1","out","kb_gate1"], ["KEY 1","out","kb_key1"], ["GATE 2","out","kb_gate2"], ["KEY 2","out","kb_key2"], ["MIDI","midiout","kb_midi"]]
+	[["GATE 1","out","kb_gate1"], ["KEY 1","out","kb_key1"], ["GATE 2","out","kb_gate2"], ["KEY 2","out","kb_key2"], ["TRIG","out","kb_trig"], ["MIDI","midiout","kb_midi"]]
 ];
+Harm.SCOPE_TIMES = [0.005, 0.02, 0.1, 0.5, 2];
 Harm.LFO_SHAPES = ["sine","tri","saw","ramp","square","sh"];
 
 Harm.jackTypes = function()
@@ -246,6 +248,8 @@ Harm.prototype.setSettings = function( data )
 		s.seq_oct = 1;
 	s.scale_file = typeof data.scale_file == "string" ? data.scale_file : null;
 	var jack_ids = Harm.jackTypes();
+	if(Harm.SCOPE_TIMES.indexOf( s.scope.time ) == -1)
+		s.scope.time = 0.02;
 	s.lfo.forEach(function(l){
 		if(Harm.LFO_SHAPES.indexOf( l.shape ) == -1)
 			l.shape = "sine";
@@ -571,7 +575,8 @@ Harm.prototype.onMIDIMessage = function( data )
 }
 
 // ---- keys device: every note source (MIDI device, on-screen keys, computer keyboard) ends here ----
-// The full keyboard feeds the MIDI output (last note priority). Each zone of the split keyboard
+// The full keyboard feeds the MIDI output (last note priority) and the TRIG output (a pulse on every
+// key press, whatever the split). Each zone of the split keyboard
 // feeds its own KEY (1V/oct, C4 = 0V) and GATE outputs; without split both zones carry all notes.
 
 Harm.prototype.noteZone = function( note )
@@ -588,6 +593,7 @@ Harm.prototype.noteOn = function( note )
 	var zone = this.noteZone( note );
 	k.held[ note ] = zone;
 	k.all.push( note );
+	this.post({ type: "kbTrig" });
 	this.post({ type: "midi", pitch: (note - 60) / 12, gate: true, retrigger: true });
 	this.pushZone( zone, note );
 	if(!this.settings.kb.split)

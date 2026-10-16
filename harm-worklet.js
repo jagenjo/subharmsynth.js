@@ -15,9 +15,9 @@ const C4 = 261.6255653005986;
 
 // must match the jack ids in harm.js
 const OUT_IDS = ["vco1","vco1_sub1","vco1_sub2","vco2","vco2_sub1","vco2_sub2","vca","vca_eg","vcf_eg","seq1","seq1_clk","seq2","seq2_clk","clock_out","trigger_out",
-	"lfo1","lfo2","comp_gr","kb_gate1","kb_key1","kb_gate2","kb_key2"];
+	"lfo1","lfo2","comp_gr","kb_gate1","kb_key1","kb_gate2","kb_key2","kb_trig"];
 const IN_IDS = ["vco1_in","vco1_sub_in","vco1_pwm","vca_in","vco2_in","vco2_sub_in","vco2_pwm","cutoff_in","play_in","reset_in","trigger_in","rhythm1_in","rhythm2_in","rhythm3_in","rhythm4_in","clock_in",
-	"lfo1_rate","lfo2_rate","lfo1_sync","lfo2_sync","comp_sc"];
+	"lfo1_rate","lfo2_rate","lfo1_sync","lfo2_sync","comp_sc","scope_in"];
 
 const O_VCO = [0, 3]; // +1 = sub 1, +2 = sub 2
 const O_VCA = 6, O_VCA_EG = 7, O_VCF_EG = 8, O_SEQ = [9, 11], O_SEQ_CLK = [10, 12], O_CLOCK = 13, O_TRIG = 14;
@@ -25,20 +25,20 @@ const I_VCO_PITCH = [0, 4], I_VCO_SUB = [1, 5], I_VCO_PWM = [2, 6];
 const I_VCA = 3, I_CUTOFF = 7, I_PLAY = 8, I_RESET = 9, I_TRIG = 10, I_RHYTHM = 11, I_CLOCK = 15;
 // extra devices: dual LFO and compressor
 const O_LFO = [15, 16], O_COMP_GR = 17;
-const O_KB_GATE = [18, 20], O_KB_KEY = [19, 21]; // keys device
-const I_LFO_RATE = [16, 17], I_LFO_SYNC = [18, 19], I_COMP_SC = 20;
+const O_KB_GATE = [18, 20], O_KB_KEY = [19, 21], O_KB_TRIG = 22; // keys device
+const I_LFO_RATE = [16, 17], I_LFO_SYNC = [18, 19], I_COMP_SC = 20, I_SCOPE = 21;
 const MIDI_MESSAGES = { midi: 1, bend: 1, midiClock: 1, midiStart: 1, midiStop: 1, midiContinue: 1 };
 const LFO_SHAPES = { sine: 0, tri: 1, saw: 2, ramp: 3, square: 4, sh: 5 };
-const PULSE_OUTS = [O_SEQ_CLK[0], O_SEQ_CLK[1], O_CLOCK, O_TRIG];
+const PULSE_OUTS = [O_SEQ_CLK[0], O_SEQ_CLK[1], O_CLOCK, O_TRIG, O_KB_TRIG];
 
 const WAVE_SQUARE = 0, WAVE_PWM = 1, WAVE_SAW = 2;
 const WAVE_MODES = { square: WAVE_SQUARE, pwm: WAVE_PWM, saw: WAVE_SAW };
 
 const GATE_V = 5;
 const DB_TO_LN = Math.LN10 / 20;
-const SCOPE_RING = 4096;   // power of two
-const SCOPE_SPAN = 1024;   // samples shown (~21ms at 48kHz)
-const SCOPE_POINTS = 256;
+const SCOPE_RING = 1024;     // columns kept, power of two
+const SCOPE_POINTS = 256;    // columns shown
+const SCOPE_ROLL_TIME = 0.2; // time bases above this scroll instead of triggering
 const GATE_THRESHOLD = 1;
 const PULSE_TIME = 0.005;
 const SUB_DIV_PER_VOLT = 3;   // how many subharmonic divisions one volt of CV shifts
@@ -152,8 +152,14 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
 		this.compGrPeak = 0;
 
 		// oscilloscope on the compressor: ring buffer of the master output
-		this.scopeBuf = new Float32Array(SCOPE_RING);
+		this.scopeMin = new Float32Array(SCOPE_RING);
+		this.scopeMax = new Float32Array(SCOPE_RING);
 		this.scopePos = 0;
+		this.scopeCount = 0;
+		this.scopeTime = 0;
+		this.scopeBucket = 1;
+		this.scopeLo = 0;
+		this.scopeHi = 0;
 
 		this.sampleCount = 0;
 		this.stateCounter = 0;
@@ -166,6 +172,9 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
 		if (!this.midiConnected && MIDI_MESSAGES[m.type])
 			return;
 		switch (m.type) {
+			case "kbTrig": // any key pressed, whatever the split
+				this.pulses[O_KB_TRIG] = Math.round(PULSE_TIME * sampleRate);
+				break;
 			case "kb":
 				if (m.key !== undefined) this.kbKey[m.zone] = m.key;
 				this.kbGate[m.zone] = !!m.gate;
@@ -332,19 +341,51 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
 		return rising;
 	}
 
-	// latest SCOPE_SPAN samples, starting at a rising zero crossing when there is one
-	scopeSnapshot() {
-		const buf = this.scopeBuf, mask = SCOPE_RING - 1;
-		let start = (this.scopePos - SCOPE_SPAN * 2 + SCOPE_RING) & mask;
-		for (let k = 1; k < SCOPE_SPAN; k++) {
-			const i = (start + k) & mask;
-			if (buf[(i - 1) & mask] < 0 && buf[i] >= 0) { start = i; break; }
+	// scope input: one min/max pair per bucket of samples, bucket size from the time base
+	scopeFeed(v, timeBase) {
+		if (timeBase !== this.scopeTime) {
+			this.scopeTime = timeBase;
+			this.scopeBucket = Math.max(1, Math.round(timeBase * sampleRate / SCOPE_POINTS));
+			this.scopeMin.fill(0);
+			this.scopeMax.fill(0);
+			this.scopeCount = 0;
 		}
-		const out = new Float32Array(SCOPE_POINTS);
-		const step = SCOPE_SPAN / SCOPE_POINTS;
-		for (let k = 0; k < SCOPE_POINTS; k++)
-			out[k] = buf[(start + Math.floor(k * step)) & mask];
-		return out;
+		if (this.scopeCount === 0) { this.scopeLo = v; this.scopeHi = v; }
+		else { if (v < this.scopeLo) this.scopeLo = v; if (v > this.scopeHi) this.scopeHi = v; }
+		if (++this.scopeCount >= this.scopeBucket) {
+			this.scopeMin[this.scopePos] = this.scopeLo;
+			this.scopeMax[this.scopePos] = this.scopeHi;
+			this.scopePos = (this.scopePos + 1) & (SCOPE_RING - 1);
+			this.scopeCount = 0;
+		}
+	}
+
+	// SCOPE_POINTS columns: triggered on a rising crossing of the signal's middle level for
+	// short time bases, rolling (newest on the right) for long ones
+	scopeSnapshot() {
+		const mask = SCOPE_RING - 1, n = SCOPE_POINTS;
+		let start = (this.scopePos - n + SCOPE_RING) & mask;
+		if (this.scopeTime <= SCOPE_ROLL_TIME) {
+			const from = (this.scopePos - 2 * n + SCOPE_RING) & mask;
+			let lo = Infinity, hi = -Infinity;
+			for (let k = 0; k < 2 * n; k++) {
+				const i = (from + k) & mask;
+				if (this.scopeMin[i] < lo) lo = this.scopeMin[i];
+				if (this.scopeMax[i] > hi) hi = this.scopeMax[i];
+			}
+			const level = (lo + hi) * 0.5;
+			for (let k = 1; k < n; k++) {
+				const i = (from + k) & mask, j = (i - 1) & mask;
+				const prev = (this.scopeMin[j] + this.scopeMax[j]) * 0.5, cur = (this.scopeMin[i] + this.scopeMax[i]) * 0.5;
+				if (prev < level && cur >= level && hi - lo > 1e-4) { start = i; break; }
+			}
+		}
+		const min = new Float32Array(n), max = new Float32Array(n);
+		for (let k = 0; k < n; k++) {
+			min[k] = this.scopeMin[(start + k) & mask];
+			max[k] = this.scopeMax[(start + k) & mask];
+		}
+		return { min: min, max: max, input: this.patched[I_SCOPE] === 1 };
 	}
 
 	process(inputs, outputs) {
@@ -576,7 +617,7 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
 			outs[O_KB_KEY[1]] = this.kbKey[1];
 			outs[O_SEQ[0]] = s.seq[0][this.step[0]] * s.seq_oct;
 			outs[O_SEQ[1]] = s.seq[1][this.step[1]] * s.seq_oct;
-			for (let q = 0; q < 4; q++) {
+			for (let q = 0; q < PULSE_OUTS.length; q++) {
 				const idx = PULSE_OUTS[q];
 				if (pulses[idx] > 0) { outs[idx] = GATE_V; pulses[idx]--; }
 				else outs[idx] = 0;
@@ -599,8 +640,8 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
 			else
 				outs[O_COMP_GR] = 0;
 			const y = fastTanh(master); // soft limiter on the output
-			this.scopeBuf[this.scopePos] = y;
-			this.scopePos = (this.scopePos + 1) & (SCOPE_RING - 1);
+			// scope: the patched SCOPE input (+-5V full scale) or the master output
+			this.scopeFeed(patched[I_SCOPE] ? ins[I_SCOPE] / 5 : y, s.scope.time);
 			L[j] = y;
 			if (R) R[j] = y;
 		}

@@ -1287,8 +1287,9 @@ function drawDeviceJacks( x, y, w, h, rows )
 	ctx.fillStyle = "#1f1f1e";
 	ctx.beginPath(); ctx.roundRect( px, y + 10, 170, h - 20, 6 ); ctx.fill();
 	rows.forEach(function(row, r){
+		var spacing = row.length > 2 ? 56 : 80; // centred on the plate
 		row.forEach(function(j, c){
-			drawJack( j[2], px + 45 + c * 80, y + 50 + r * 58, j[0], j[1] );
+			drawJack( j[2], px + 85 + (c - (row.length - 1) * 0.5) * spacing, y + 50 + r * 58, j[0], j[1] );
 		});
 	});
 	return px;
@@ -1339,9 +1340,26 @@ function drawLfoDevice( x, y, w, h )
 	}
 }
 
-// small retro CRT oscilloscope: green phosphor trace of the master output
+// small retro CRT oscilloscope: green phosphor trace of the SCOPE input (+-5V full scale) or,
+// with nothing patched, the master output. Clicking the screen cycles the time base.
+function fmtScopeTime( t ) { return t >= 1 ? t + " s" : Math.round( t * 1000 ) + " ms"; }
+
 function drawScope( x, y, w, h, data )
 {
+	var scope = synth.settings.scope;
+	var hover = !cable_drag && (ui.active === null || ui.active === "scope") && hitRect( x, y, w, h );
+	if(hover)
+	{
+		ui.hot = "scope";
+		tooltips.push([ "CLICK: TIME BASE (" + fmtScopeTime( scope.time ) + ")", x + w * 0.5, y + h + 12 + OY ]);
+	}
+	if(hover && ui.pressed && ui.active === null)
+	{
+		ui.active = "scope";
+		var times = Harm.SCOPE_TIMES;
+		scope.time = times[ (times.indexOf( scope.time ) + 1) % times.length ];
+	}
+
 	// bezel and screen
 	ctx.fillStyle = "#050505";
 	ctx.beginPath(); ctx.roundRect( x - 3, y - 3, w + 6, h + 6, 8 ); ctx.fill();
@@ -1364,9 +1382,11 @@ function drawScope( x, y, w, h, data )
 	ctx.strokeStyle = "rgba(80,255,120,0.25)";
 	ctx.beginPath(); ctx.moveTo( x, y + h * 0.5 ); ctx.lineTo( x + w, y + h * 0.5 ); ctx.stroke();
 
-	// trace, drawn twice: a wide soft glow and a thin bright core
+	// trace, drawn twice: a wide soft glow and a thin bright core. Each column holds the min and
+	// max of the samples it covers, so dense audio at long time bases shows as a band
 	var mid = y + h * 0.5, amp = h * 0.45;
-	var n = data ? data.length : 0;
+	var n = data && data.min ? data.min.length : 0;
+	var Y = function(v) { return mid - clamp( v, -1.05, 1.05 ) * amp; };
 	var trace = function(){
 		ctx.beginPath();
 		if(!n)
@@ -1377,8 +1397,9 @@ function drawScope( x, y, w, h, data )
 		for(var i = 0; i < n; ++i)
 		{
 			var px = x + (i / (n - 1)) * w;
-			var py = mid - clamp( data[i], -1.05, 1.05 ) * amp;
-			if(i) ctx.lineTo( px, py ); else ctx.moveTo( px, py );
+			var lo = Y( data.max[i] ), hi = Y( data.min[i] );
+			if(i) ctx.lineTo( px, lo ); else ctx.moveTo( px, lo );
+			if(hi - lo > 1) ctx.lineTo( px, hi );
 		}
 	};
 	ctx.lineJoin = "round";
@@ -1404,7 +1425,9 @@ function drawScope( x, y, w, h, data )
 	ctx.textBaseline = "middle";
 	ctx.font = "9px " + FONT;
 	ctx.fillStyle = "rgba(125,255,154,0.6)";
-	ctx.fillText( "OUT", x + 5, y + 8 );
+	ctx.fillText( data && data.input ? "IN \u00b15V" : "OUT", x + 5, y + 8 );
+	ctx.textAlign = "right";
+	ctx.fillText( fmtScopeTime( scope.time ) + (scope.time > 0.2 ? " ROLL" : ""), x + w - 5, y + 8 );
 }
 
 function drawCompressor( x, y, w, h )
@@ -1522,7 +1545,8 @@ function drawKeysDevice( x, y, w, h )
 		cx + 60, y + 89, 10, false, DIM_COLOR );
 
 	// outputs
-	var pw = 5 * 58 + 24, px = x + w - 22 - 10 - pw;
+	var njacks = Harm.KB_JACKS[0].length;
+	var pw = njacks * 58 + 24, px = x + w - 22 - 10 - pw;
 	ctx.fillStyle = "#1f1f1e";
 	ctx.beginPath(); ctx.roundRect( px, y + 8, pw, h - 16, 6 ); ctx.fill();
 	Harm.KB_JACKS[0].forEach(function(j, c){
