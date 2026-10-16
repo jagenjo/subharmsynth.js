@@ -6,7 +6,7 @@
 
 (function(){
 
-var SIZE = [1568, 596]; // 60HP
+var SIZE = [1568, 500]; // 60HP, more compact than the other panels
 var BITS = 8;
 var SCALE_NAMES = ["UNQUANTIZED", "CHROMATIC", "MAJOR", "PENTATONIC", "MELODIC MINOR", "HARMONIC MINOR", "DIMINISHED 6TH",
 	"WHOLE TONE", "HIRAJOSHI", "7 SUS 4", "MAJOR 7TH", "MINOR", "MINOR 7TH", "DORIAN", "HANG DRUM"];
@@ -112,9 +112,9 @@ function clone( o ) { return JSON.parse( JSON.stringify( o ) ); }
 // panel
 
 var COLS = [85, 180, 272, 364, 456, 548, 650, 742, 834, 926, 1020, 1112, 1204];
-var ROWS = [100, 236];
+var ROWS = [90, 208];
 var JACK_COLS = [1292, 1357, 1422, 1487];
-var BIT_X0 = 380, BIT_DX = 50, SEQ_Y = [362, 446];
+var BIT_X0 = 380, BIT_DX = 50, SEQ_Y = [306, 372];
 
 function drawBackground()
 {
@@ -127,12 +127,12 @@ function drawBackground()
 	ctx.textBaseline = "alphabetic";
 	ctx.font = "bold 30px " + FONT;
 	ctx.fillStyle = TEXT_COLOR;
-	ctx.fillText( "MAZE", 46, 560 );
+	ctx.fillText( "MAZE", 46, h - 30 );
 	var tw = ctx.measureText( "MAZE" ).width;
-	ctx.fillRect( 54 + tw, 534, 1.5, 28 );
+	ctx.fillRect( 54 + tw, h - 56, 1.5, 28 );
 	ctx.font = "11px " + FONT;
-	ctx.fillText( "PARALLEL GENERATIVE", 62 + tw, 546 );
-	ctx.fillText( "ANALOG SYNTHESIZER", 62 + tw, 559 );
+	ctx.fillText( "PARALLEL GENERATIVE", 62 + tw, h - 44 );
+	ctx.fillText( "ANALOG SYNTHESIZER", 62 + tw, h - 31 );
 }
 
 function drawVoice()
@@ -192,20 +192,20 @@ function drawSequencers()
 {
 	var s = M.settings, st = M.state, u = ui_state[ M.id ] || (ui_state[ M.id ] = { buffer_down: 0, saved: 0 });
 	var live = st.seq || s.seq;
-	drawSection( "GENERATIVE SEQUENCER", 300, 1245, 318 );
+	drawSection( "GENERATIVE SEQUENCER", 300, 1245, 266 );
 
 	// transport, BUFFER, CHAIN SEQ on the left
-	s.tempo = knob( "tempo", 95, 380, 28, s.tempo, 20, 600, { label: "TEMPO", style: "ring", exp: true, def: 120, labelSize: 11,
+	s.tempo = knob( "tempo", 95, 330, 28, s.tempo, 20, 600, { label: "TEMPO", style: "ring", exp: true, def: 120, labelSize: 11,
 		format: function(v){ return Math.round( v ) + " BPM"; } } );
-	drawLed( 130, 345, 3.5, st.clock && st.playing, "#ffb02f" );
-	if(button( "run", 160, 340, 100, 24, "RUN / STOP", st.playing ).clicked) send({ type: "play" });
-	if(button( "reset", 160, 370, 100, 24, "RESET" ).clicked) send({ type: "reset" });
-	if(button( "advance", 160, 400, 100, 24, "ADVANCE" ).clicked) send({ type: "next" });
-	var trig = button( "trigger", 50, 440, 100, 24, "TRIGGER" );
+	drawLed( 130, 296, 3.5, st.clock && st.playing, "#ffb02f" );
+	if(button( "run", 160, 292, 100, 24, "RUN / STOP", st.playing ).clicked) send({ type: "play" });
+	if(button( "reset", 160, 320, 100, 24, "RESET" ).clicked) send({ type: "reset" });
+	if(button( "advance", 160, 348, 100, 24, "ADVANCE" ).clicked) send({ type: "next" });
+	var trig = button( "trigger", 50, 380, 100, 24, "TRIGGER" );
 	if(trig.clicked) send({ type: "trigger", gate: true });
 	// BUFFER: a short press recalls the saved pattern, holding it for a second saves the current one
 	var now = performance.now();
-	var buf = button( "buffer", 160, 440, 100, 24, now < u.saved ? "SAVED" : "BUFFER", now < u.saved || (u.buffer_down && now - u.buffer_down > 1000) );
+	var buf = button( "buffer", 160, 380, 100, 24, now < u.saved ? "SAVED" : "BUFFER", now < u.saved || (u.buffer_down && now - u.buffer_down > 1000) );
 	if(buf.clicked)
 		u.buffer_down = now;
 	if(u.buffer_down && buf.held && now - u.buffer_down > 1000 && u.saved < u.buffer_down)
@@ -223,7 +223,7 @@ function drawSequencers()
 		}
 		u.buffer_down = 0;
 	}
-	if(button( "chain", 50, 470, 100, 24, "CHAIN SEQ", s.chain ).clicked) s.chain = !s.chain;
+	if(button( "chain", 160, 408, 100, 24, "CHAIN SEQ", s.chain ).clicked) s.chain = !s.chain;
 
 	for(var k = 0; k < 2; ++k)
 	{
@@ -269,25 +269,24 @@ function drawSequencers()
 				ctx.fillRect( bx - 1, y + 22 - Math.max( 0, v ) * 10, 2, Math.abs( v ) * 10 + 1 );
 			}
 		}
-		drawLabel( "LENGTH " + q.length, BIT_X0 + 3.5 * BIT_DX, y + 36, 9, false, DIM_COLOR );
 		var bx0 = BIT_X0 + 8 * BIT_DX + 4;
 		if(button( "length" + k, bx0, y - 12, 70, 24, "LENGTH" ).clicked) send({ type: "length", seq: k });
 		if(button( "flip" + k, bx0 + 78, y - 12, 70, 24, "BIT FLIP" ).clicked) send({ type: "flip", seq: k });
 		if(button( "shift" + k, bx0 + 156, y - 12, 70, 24, "BIT SHIFT" ).clicked) send({ type: "shift", seq: k });
-		s.corrupt[k] = knob( "corrupt" + k, 1110, y, 20, s.corrupt[k], 0, 1, { label: "CORRUPT", def: 0, labelSize: 10,
+		s.corrupt[k] = knob( "corrupt" + k, 1110, y, 17, s.corrupt[k], 0, 1, { label: "CORRUPT", def: 0, labelSize: 10,
 			format: function(v){ return v < 0.01 ? "LOCKED" : (v <= 0.5 ? "VOLTAGES " + Math.round( v * 200 ) + "%" : "VOLTAGES + BITS " + Math.round( (v - 0.5) * 200 ) + "%"); } } );
-		s.cv_range[k] = knob( "cv_range" + k, 1200, y, 20, s.cv_range[k], 0, 1, { label: "SEQ" + (k + 1) + " CV RANGE", def: 0.35, labelSize: 10,
+		s.cv_range[k] = knob( "cv_range" + k, 1200, y, 17, s.cv_range[k], 0, 1, { label: "SEQ" + (k + 1) + " CV RANGE", def: 0.35, labelSize: 10,
 			format: function(v){ return "±" + (v * 5).toFixed(2) + " V"; } } );
 	}
 
 	// quantizer, ORDER, U MIX
-	var qy = 508;
+	var qy = 440;
 	drawLabel( "QUANTIZE", 470, qy - 16, 10 );
 	drawLcd( 380, qy - 4, 180, 24, SCALE_NAMES[ s.quantize ], "center" );
 	if(button( "qprev", 568, qy - 3, 30, 22, "◀" ).clicked) s.quantize = (s.quantize - 1 + SCALE_NAMES.length) % SCALE_NAMES.length;
 	if(button( "qnext", 602, qy - 3, 30, 22, "▶" ).clicked) s.quantize = (s.quantize + 1) % SCALE_NAMES.length;
-	s.order = leverSwitch( "order", 700, qy - 34, s.order, [["vcw_vcf", "VCW → VCF"], ["parallel", "PARALLEL"], ["vcf_vcw", "VCF → VCW"]], "ORDER" );
-	s.umix1_lvl = knob( "umix1_lvl", 1000, qy + 8, 20, s.umix1_lvl, 0, 1, { label: "U MIX 1 LVL", def: 0.5, labelSize: 10, format: fmtPct } );
+	s.order = leverSwitch( "order", 760, qy - 30, s.order, [["vcw_vcf", "VCW → VCF"], ["parallel", "PARALLEL"], ["vcf_vcw", "VCF → VCW"]], "ORDER" );
+	s.umix1_lvl = knob( "umix1_lvl", 1000, qy + 4, 20, s.umix1_lvl, 0, 1, { label: "U MIX 1 LVL", def: 0.5, labelSize: 10, format: fmtPct } );
 
 	// the live pattern goes into the settings, so patches save it (seq_id is kept: no reload)
 	if(st.seq && JSON.stringify( st.seq ) != JSON.stringify( s.seq ))
@@ -313,7 +312,7 @@ function drawPatchBay()
 		for(var c = 0; c < 4; ++c)
 		{
 			var j = JACKS[r][c];
-			drawJack( j[2], JACK_COLS[c], 74 + r * 69, j[0], j[1] );
+			drawJack( j[2], JACK_COLS[c], 68 + r * 55, j[0], j[1] ); // rows closer than on the other panels
 		}
 }
 
