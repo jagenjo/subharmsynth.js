@@ -13,7 +13,7 @@ var WR = {
 	order: []
 };
 
-WR.VERSION = "20261016t"; // bump together with the ?v= in index.html so browsers reload the scripts
+WR.VERSION = "20261016u"; // bump together with the ?v= in index.html so browsers reload the scripts
 
 // def: {
 //   title, description,           names for menus and the panel
@@ -38,11 +38,13 @@ WR.VERSION = "20261016t"; // bump together with the ?v= in index.html so browser
 WR.registerSynth = function( type, def )
 {
 	def.type = type;
-	// a MIDI IN comes with the MASTER MIDI switch: the keys' MIDI without a cable
+	// a MIDI IN is on the back, with the MASTER MIDI switch (the keys' MIDI without a cable) and the
+	// channel it listens to (0 = OMNI, all of them)
 	if(def.midi_in)
 	{
 		var defaults = def.defaults;
-		def.defaults = function() { var s = defaults(); s.midi_master = false; return s; };
+		def.defaults = function() { var s = defaults(); s.midi_master = false; s.midi_channel = 0; return s; };
+		def.rear_jacks = (def.rear_jacks || []).concat([[ "MIDI IN", "midiin", def.midi_in ]]);
 	}
 	WR.types[ type ] = def;
 	WR.order.push( type );
@@ -54,6 +56,7 @@ WR.jackId = function( module_id, id ) { return module_id + "." + id; }
 // audio sockets on the back of the audio I/O row (line level, "ain" / "aout"): patched like the
 // front jacks, but only with each other. An audio input sums every cable plugged into it
 WR.REAR_JACKS = {
+	keys: [["MIDI OUT","midiout","kb_midi"]], // every note: the MIDI device, the on-screen keys, the QWERTY keys, the song
 	io: [["MAIN IN L","ain","io_main_l"], ["MAIN IN R","ain","io_main_r"], ["INPUT L","aout","io_input_l"], ["INPUT R","aout","io_input_r"]]
 };
 // the default audio path after the synths: compressor -> delay -> reverb -> speakers (L red, R white)
@@ -69,7 +72,7 @@ WR.IO_JACKS = [
 	[["IN L","out","in_l"], ["IN R","out","in_r"]]
 ];
 WR.KB_JACKS = [
-	[["GATE 1","out","kb_gate1"], ["KEY 1","out","kb_key1"], ["GATE 2","out","kb_gate2"], ["KEY 2","out","kb_key2"], ["TRIG","out","kb_trig"], ["MIDI","midiout","kb_midi"]]
+	[["GATE 1","out","kb_gate1"], ["KEY 1","out","kb_key1"], ["GATE 2","out","kb_gate2"], ["KEY 2","out","kb_key2"], ["TRIG","out","kb_trig"]]
 ];
 
 function WRContext()
@@ -81,7 +84,7 @@ function WRContext()
 	this.native = {};       // module id -> its native nodes (modules with def.native)
 	this.custom_scale = null; // { file, description, degrees, period }
 	this.midi = { access: null, inputs: [], selected: "all", activity: 0, status: "off" };
-	this.keys = { held: {}, all: [], zones: [[], []] }; // held: note -> zone
+	this.keys = { held: {}, channel: {}, all: [], zones: [[], []] }; // held: note -> zone, channel: note -> MIDI channel
 	this.onmidichange = null;
 	// audio I/O: per browser, not part of the patches
 	this.io = WRContext.loadIO();
@@ -103,7 +106,8 @@ WRContext.rackDefaults = function()
 {
 	return {
 		scale_file: null,
-		kb: { split: false, split_note: 60, octave: 0 } // keys device; split_note starts the upper zone
+		kb: { split: false, split_note: 60, octave: 0, channel: 1 } // keys device; split_note starts the upper zone; channel
+		                                                             // of the on-screen and QWERTY keys
 	};
 }
 
@@ -367,7 +371,7 @@ WRContext.jackTypes = function( modules )
 	modules.forEach(function(m){
 		var def = WR.types[ m.type ];
 		def.jacks.concat([ def.rear_jacks || [] ]).forEach(function(row){
-			row.forEach(function(j){ types[ WR.jackId( m.id, j[2] ) ] = j[1]; });
+			row.forEach(function(j){ if(j) types[ WR.jackId( m.id, j[2] ) ] = j[1]; }); // null: an empty place
 		});
 	});
 	return types;
@@ -683,7 +687,8 @@ WR.migrateV2 = function( data )
 			r[k] = data[k];
 	});
 	var ids = {};
-	WR.types.subharm.jacks.forEach(function(row){ row.forEach(function(j){ ids[ j[2] ] = true; }); });
+	var subharm = WR.types.subharm;
+	subharm.jacks.concat([ subharm.rear_jacks || [] ]).forEach(function(row){ row.forEach(function(j){ if(j) ids[ j[2] ] = true; }); });
 	r.patches = (Array.isArray(data.patches) ? data.patches : []).map(function(p){
 		if(!Array.isArray(p))
 			return p;
@@ -787,6 +792,7 @@ WRContext.prototype.setSettings = function( data )
 	s.scale_file = typeof data.scale_file == "string" ? data.scale_file : null;
 	s.kb.split_note = Math.min( 96, Math.max( 24, Math.round( s.kb.split_note ) ) );
 	s.kb.octave = Math.min( 2, Math.max( -2, Math.round( s.kb.octave ) ) );
+	s.kb.channel = Math.min( 16, Math.max( 1, Math.round( s.kb.channel ) ) );
 
 	// modules: known types only, unique ids, settings validated by their synth
 	s.modules = [];
@@ -1073,15 +1079,15 @@ WRContext.prototype.onMIDIMessage = function( data )
 	if(st >= 0xF0)
 		return;
 
-	var cmd = st & 0xF0;
+	var cmd = st & 0xF0, channel = (st & 0x0F) + 1;
 	if(cmd == 0x90 && data[2] > 0)
-		this.noteOn( data[1] );
+		this.noteOn( data[1], channel, data[2] / 127 );
 	else if(cmd == 0x80 || cmd == 0x90)
-		this.noteOff( data[1] );
+		this.noteOff( data[1], channel );
 	else if(cmd == 0xE0)
 	{
 		var bend = ((data[2] << 7) | data[1]) - 8192;
-		this.post({ type: "bend", value: (bend / 8192) * (2 / 12) }); // +-2 semitones
+		this.post({ type: "bend", channel: channel, value: (bend / 8192) * (2 / 12) }); // +-2 semitones
 	}
 	else if(cmd == 0xB0 && (data[1] == 123 || data[1] == 120))
 		this.allNotesOff();
@@ -1098,16 +1104,21 @@ WRContext.prototype.noteZone = function( note )
 	return kb.split && note >= kb.split_note ? 1 : 0;
 }
 
-WRContext.prototype.noteOn = function( note )
+// channel: 1..16, the keys device's own channel when missing (on-screen and QWERTY keys)
+WRContext.prototype.noteOn = function( note, channel, velocity )
 {
 	var k = this.keys;
 	if(k.held[ note ] !== undefined)
 		return;
+	channel = channel || this.settings.kb.channel;
 	var zone = this.noteZone( note );
 	k.held[ note ] = zone;
+	k.channel[ note ] = channel;
 	k.all.push( note );
 	this.post({ type: "kbTrig" });
-	this.post({ type: "midi", pitch: (note - 60) / 12, gate: true, retrigger: true });
+	this.post({ type: "note", channel: channel, note: note, on: true, vel: velocity === undefined ? 1 : velocity });
+	if(this.onnote)
+		this.onnote( note, true, channel, velocity === undefined ? 1 : velocity );
 	this.pushZone( zone, note );
 	if(!this.settings.kb.split)
 		this.pushZone( 1, note );
@@ -1119,12 +1130,13 @@ WRContext.prototype.noteOff = function( note )
 	var zone = k.held[ note ];
 	if(zone === undefined)
 		return;
+	var channel = k.channel[ note ];
 	delete k.held[ note ];
+	delete k.channel[ note ];
 	k.all = k.all.filter(function(n){ return n != note; });
-	if(k.all.length)
-		this.post({ type: "midi", pitch: (k.all[k.all.length - 1] - 60) / 12, gate: true, retrigger: false });
-	else
-		this.post({ type: "midi", gate: false });
+	this.post({ type: "note", channel: channel, note: note, on: false });
+	if(this.onnote)
+		this.onnote( note, false, channel );
 	this.popZone( zone, note );
 	if(k.zones[1].indexOf( note ) != -1)
 		this.popZone( 1, note );
@@ -1149,8 +1161,8 @@ WRContext.prototype.popZone = function( zone, note )
 WRContext.prototype.allNotesOff = function()
 {
 	Object.keys( this.keys.held ).forEach(function(n){ this.noteOff( Number(n) ); }, this);
-	this.keys = { held: {}, all: [], zones: [[], []] };
-	this.post({ type: "midi", gate: false });
+	this.keys = { held: {}, channel: {}, all: [], zones: [[], []] };
+	this.post({ type: "notesOff" });
 	this.post({ type: "kb", zone: 0, gate: false });
 	this.post({ type: "kb", zone: 1, gate: false });
 }

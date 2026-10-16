@@ -20,7 +20,7 @@ var JACKS = [
 	[["U MIX 1 (RING)","in","umix1"], ["U MIX 2","in","umix2"], ["EG2 TRIG","in","eg2_trig"], ["U MIX 1+2","out","umix_out"]],
 	[["CLOCK 1","in","clock1"], ["BIT FLIP 1","in","bit_flip1"], ["SEQ1 CV","out","seq1_cv"], ["SEQ1 TRIG","out","seq1_trig"]],
 	[["CLOCK 2","in","clock2"], ["BIT FLIP 2","in","bit_flip2"], ["SEQ2 CV","out","seq2_cv"], ["SEQ2 TRIG","out","seq2_trig"]],
-	[["MIDI","midiin","midi_in"], ["TRIGGER","in","trigger_in"], ["RESET","in","reset_in"], ["CLOCK","out","clock_out"]]
+	[null, ["TRIGGER","in","trigger_in"], ["RESET","in","reset_in"], ["CLOCK","out","clock_out"]]
 ];
 
 var M = null;
@@ -312,6 +312,7 @@ function drawPatchBay()
 		for(var c = 0; c < 4; ++c)
 		{
 			var j = JACKS[r][c];
+			if(!j) { drawLabel( "MIDI: BACK", JACK_COLS[c], 68 + r * 55, 9, false, DIM_COLOR ); continue; } // MIDI is on the back
 			drawJack( j[2], JACK_COLS[c], 68 + r * 55, j[0], j[1] ); // rows closer than on the other panels
 		}
 }

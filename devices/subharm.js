@@ -22,7 +22,7 @@ var JACKS = [
 	[["PLAY","in","play_in"], ["RESET","in","reset_in"], ["TRIGGER","in","trigger_in"], ["VCF EG","out","vcf_eg"]],
 	[["RHYTHM 1","in","rhythm1_in"], ["RHYTHM 2","in","rhythm2_in"], ["RHYTHM 3","in","rhythm3_in"], ["RHYTHM 4","in","rhythm4_in"]],
 	[["SEQ 1","out","seq1"], ["SEQ 1 CLK","out","seq1_clk"], ["SEQ 2","out","seq2"], ["SEQ 2 CLK","out","seq2_clk"]],
-	[["MIDI IN","midiin","midi_in"], ["CLOCK","in","clock_in"], ["CLOCK","out","clock_out"], ["TRIGGER","out","trigger_out"]]
+	[null, ["CLOCK","in","clock_in"], ["CLOCK","out","clock_out"], ["TRIGGER","out","trigger_out"]] // MIDI IN is on the back
 ];
 
 var M = null;          // the module being drawn: { id, settings, state, post }
@@ -426,6 +426,7 @@ function drawPatchBay()
 		for(var c = 0; c < 4; ++c)
 		{
 			var j = JACKS[r][c];
+			if(!j) { drawLabel( "MIDI: BACK", JACK_COLS[c], 74 + r * 69, 9, false, DIM_COLOR ); continue; } // MIDI IN is on the back
 			drawJack( j[2], JACK_COLS[c], 74 + r * 69, j[0], j[1] );
 		}
 }
@@ -646,6 +647,7 @@ function classicPatchBay()
 		for(var c = 0; c < 4; ++c)
 		{
 			var j = JACKS[r][c];
+			if(!j) { drawLabel( "MIDI: BACK", 1158 + c * 68, 62 + r * 70, 9, false, DIM_COLOR ); continue; } // MIDI IN is on the back
 			drawJack( j[2], 1158 + c * 68, 62 + r * 70, j[0], j[1] );
 		}
 }

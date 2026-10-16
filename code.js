@@ -833,48 +833,18 @@ function drawJack( id, x, y, label, type )
 	ctx.beginPath(); ctx.arc( x, y, 8, 0, Math.PI * 2 ); ctx.fill();
 	ctx.fillStyle = "#000";
 	ctx.beginPath(); ctx.arc( x, y, 5.5, 0, Math.PI * 2 ); ctx.fill();
-
-	if(type == "midiin")
-	{
-		// MASTER MIDI: a tiny switch under the jack; on, the keys' MIDI comes in without a cable and
-		// the jack shows a plug with no wire
-		var mid = id.substr( 0, id.indexOf(".") );
-		var mod = rack.settings.modules.find(function(m){ return m.id == mid; });
-		var master = !!(mod && mod.settings.midi_master);
-		if(mod)
-		{
-			if(midiMasterButton( "midi_master", x - 27, y + 15, 54, 13, master ))
-			{
-				rack.setMidiMaster( mid, !master );
-				master = !master;
-				setStatus( master ? "MASTER MIDI on: the keys' MIDI reaches it without a cable" : "MASTER MIDI off: cable the keys' MIDI output into MIDI IN" );
-			}
-			if(master)
-			{
-				ctx.fillStyle = "#111";
-				ctx.beginPath(); ctx.arc( x, y, 9.5, 0, Math.PI * 2 ); ctx.fill();
-				ctx.fillStyle = CABLE_COLORS[5];
-				ctx.beginPath(); ctx.arc( x, y, 7.5, 0, Math.PI * 2 ); ctx.fill();
-				ctx.fillStyle = "rgba(0,0,0,0.35)";
-				ctx.beginPath(); ctx.arc( x, y, 3, 0, Math.PI * 2 ); ctx.fill();
-			}
-		}
-		// lights with incoming MIDI while connected
-		var cabled = rack.settings.patches.some(function(p){ return p[1] == id; });
-		var active = (cabled || master) && rack.midi.access && (performance.now() - rack.midi.activity) < 120;
-		drawLed( x - 27, y - 24, 2.5, active, "#3bd16f" );
-	}
 }
 
-// the tiny MASTER MIDI switch under a MIDI IN jack; returns true when clicked
-function midiMasterButton( id, x, y, w, h, on )
+// a tiny switch (MASTER MIDI and the channels, on the back next to the MIDI sockets); returns true when clicked
+function tinyButton( id, x, y, w, h, text, on, tooltip )
 {
 	id = id_prefix + id;
 	var hover = !cable_drag && ui.active === null && hitRect( x, y, w, h );
 	if(hover)
 	{
 		ui.hot = id;
-		tip( on ? "CLICK: CABLE INSTEAD" : "CLICK: KEYS' MIDI WITHOUT A CABLE", x + w * 0.5, y + h + 10 );
+		if(tooltip)
+			tip( tooltip, x + w * 0.5, y + h + 10 );
 	}
 	var clicked = hover && ui.pressed;
 	if(clicked)
@@ -885,7 +855,7 @@ function midiMasterButton( id, x, y, w, h, on )
 	ctx.textAlign = "center";
 	ctx.textBaseline = "middle";
 	ctx.fillStyle = on ? "#fff" : TEXT_COLOR;
-	ctx.fillText( "MASTER MIDI", x + w * 0.5, y + h * 0.5 + 1 );
+	ctx.fillText( text, x + w * 0.5, y + h * 0.5 + 1 );
 	return clicked;
 }
 
@@ -1177,7 +1147,7 @@ function drawCollapsedBar( id, x, y, w, name, jack_rows )
 	ctx.fillText( name, x + 52, cy + 1 );
 	var end = x + 52 + ctx.measureText( name ).width;
 	var all = [];
-	(jack_rows || []).forEach(function(row){ all = all.concat( row ); });
+	(jack_rows || []).forEach(function(row){ all = all.concat( row.filter(function(j){ return j; }) ); });
 	all.forEach(function(j, k){
 		drawMiniJack( j[2], x + w - 22 - 20 - (all.length - 1 - k) * 24, cy, j[0], j[1] );
 	});
@@ -1545,18 +1515,37 @@ function drawRearSocket( id, x, y, label, type, device, mini )
 	g.addColorStop( 0, hover && !cable_drag ? "#ececE6" : "#d4d4ce" );
 	g.addColorStop( 1, "#6d6d68" );
 	ctx.fillStyle = g;
-	ctx.beginPath();
-	for(var i = 0; i < 6; ++i)
+	if(type == "midiin" || type == "midiout")
 	{
-		var a = Math.PI / 6 + i * Math.PI / 3;
-		ctx.lineTo( x + Math.cos(a) * r, y + Math.sin(a) * r );
+		// 5 pin DIN socket: round shell, black face, pins in an arc and the key notch
+		ctx.beginPath(); ctx.arc( x, y, r * 1.05, 0, Math.PI * 2 ); ctx.fill();
+		ctx.fillStyle = "#0a0a0a";
+		ctx.beginPath(); ctx.arc( x, y, r * 0.8, 0, Math.PI * 2 ); ctx.fill();
+		ctx.fillStyle = "#b8b8b2";
+		if(!mini)
+			for(var i = 0; i < 5; ++i)
+			{
+				var a = Math.PI * (0.75 + i * 0.25) + Math.PI * 0.25;
+				ctx.beginPath(); ctx.arc( x + Math.cos(a) * r * 0.5, y + Math.sin(a) * r * 0.5, 1.6, 0, Math.PI * 2 ); ctx.fill();
+			}
+		ctx.fillStyle = "#6d6d68";
+		ctx.fillRect( x - r * 0.12, y + r * 0.62, r * 0.24, r * 0.2 );
 	}
-	ctx.closePath();
-	ctx.fill();
-	ctx.fillStyle = "#2a2a28";
-	ctx.beginPath(); ctx.arc( x, y, r * 0.62, 0, Math.PI * 2 ); ctx.fill();
-	ctx.fillStyle = "#000";
-	ctx.beginPath(); ctx.arc( x, y, r * 0.42, 0, Math.PI * 2 ); ctx.fill();
+	else
+	{
+		ctx.beginPath();
+		for(var i = 0; i < 6; ++i)
+		{
+			var a = Math.PI / 6 + i * Math.PI / 3;
+			ctx.lineTo( x + Math.cos(a) * r, y + Math.sin(a) * r );
+		}
+		ctx.closePath();
+		ctx.fill();
+		ctx.fillStyle = "#2a2a28";
+		ctx.beginPath(); ctx.arc( x, y, r * 0.62, 0, Math.PI * 2 ); ctx.fill();
+		ctx.fillStyle = "#000";
+		ctx.beginPath(); ctx.arc( x, y, r * 0.42, 0, Math.PI * 2 ); ctx.fill();
+	}
 	// hovering says where it goes
 	if(hover && !cable_drag)
 	{
@@ -1565,6 +1554,54 @@ function drawRearSocket( id, x, y, label, type, device, mini )
 			return (p[0] == id ? "\u2192 " : "\u2190 ") + jackDevice( other ) + " " + jackLabel( other );
 		});
 		tip( device + " " + label + "  " + (links.length ? links.join(", ") : "(not connected)"), x, y - r - 14 );
+	}
+}
+
+// MIDI channel names: 0 = OMNI (every channel)
+function channelName( c ) { return c ? "CH " + c : "OMNI"; }
+
+// under a module's MIDI IN socket: MASTER MIDI (the keys' MIDI without a cable) and the channel it
+// listens to (click: next, Shift + click: previous)
+function midiInSwitches( module_id, jack, x, y )
+{
+	var m = rack.settings.modules.find(function(m){ return m.id == module_id; });
+	if(!m)
+		return;
+	var s = m.settings;
+	if(s.midi_master)
+	{
+		// a plug with no wire
+		ctx.fillStyle = "#111";
+		ctx.beginPath(); ctx.arc( x, y, 9.5, 0, Math.PI * 2 ); ctx.fill();
+		ctx.fillStyle = CABLE_COLORS[5];
+		ctx.beginPath(); ctx.arc( x, y, 7.5, 0, Math.PI * 2 ); ctx.fill();
+	}
+	var active = (s.midi_master || rack.settings.patches.some(function(p){ return p[1] == jack; })) &&
+		rack.midi.access && (performance.now() - rack.midi.activity) < 120;
+	drawLed( x + 22, y - 12, 2.5, active, "#3bd16f" );
+	if(tinyButton( module_id + ".midi_master", x - 28, y + 19, 56, 13, "MASTER MIDI", s.midi_master,
+		s.midi_master ? "CLICK: CABLE INSTEAD" : "CLICK: THE KEYS' MIDI WITHOUT A CABLE" ))
+	{
+		rack.setMidiMaster( module_id, !s.midi_master );
+		setStatus( s.midi_master ? "MASTER MIDI on: the keys' MIDI reaches it without a cable" : "MASTER MIDI off: cable the keys' MIDI OUT into MIDI IN" );
+	}
+	if(tinyButton( module_id + ".midi_channel", x - 28, y + 35, 56, 13, channelName( s.midi_channel ), s.midi_channel > 0,
+		"LISTENS TO " + (s.midi_channel ? "CHANNEL " + s.midi_channel : "EVERY CHANNEL") + "  (CLICK: NEXT, SHIFT: PREVIOUS)" ))
+	{
+		s.midi_channel = (s.midi_channel + (ui.shift ? 16 : 1)) % 17;
+		rack.allNotesOff();
+	}
+}
+
+// under the keys' MIDI OUT: the channel of the on-screen and QWERTY keys
+function keysChannelSwitch( x, y )
+{
+	var kb = rack.settings.kb;
+	if(tinyButton( "kb_channel", x - 28, y + 19, 56, 13, "KB CH " + kb.channel, false,
+		"THE ON-SCREEN AND QWERTY KEYS PLAY ON CHANNEL " + kb.channel + "  (CLICK: NEXT, SHIFT: PREVIOUS)" ))
+	{
+		rack.allNotesOff();
+		kb.channel = (kb.channel - 1 + (ui.shift ? 15 : 1)) % 16 + 1;
 	}
 }
 
@@ -1653,11 +1690,19 @@ function drawRearDevice( id, x, y, w, h, name )
 	// audio sockets on the right
 	if(sockets.length)
 	{
-		var py = y + Math.max( 6, h * 0.5 - 40 ), ph = Math.min( h - 12, 80 );
+		// MIDI sockets have their switches under them: a taller plate
+		var midi = sockets.some(function(sk){ return sk[1] == "midiin" || sk[1] == "midiout"; });
+		var ph = Math.min( h - 12, midi ? 100 : 80 ), py = y + Math.max( 6, (h - ph) * 0.5 );
+		var sy = midi ? py + 44 : py + ph * 0.5 + 12;
 		ctx.fillStyle = "#18181a";
 		ctx.beginPath(); ctx.roundRect( px, py, pw, ph, 6 ); ctx.fill();
 		sockets.forEach(function(sk, k){
-			drawRearSocket( sk[2], px + 8 + spacing * (k + 0.5), py + ph * 0.5 + 12, sk[0], sk[1], name );
+			var sx = px + 8 + spacing * (k + 0.5);
+			drawRearSocket( sk[2], sx, sy, sk[0], sk[1], name );
+			if(sk[1] == "midiin")
+				midiInSwitches( id, sk[2], sx, sy );
+			else if(sk[1] == "midiout" && id == "keys")
+				keysChannelSwitch( sx, sy );
 		});
 	}
 	collapseButton( id, x + 36, y + 11 );

@@ -43,7 +43,7 @@ One patch bay spans all of them: any output can be cabled to any input of any de
 - **Add device** (toolbar) inserts a new device at the bottom of the rack. The menu is grouped into synths (Subharm, DRAM, Brother-32, Maze), modulation (dual LFO), mixing (mixer, compressor) and effects (reverb, delay).
   - You can have several of the same kind (`dram`, `dram2`, …). Reverbs are limited to 8, one per send / return slot of the audio engine.
   - A new LFO, compressor, reverb or delay arrives unpatched: patch its audio on the back (Tab).
-  - A synth with a MIDI IN (Subharm, Brother-32, Maze) gets the keys' MIDI through **MASTER MIDI**, a tiny switch under its MIDI IN jack, instead of a long cable across the rack. While it is on, the jack shows a plug with no wire. Switching it on unplugs a MIDI IN cable; patching a cable into MIDI IN switches it off. It is saved with the patch; older patches keep their MIDI cables.
+  - A synth with a MIDI IN (Subharm, Brother-32, Maze) gets the keys' MIDI through **MASTER MIDI** instead of a long cable across the rack (see *MIDI on the back*).
   - A new synth's audio goes to the first free mixer channel; with no mixer, to wherever the other synths go (or the compressor).
   - A new mixer takes over the synths that weren't on a mixer: they move onto its channels, and its MAIN L / R go where they went.
 - Each synth has three buttons on its right wood cheek: **move up**, **move down** and **remove**. A full-width device moves past a whole row: a pair of half-width devices stays together. Removing asks first and unplugs that synth's cables.
@@ -138,7 +138,7 @@ A replica of the Moog Mother-32, named Brother-32 here. Patches that still use t
 - **32-point patch bay** (4 × 8):
   - 18 inputs: EXT AUDIO, MIX CV, VCA CV, VCF CUTOFF, VCF RES, VCO 1V/OCT, VCO LIN FM, VCO MOD, LFO RATE, MIX 1, MIX 2, VC MIX CTRL, MULT, GATE, TEMPO (a clock that replaces the internal one), RUN/STOP, RESET, HOLD.
   - 14 outputs: VCA, NOISE, VCF, VCO SAW, VCO PULSE, LFO TRI, LFO SQ, VC MIX, MULT 1, MULT 2, ASSIGN, EG, KB, GATE.
-- **MIDI IN** (cabled from the keys when the Brother-32 is added): notes, pitch bend, and clock (24 ppqn to 16ths) with start / stop.
+- **MIDI IN** (on the back, MASTER MIDI on when the Brother-32 is added): notes, pitch bend, and clock (24 ppqn to 16ths) with start / stop.
 - **Factory patches:** *Acid Line*, *PWM Drift* and, in RACK, *Brother & Drummer* (the Brother-32's ASSIGN clock drives the DRAM).
 
 ## DRAM
@@ -190,6 +190,15 @@ The thin row at the top. Its settings are remembered by the browser, not saved i
 - **GAIN** sets the input level: unity at the middle, up to +12 dB.
 - **IN L / IN R** jacks carry the input as ±5 V signals, so it can be patched anywhere. For example: DRAM EXT AUDIO to filter the microphone, the scope, the compressor's sidechain, or a pitch / cutoff input for audio-rate modulation.
 - **MASTER** is the volume of everything (after the reverb): 0 dB at the default position, up to +3.9 dB. The L / R meters show the peak level after it.
+
+## MIDI on the back
+
+MIDI sockets are on the back of the devices (Tab): the keys' **MIDI OUT**, and a **MIDI IN** on the Subharm, Brother-32 and Maze.
+
+- **Cable or MASTER MIDI:** a MIDI cable from MIDI OUT to a MIDI IN carries the notes. Or switch on **MASTER MIDI** under the MIDI IN to get them without a cable; new synths start that way. Switching it on unplugs a MIDI IN cable, and patching a cable switches it off.
+- **Channels:** the **CH** switch under each MIDI IN picks the channel the synth listens to: OMNI (every channel, the default) or 1–16. Click for the next, Shift + click for the previous.
+- **Keys:** **KB CH** under the MIDI OUT sets the channel of the on-screen and QWERTY keys. Notes from a MIDI device keep their own channel.
+- **Engine:** every channel has its own note stack with last-note priority, so two synths on different channels play their own lines. Clock and start / stop go to every synth the MIDI reaches.
 
 ## Keys device and MIDI
 

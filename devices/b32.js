@@ -14,7 +14,6 @@ var VCO_MIN = 32.70, VCO_MAX = 2093; // C1..C7
 var ASSIGNS = [["accent", "ACCENT"], ["clock", "CLOCK"], ["ramp", "SEQ RAMP"]];
 
 // patch bay: 4 columns x 8 rows like the hardware (inputs, outputs with inverted labels);
-// the last row is the MIDI IN, drawn on its own
 var JACKS = [
 	[["EXT AUDIO","in","ext_audio"], ["MIX CV","in","mix_cv"], ["VCA CV","in","vca_cv"], ["VCA","out","vca"]],
 	[["NOISE","out","noise"], ["VCF CUTOFF","in","cutoff_in"], ["VCF RES","in","res_in"], ["VCF","out","vcf"]],
@@ -23,9 +22,8 @@ var JACKS = [
 	[["MIX 1","in","mix1"], ["MIX 2","in","mix2"], ["VC MIX CTRL","in","vc_mix_ctrl"], ["VC MIX","out","vc_mix"]],
 	[["MULT","in","mult_in"], ["MULT 1","out","mult1"], ["MULT 2","out","mult2"], ["ASSIGN","out","assign"]],
 	[["GATE","in","gate_in"], ["EG","out","eg"], ["KB","out","kb"], ["GATE","out","gate"]],
-	[["TEMPO","in","tempo_in"], ["RUN/STOP","in","run_stop"], ["RESET","in","reset_in"], ["HOLD","in","hold"]],
-	[["MIDI IN","midiin","midi_in"]]
-];
+	[["TEMPO","in","tempo_in"], ["RUN/STOP","in","run_stop"], ["RESET","in","reset_in"], ["HOLD","in","hold"]]
+]; // MIDI IN is on the back
 
 var M = null;
 var ui_state = {}; // module id -> { sel: selected step, oct: keyboard octave, rec, key: note held with the pointer }
@@ -221,8 +219,6 @@ function drawSequencer()
 		send({ type: "reset" });
 	if(button( "next", 50, 314, 100, 26, "NEXT STEP" ).clicked)
 		send({ type: "next" });
-	var j = JACKS[8][0];
-	drawJack( j[2], 210, 358, j[0], j[1] );
 
 	// step grid: 2 rows of 16
 	for(var i = 0; i < STEPS; ++i)

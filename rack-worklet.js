@@ -12,6 +12,11 @@
 // the module id ("subharm.vco1", "comp.in_l"). Cables are copied with one sample of delay. CV inputs
 // take one cable; audio inputs (rear sockets) sum all the cables plugged in. MIDI reaches a module
 // through a cable from the keys' MIDI output into its MIDI IN, or with its MASTER MIDI switch on.
+//
+// MIDI notes come in as { type: "note", channel 1..16, note, on }: one note stack per channel (plus
+// one for OMNI, with every note) turns them into the mono { type: "midi", pitch, gate, retrigger }
+// messages the modules play, last note priority, sent to the modules listening to that channel.
+// { type: "sched", frame, msg } queues any message for a sample frame (the song sequencer).
 
 const SLOTS = 8;
 const RACK_OUT_IDS = ["kb_gate1","kb_key1","kb_gate2","kb_key2","kb_trig","in_l","in_r","io_input_l","io_input_r"];
@@ -19,7 +24,8 @@ const RACK_IN_IDS = ["io_main_l","io_main_r"];
 const O_KB_GATE = [0, 2], O_KB_KEY = [1, 3], O_KB_TRIG = 4, O_IN_L = 5, O_IN_R = 6, O_IO_IN = [7, 8];
 const I_MAIN = [0, 1];
 const MIDI_OUT = "kb_midi";
-const MIDI_MESSAGES = { midi: 1, bend: 1, midiClock: 1, midiStart: 1, midiStop: 1, midiContinue: 1 };
+// realtime MIDI (no channel) goes to every module the MIDI reaches
+const MIDI_REALTIME = { midiClock: 1, midiStart: 1, midiStop: 1, midiContinue: 1 };
 
 const GATE_V = 5;
 const PULSE_TIME = 0.005;
@@ -58,17 +64,69 @@ class RackProcessor extends AudioWorkletProcessor {
 		this.kbKey = [0, 0];
 		this.kbTrig = 0;
 		this.stateCounter = 0;
+		this.stacks = [];    // held notes per channel, 0 = all channels (OMNI)
+		for (let c = 0; c <= 16; c++) this.stacks.push([]);
+		this.queue = [];     // scheduled messages, sorted by frame
 		this.port.onmessage = (e) => this.onMessage(e.data);
 	}
 
+	// modules the MIDI of `channel` reaches: cabled (or MASTER MIDI), listening to it or OMNI (0)
+	toChannel(channel, msg, omni) {
+		for (const mod of this.modules)
+			if (mod.dsp.midiConnected && (omni ? mod.midiChannel === 0 : mod.midiChannel === channel && channel > 0))
+				mod.dsp.message(msg);
+	}
+
+	noteEvent(m) {
+		const ch = Math.max(1, Math.min(16, m.channel | 0));
+		for (const k of [ch, 0]) {
+			const st = this.stacks[k];
+			const i = st.indexOf(m.note);
+			if (i >= 0) st.splice(i, 1);
+			let msg;
+			if (m.on) {
+				st.push(m.note);
+				msg = { type: "midi", pitch: (m.note - 60) / 12, gate: true, retrigger: true, velocity: m.vel };
+			}
+			else if (st.length)
+				msg = { type: "midi", pitch: (st[st.length - 1] - 60) / 12, gate: true, retrigger: false };
+			else
+				msg = { type: "midi", gate: false };
+			if (m.on || i >= 0) this.toChannel(ch, msg, k === 0);
+		}
+	}
+
+	notesOff() {
+		for (const st of this.stacks) st.length = 0;
+		for (const mod of this.modules)
+			if (mod.dsp.midiConnected) mod.dsp.message({ type: "midi", gate: false });
+	}
+
+	schedule(m) {
+		const q = this.queue;
+		let i = q.length;
+		while (i > 0 && q[i - 1].frame > m.frame) i--;
+		q.splice(i, 0, m);
+	}
+
 	onMessage(m) {
-		if (MIDI_MESSAGES[m.type]) {
-			// MIDI reaches a module only through a cable from the keys device's MIDI output
+		if (MIDI_REALTIME[m.type]) {
 			for (const mod of this.modules)
 				if (mod.dsp.midiConnected) mod.dsp.message(m);
 			return;
 		}
 		switch (m.type) {
+			case "note": this.noteEvent(m); break;
+			case "bend": {
+				const ch = Math.max(1, Math.min(16, m.channel | 0));
+				const msg = { type: "bend", value: m.value };
+				this.toChannel(ch, msg, false);
+				this.toChannel(ch, msg, true);
+				break;
+			}
+			case "notesOff": this.notesOff(); break;
+			case "sched": this.schedule(m); break;
+			case "unsched": this.queue = this.queue.filter(e => e.tag !== m.tag); break;
 			case "settings":
 				if (m.tempo > 0) this.tempo = m.tempo;
 				this.setSettings(m.settings);
@@ -108,6 +166,7 @@ class RackProcessor extends AudioWorkletProcessor {
 			// native modules take the send / return slots in rack order (the main thread does the same)
 			mod.slot = Dsp.NATIVE && slot < SLOTS ? 1 + slot++ : -1;
 			mod.midiMaster = !!(m.settings && m.settings.midi_master); // MASTER MIDI: the keys' MIDI without a cable
+			mod.midiChannel = m.settings ? Math.max(0, Math.min(16, m.settings.midi_channel | 0)) : 0; // 0 = OMNI
 			if (mod.slot < 0) { mod.dsp.send = null; mod.dsp.ret = null; }
 			mod.dsp.setSettings(m.settings);
 			byId[m.id] = mod;
@@ -187,8 +246,12 @@ class RackProcessor extends AudioWorkletProcessor {
 		const nc = this.numCables, srcArr = this.srcArr, srcIdx = this.srcIdx, dstArr = this.dstArr, dstIdx = this.dstIdx;
 		const nz = this.numZero, zeroArr = this.zeroArr, zeroIdx = this.zeroIdx;
 
+		const q = this.queue;
 		for (let j = 0; j < n; j++) {
 			this.j = j;
+			// ---- scheduled messages (the song sequencer) due at this sample ----
+			while (q.length && q[0].frame <= currentFrame + j)
+				this.onMessage(q.shift().msg);
 			// ---- audio interface input: +-5V on the front, line level on the back ----
 			const inL = io ? io[0][j] : 0, inR = io ? io[1][j] : 0;
 			outs[O_IN_L] = inL * 5;
