@@ -1,6 +1,6 @@
 # subharmsynth.js
 
-A browser rack of semi-modular synthesizers built on the WebAudio API: replicas of the Moog Subharmonicon (polyrhythmic synthesizer), DFAM (percussion synthesizer, here called DRAM), Mother-32 (synthesizer with a 32 step sequencer, here called Brother-32) and Labyrinth (parallel generative synthesizer, here called Maze), with a mixer, LFOs, compressors, reverbs and delays, all patchable with each other.
+**SYNTHS** is a browser rack of semi-modular synthesizers built on the WebAudio API: replicas of the Moog Subharmonicon (polyrhythmic synthesizer), DFAM (percussion synthesizer, here called DRAM), Mother-32 (synthesizer with a 32 step sequencer, here called Brother-32) and Labyrinth (parallel generative synthesizer, here called Maze), with a mixer, LFOs, compressors, reverbs and delays, all patchable with each other.
 
 All synthesis runs in real time in one `AudioWorkletProcessor` (`rack-worklet.js`), which hosts each synth's DSP and copies the patch cables between them every sample. Oscillators, filters, envelopes, clocks, sequencers and the cables are all computed per sample, so patching between synths is sample-accurate. The reverb and delay are native WebAudio nodes after it.
 

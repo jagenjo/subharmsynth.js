@@ -3,21 +3,21 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>SUBHARM rack</title>
-<meta name="description" content="A browser replica of the Moog Subharmonicon polyrhythmic synthesizer, built with the WebAudio API: subharmonic oscillators, polyrhythmic sequencers, patch bay, LFOs, compressor and MIDI." />
+<title>SYNTHS</title>
+<meta name="description" content="A rack of semi-modular synthesizers in the browser, built with the WebAudio API: the SUBHARM, DRAM, BROTHER-32 and MAZE synthesizers, a mixer, LFOs, compressors, reverbs and delays, patchable front and back." />
 <!-- link previews (Open Graph / Twitter); image URLs must be absolute -->
 <meta property="og:type" content="website" />
-<meta property="og:title" content="SUBHARM: Subharmonicon in the browser" />
-<meta property="og:description" content="A WebAudio replica of the Moog Subharmonicon: subharmonic oscillators, polyrhythmic sequencers, patch bay, LFOs, compressor and MIDI." />
+<meta property="og:title" content="SYNTHS: a modular synth rack in the browser" />
+<meta property="og:description" content="A rack of semi-modular synthesizers in the browser, built with the WebAudio API: the SUBHARM, DRAM, BROTHER-32 and MAZE synthesizers, a mixer, LFOs, compressors, reverbs and delays, patchable front and back." />
 <meta property="og:url" content="https://tamats.com/projects/synth/" />
 <meta property="og:image" content="https://tamats.com/projects/synth/preview.jpg" />
 <meta property="og:image:type" content="image/jpeg" />
 <meta property="og:image:width" content="1600" />
 <meta property="og:image:height" content="962" />
-<meta property="og:image:alt" content="The SUBHARM synthesizer panel with knobs, sequencers and patch cables" />
+<meta property="og:image:alt" content="The SYNTHS rack: synthesizer panels with knobs, sequencers and patch cables" />
 <meta name="twitter:card" content="summary_large_image" />
-<meta name="twitter:title" content="SUBHARM: Subharmonicon in the browser" />
-<meta name="twitter:description" content="A WebAudio replica of the Moog Subharmonicon: subharmonic oscillators, polyrhythmic sequencers, patch bay, LFOs, compressor and MIDI." />
+<meta name="twitter:title" content="SYNTHS: a modular synth rack in the browser" />
+<meta name="twitter:description" content="A rack of semi-modular synthesizers in the browser, built with the WebAudio API: the SUBHARM, DRAM, BROTHER-32 and MAZE synthesizers, a mixer, LFOs, compressors, reverbs and delays, patchable front and back." />
 <meta name="twitter:image" content="https://tamats.com/projects/synth/preview.jpg" />
 <link rel="preconnect" href="https://fonts.gstatic.com">
 <link href="https://fonts.googleapis.com/css2?family=Antonio:wght@500;700&family=Oswald:wght@500&display=swap" rel="stylesheet">
@@ -42,7 +42,7 @@
 </head>
 <body>
 <header>
-	<span class="title">SUBHARM</span>
+	<span class="title">SYNTHS</span>
 	<div class="group">
 		<button id="power" title="Start / suspend the audio engine">Audio off</button>
 	</div>
@@ -76,17 +76,17 @@
 	<span id="status"></span>
 </header>
 <canvas id="panel"></canvas>
-<script src="webrack.js?v=20261016r"></script>
+<script src="webrack.js?v=20261016s"></script>
 <!-- synths: each registers itself in the rack (panel here, DSP in its -worklet.js) -->
-<script src="devices/subharm.js?v=20261016r"></script>
-<script src="devices/dram.js?v=20261016r"></script>
-<script src="devices/b32.js?v=20261016r"></script>
-<script src="devices/maze.js?v=20261016r"></script>
-<script src="devices/mixer.js?v=20261016r"></script>
-<script src="devices/lfo.js?v=20261016r"></script>
-<script src="devices/comp.js?v=20261016r"></script>
-<script src="devices/reverb.js?v=20261016r"></script>
-<script src="devices/delay.js?v=20261016r"></script>
-<script src="code.js?v=20261016r"></script>
+<script src="devices/subharm.js?v=20261016s"></script>
+<script src="devices/dram.js?v=20261016s"></script>
+<script src="devices/b32.js?v=20261016s"></script>
+<script src="devices/maze.js?v=20261016s"></script>
+<script src="devices/mixer.js?v=20261016s"></script>
+<script src="devices/lfo.js?v=20261016s"></script>
+<script src="devices/comp.js?v=20261016s"></script>
+<script src="devices/reverb.js?v=20261016s"></script>
+<script src="devices/delay.js?v=20261016s"></script>
+<script src="code.js?v=20261016s"></script>
 </body>
 </html>

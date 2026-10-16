@@ -2356,7 +2356,7 @@ $("patch-delete").addEventListener("click", function(){
 });
 
 $("patch-export").addEventListener("click", function(){
-	var name = currentPatchName() || "subharm-patch";
+	var name = currentPatchName() || "synths-patch";
 	var blob = new Blob([ rack.exportPatch( name ) ], { type: "application/json" });
 	var a = document.createElement("a");
 	a.href = URL.createObjectURL( blob );
