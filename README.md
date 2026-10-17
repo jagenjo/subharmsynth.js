@@ -26,6 +26,7 @@ Needs a browser with AudioWorklet support, served over `https://` or `localhost`
 | `devices/comp.js`, `devices/comp-worklet.js` | the stereo compressor and its scope |
 | `devices/delay.js`, `devices/delay-worklet.js` | the stereo / ping-pong delay |
 | `devices/universe.js`, `devices/universe-worklet.js` | Universe, the granular / looper effect |
+| `devices/hyper.js`, `devices/hyper-worklet.js` | Hyper, the distortion / bit crusher |
 | `devices/reverb.js`, `devices/reverb-worklet.js` | the convolution reverb: native nodes, bridged through a send / return slot |
 | `data/patches.json` | factory patches |
 | `old/` | the original version of this replica, as in the first commit |
@@ -38,16 +39,16 @@ The page is a rack. From the top:
 
 1. The **AUDIO I/O** device.
 2. The **KEYS** device.
-3. The devices, in the order you choose. Synths and mixers take a full row. The half-width devices (dual LFO, compressor, reverb, delay, Universe) sit side by side when two are next to each other.
+3. The devices, in the order you choose. Synths and mixers take a full row. The half-width devices (dual LFO, compressor, reverb, delay, Universe, Hyper) sit side by side when two are next to each other.
 
 A new rack has a Subharm, an LFO and a compressor, then a reverb and a delay, cabled as the default audio path.
 
 One patch bay spans all of them: any output can be cabled to any input of any device. The front carries CV, gates and audio at ±5 V; the back carries the line-level audio between devices (see *Rear view*).
 
-- **Add device** (toolbar) inserts a new device at the bottom of the rack. The menu is grouped into synths (Subharm, DRAM, Brother-32, Maze, Mystic), modulation (dual LFO), mixing (mixer, compressor) and effects (reverb, delay, Universe).
+- **Add device** (toolbar) inserts a new device at the bottom of the rack. The menu is grouped into synths (Subharm, DRAM, Brother-32, Maze, Mystic), modulation (dual LFO), mixing (mixer, compressor) and effects (reverb, delay, Universe, Hyper).
   - You can have several of the same kind (`dram`, `dram2`, …). Reverbs are limited to 8, one per send / return slot of the audio engine.
   - A new LFO, compressor, reverb or delay arrives unpatched: patch its audio on the back (Tab).
-  - A new Universe goes in just before the speakers (between the last device and MAIN IN), so you hear it right away.
+  - A new Universe or Hyper goes in just before the speakers (between the last device and MAIN IN), so you hear it right away.
   - A synth with a MIDI IN (Subharm, Brother-32, Maze) gets the keys' MIDI through **MASTER MIDI** instead of a long cable across the rack (see *MIDI on the back*).
   - A new synth's audio goes to the first free mixer channel; with no mixer, to wherever the other synths go (or the compressor).
   - A new mixer takes over the synths that weren't on a mixer: they move onto its channels, and its MAIN L / R go where they went.
@@ -152,6 +153,21 @@ A replica of the Hologram Microcosm granular / looper pedal, named Universe here
 - **Phrase looper** (up to 60 s): REC → PLAY → DUB (overdub) → PLAY, STOP and ERASE, plus REVERSE, PRE-FX (record the dry input) and ONLY (the effect off, only the loop and the dry signal). The bar shows the loop's position.
 - **CV:** CLOCK, HOLD (a gate toggles it), ACTIVITY and MIX (±5 V) in; CLOCK (a pulse each step) and ENV (input level) out.
 - **Not the pedal's algorithms:** each effect follows the manual's description of what it does, but the sound is my own approximation. User presets are the rack's patches, and the loop is not saved with them.
+
+## Hyper
+
+A lo-fi distortion and bit crusher (half width, stereo IN / OUT on the back), for the warm, crunchy, slightly broken sound of Disasterpeace's soundtracks (*Fez*, *Hyper Light Drifter*). The signal goes through, in order:
+
+- **WOBBLE:** tape wow (0.55 Hz) and flutter (6.3 Hz), a short delay whose length moves, so the pitch bends.
+- **DRIVE** (up to +36 dB) into a **TYPE** of saturation: TAPE (soft), TUBE (asymmetric, even harmonics), FUZZ (hard clipping) or FOLD (the wave folds back on itself). The level is compensated as DRIVE goes up.
+- **TONE:** a low pass after the distortion.
+- **RATE:** sample rate reduction, 100 Hz to 48 kHz, without anti-aliasing (the aliasing is part of the sound).
+- **BITS:** 16 down to 1, continuous.
+- **MIX** with the dry signal, **OUT** level and **ON** (off: dry through).
+- **Starting points:** DRIFTER (warm, wobbly, slightly crushed), 8-BIT (chiptune grit), BROKEN (a dying console) and FOLDED.
+- **CV:** DRIVE (±5 V = the whole range), BITS (1 V = 3 bits fewer), RATE (1 V/oct).
+
+These settings are my reading of that sound, not a recipe from the artist. His music gets much of it from the synths and samples themselves; Hyper adds the grit and the wobble.
 
 ## Maze
 
