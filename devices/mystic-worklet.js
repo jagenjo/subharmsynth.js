@@ -12,16 +12,44 @@
 
 const C4 = 261.6255653005986;
 const IN_IDS = ["pitch_in","gate_in","mod1_in","mod2_in","clock_in"];
-const OUT_IDS = ["env1_out","menv_out","lfo_out","gate_out","audio"];
+const OUT_IDS = ["env1_out","menv_out","lfo_out","gate_out","audio","pitch_out","clock_out"];
 const I_PITCH = 0, I_GATE = 1, I_MOD1 = 2, I_MOD2 = 3, I_CLOCK = 4;
-const O_ENV1 = 0, O_MENV = 1, O_LFO = 2, O_GATE = 3, O_AUDIO = 4;
+const O_ENV1 = 0, O_MENV = 1, O_LFO = 2, O_GATE = 3, O_AUDIO = 4, O_PITCH = 5, O_CLOCK = 6;
 const VOICES = 8;
 const CTRL = 16; // samples between control updates of a voice (pitch, WAVSCAN, filter coefficients)
 const TABLE = 2048;
 const GATE_THRESHOLD = 1;
 const DECAY_TC = Math.log(1 / 0.01);
 const ATTACK_TARGET = 1.3, ATTACK_TC = Math.log(ATTACK_TARGET / (ATTACK_TARGET - 1));
-const ARP_DIVS = [1, 0.5, 1 / 3, 0.25, 1 / 6, 0.125]; // beats: 1/4, 1/8, 1/8T, 1/16, 1/16T, 1/32
+const ARP_DIVS = [1, 0.5, 1 / 3, 0.25, 1 / 6, 0.125, 2 / 3, 1 / 12]; // beats: 1/4, 1/8, 1/8T, 1/16, 1/16T, 1/32, 1/4T, 1/32T
+
+// DELAY and REVERB after the amp (mono)
+class FxLine {
+	constructor(n) { this.b = new Float32Array(n); this.n = n; this.w = 0; }
+	write(x) { this.b[this.w] = x; if (++this.w >= this.n) this.w = 0; }
+	read(d) {
+		d = d < 1 ? 1 : (d > this.n - 2 ? this.n - 2 : d);
+		let p = this.w - d; if (p < 0) p += this.n;
+		let i = p | 0; if (i >= this.n) i -= this.n;
+		const f = p - Math.floor(p), a = this.b[i], b = this.b[i + 1 < this.n ? i + 1 : 0];
+		return a + (b - a) * f;
+	}
+}
+class FxReverb { // 4 line feedback delay network with damping
+	constructor() {
+		const k = sampleRate / 44100;
+		this.len = [1557, 1617, 1491, 1422].map(l => Math.round(l * k));
+		this.lines = this.len.map(l => new FxLine(l + 2));
+		this.lp = new Float64Array(4); this.o = new Float64Array(4);
+	}
+	process(x, g, damp) {
+		const L = this.lines, o = this.o;
+		for (let k = 0; k < 4; k++) o[k] = L[k].read(this.len[k]);
+		const sum = (o[0] + o[1] + o[2] + o[3]) * 0.5;
+		for (let k = 0; k < 4; k++) { this.lp[k] += (sum - o[k] - this.lp[k]) * (1 - damp); L[k].write(x * 0.5 + this.lp[k] * g); }
+		return (o[0] - o[1] + o[2] - o[3]) * 0.5;
+	}
+}
 const MIDI_CLOCK_TIMEOUT = 0.5;
 const VOWELS = [[800, 1150], [350, 2000], [270, 2300], [450, 800], [325, 700]]; // A E I O U formants
 
@@ -188,6 +216,7 @@ class MysticDSP {
 	// ---- arpeggiator: one step ----
 	arpStep() {
 		const s = this.s, a = s.arp;
+		this.clockPulse = Math.round(0.005 * sampleRate);
 		if (this.arpNote >= 0) { this.voiceOff(this.arpNote); this.arpNote = -1; }
 		if (!this.held.length) return;
 		let notes = this.held.map(h => h[0]);
@@ -273,6 +302,8 @@ class MysticDSP {
 		this.cut1 = Math.log2(clamp(s.f1.cutoff, 20, 20000) / 20);
 		this.cut2 = Math.log2(clamp(s.f2.cutoff, 20, 20000) / 20);
 		this.vol = s.volume * s.volume;
+		if (s.delay) this.dTone = 1 - Math.exp(-2 * Math.PI * clamp(s.delay.tone, 200, 18000) / sr);
+		if (s.reverb) { this.rG = 0.7 + clamp(s.reverb.time, 0, 1) * 0.28; this.rDamp = 0.1 + (1 - clamp(s.reverb.tone, 0, 1)) * 0.6; }
 		const a = s.arp;
 		this.arpStepSamples = 60 / Math.max(10, a.tempo) * ARP_DIVS[clamp(a.div | 0, 0, ARP_DIVS.length - 1)] * sr;
 		// arpeggiator clock: CLOCK IN > MIDI clock > TEMPO
@@ -328,8 +359,10 @@ class MysticDSP {
 			if (this.arpOff > 0 && --this.arpOff === 0 && this.arpNote >= 0) { this.voiceOff(this.arpNote); this.arpNote = -1; }
 			if (patched[I_CLOCK]) { if (this.gateEdge(I_CLOCK) > 0) this.arpStep(); }
 			else if (!this.midiClock && this.held.length) {
-				this.arpPhase += 1 / this.arpStepSamples;
-				if (this.arpPhase >= 1 || this.arpIndex < 0 && this.arpNote < 0) { this.arpPhase = this.arpPhase >= 1 ? this.arpPhase - 1 : 0; this.arpStep(); }
+				// SWING: the steps long and short in turn
+				const sw = (clamp(s.arp.swing || 50, 50, 75) - 50) / 50;
+				this.arpPhase += 1 / (this.arpStepSamples * (this.arpParity ? 1 - sw : 1 + sw));
+				if (this.arpPhase >= 1 || this.arpIndex < 0 && this.arpNote < 0) { this.arpPhase = this.arpPhase >= 1 ? this.arpPhase - 1 : 0; this.arpParity = !this.arpParity; this.arpStep(); }
 			}
 			if (!this.held.length) { this.arpIndex = -1; this.arpPhase = 0; }
 		}
@@ -445,7 +478,23 @@ class MysticDSP {
 		outs[O_MENV] = lv.e3 * 5;
 		outs[O_LFO] = lfo * 5;
 		outs[O_GATE] = anyGate ? 5 : 0;
-		const audio = fastTanh(out * this.vol * 0.9);
+		outs[O_PITCH] = lv.pitch;                       // 1 V/oct, 0 V = C4
+		outs[O_CLOCK] = this.clockPulse > 0 ? 5 : 0;    // a pulse on each arpeggiator step
+		if (this.clockPulse > 0) this.clockPulse--;
+		let audio = fastTanh(out * this.vol * 0.9);
+		// DELAY, then REVERB
+		const dl = s.delay, rv = s.reverb;
+		if (dl && dl.on) {
+			if (!this.dline) this.dline = new FxLine(Math.round(sampleRate * 2.1)), this.dlp = 0;
+			const e = this.dline.read(clamp(dl.time, 0.01, 2) * sampleRate);
+			this.dlp += (e - this.dlp) * this.dTone;
+			this.dline.write(fastTanh(audio + this.dlp * clamp(dl.feedback, 0, 0.95)));
+			audio += this.dlp * dl.mix;
+		}
+		if (rv && rv.on) {
+			if (!this.rev) this.rev = new FxReverb();
+			audio += this.rev.process(audio, this.rG, this.rDamp) * rv.mix;
+		}
 		outs[O_AUDIO] = audio;
 		return audio;
 	}

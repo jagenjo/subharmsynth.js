@@ -100,12 +100,20 @@ A 6 channel line mixer in the same panel style as the synths. Insert it from *Ad
 
 ## Mystic
 
-A replica of the ASM Hydrasynth, simplified to fit on one panel; named Mystic here. Patches that still use the old `hydra` name load as Mystic. It is the rack's only **polyphonic** synth: it plays every note of its MIDI channel on 8 voices (POLY), or one voice with legato and GLIDE (MONO). Play it from the keys, a MIDI device or the song sequencer. It has no sequencer of its own.
+A replica of the ASM Hydrasynth Desktop, simplified; named Mystic here. It is the rack's only **polyphonic** synth: it plays every note of its MIDI channel on 8 voices (POLY), or one voice with legato and GLIDE (MONO). Play it from the keys, a MIDI device, the song sequencer or its own pads.
 
-- **Panel:** laid out as the Hydrasynth's. It has a matte black panel with red section titles, silver knobs with white LED rings (the LED RING knob style, which any device can use), and aluminium end cheeks.
-  - **CV / GATE and ARPEGGIATOR:** top left. **MAIN SYSTEMS** (bottom left) is an OLED with the two oscillators' waves after their mutants and the voices playing. MASTER VOLUME, POLY / MONO, GLIDE and VELOCITY are on the far left.
-  - **MASTER CONTROL:** 8 encoders around an OLED edit the module picked in **MODULE SELECT**, a diagram of the signal flow (OSC 1–3, MUTANT 1–4, RING-NOISE, MIXER, FILTER 1 / 2, AMP, ENV 1–3, LFO 1). PAGE ▲ ▼ steps through the modules, the white button under an encoder resets its parameter, and INIT resets the whole module.
-  - **FILTER CONTROLS:** CUTOFF, RESONANCE and DRIVE (MORPH on filter 2) for FILTER 1 or FILTER 2, plus ENV 1 and LFO 1 amounts to filter 1.
+- **Panel:** laid out as the Desktop's top panel in the owner's manual. It has a matte black panel with red section titles, silver knobs, LED ring encoders, aluminium end cheeks, orange-lettered access buttons and white-lettered function buttons. The screens are white dot matrix OLEDs (a 5×7 font).
+  - **CV / GATE:** inputs MOD 1 (cutoff), MOD 2 (WAVSCAN), PITCH, GATE and CLOCK; outputs PITCH, GATE, MOD 1 (ENV 1), MOD 2 (LFO 1), ENV 3 and CLOCK (a pulse on each arpeggiator step).
+  - **ARPEGGIATOR:** MODE, OCTAVE, DIVISION (1/4 to 1/32) and SWING; ON, LATCH, TRIPLET and TAP TEMPO. SHIFT + ON (EDIT) shows its page.
+  - **FILTER CONTROLS:** CUTOFF, RESONANCE and DRIVE / MORPH, on FILTER 1 or FILTER 2.
+  - **MAIN SYSTEMS:**
+    - **Patch encoder and ◀ ▶:** step through the built-in patches (INIT, Glass Pad, FM Bells, Mutant Arp, Supersaw Stack, Vowel Choir, Sub Bass, Comb Pluck). The left OLED shows the patch, or the module being edited (with its wave for the oscillators and mutants), or the BROWSE list.
+    - **Buttons:** INIT resets the module shown (SHIFT: the whole patch) and RANDOM makes a random sound. HOME shows the 8 macros (SHIFT + HOME: PANIC).
+  - **MASTER CONTROL:** 8 encoders around four OLED windows (a parameter's name and value above and below a line) edit the module picked.
+    - **Buttons:** the white buttons reset their parameter. PAGE ▲ ▼ steps through the pages, EXIT goes home, and VOICE shows polyphony and glide. MOD MATRIX shows the modulation amounts.
+  - **MODULE SELECT:** the signal flow. ENV 4–5, LFO 2–5, PRE-FX and POST-FX, which this replica does not have, are dimmed.
+  - **24 pads:** play the notes of a scale (CHORDS mode: triads); roots are tinted. With SHIFT they do what is printed under them: OCT − / +, PAD MODE, KEY, and the 16 scales.
+- **DELAY and REVERB** after the amp: DELAY has TIME, FEEDBACK, WET TONE and DRY/WET; REVERB has TIME, TONE and DRY/WET.
 - **OSC 1 and OSC 2:** each scans through 8 single-cycle waves (SINE, TRIANGLE, SAW, SQUARE, PULSE, ORGAN, VOX, DIGITAL) with **WAVSCAN**, plus SEMI and CENT.
 - **Mutators:** each of OSC 1 and OSC 2 goes through two (MUTANT 1–4 on the panel, as on the Hydrasynth), each with a mode, RATIO, DEPTH and DRY/WET:
   - **FM-LIN:** phase modulation by a sine at RATIO × the oscillator.
@@ -124,13 +132,8 @@ A replica of the ASM Hydrasynth, simplified to fit on one panel; named Mystic he
   - **MOD ENV (ENV 3)** (attack / decay), sent to the mutators' depth and to WAVSCAN.
 - **LFO:** RATE, SHAPE (SINE, TRIANGLE, SAW, SQUARE, S&H), sent to PITCH, WAVSCAN, CUTOFF and MUTATORS.
 - **ARPEGGIATOR:** UP, DOWN, UP/DOWN, RANDOM or AS PLAYED, with DIVISION (1/4 to 1/32), OCTAVES (1–4), GATE, LATCH and TEMPO. MIDI clock (or a cable in CLOCK) takes over from TEMPO.
-- **Display:** OSC 1 and OSC 2 after their mutators, the voices playing and the arpeggio.
-- **CV / GATE patch bay:**
-  - Inputs: PITCH CV (1 V/oct on every voice), GATE (plays C4), MOD 1 (cutoff, 1 V/oct), MOD 2 (WAVSCAN, ±5 V) and CLOCK (arpeggiator steps).
-  - Outputs: GATE, ENV 1, MOD ENV and LFO.
-  - MIDI and audio are on the back.
 - **Factory patches:** *Glass Pad*, *FM Bells* and *Mutant Arp*.
-- **Simplified:** the original's mod matrix, macros, extra envelopes and LFOs, and effects are replaced by the fixed routings above, and the waves are 8 instead of 219.
+- **Simplified:** the original's mod matrix (32 slots), assignable macros, ENV 4–5, LFO 2–5, pre / post effects, and patch saving inside the synth are replaced by the fixed routings and pages above; the waves are 8 instead of 219.
 - **CPU:** it is the heaviest device. In tests, 8 voices took about 13% of a CPU core, up to 30% with all four mutators stacking.
 
 ## Universe
