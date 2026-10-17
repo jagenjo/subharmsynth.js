@@ -173,6 +173,68 @@ function stop()
 	finishRecording();
 }
 
+// ---------------------------------------------------------------------------
+// EXPORT WAV: the song played once from the start, recorded from the master output (real time), its
+// tail kept until it is silent (at most 10 s more), saved as a stereo 16-bit WAV file
+
+var wav = null; // { rec, start, end, stopped }
+
+function wavSeconds() { return wav && rack.context ? Math.max( 0, ctxTime() - wav.start ).toFixed( 1 ) + " s" : ""; }
+
+function exportWav()
+{
+	if(wav) { finishWav(); return; } // a second click: stop and save what is there
+	act(function(){
+		if(!rack.node || !rack.recordStart) return;
+		if(play.on) stop();
+		play.rec = false;
+		wav = { rec: rack.recordStart(), start: ctxTime(), end: 0, stopped: 0 };
+		start();
+		wav.timer = setInterval( wavTick, 50 );
+		setStatus( "Recording the song (" + (loopBeats() * 60 / song().bpm).toFixed( 1 ) + " s and its tail)…", true );
+	});
+}
+
+function wavTick()
+{
+	if(!wav) return;
+	var now = ctxTime(), r = wav.rec, sr = rack.context.sampleRate;
+	if(!wav.end) // the song starts (start() waits for the audio)
+	{
+		if(!play.on || play.t0 < wav.start) return;
+		wav.end = play.t0 + loopBeats() * 60 / song().bpm;
+	}
+	if(play.on && now >= wav.end) stop();
+	if(play.on) return;
+	if(!wav.stopped) wav.stopped = now;
+	var songFrames = (Math.min( wav.end, wav.stopped ) - wav.start) * sr;
+	var quiet = r.frames > songFrames && (r.frames - r.lastLoud) / sr > 0.5;
+	if(quiet || now - wav.stopped > 10)
+		finishWav();
+}
+
+function finishWav()
+{
+	var w = wav;
+	if(!w) return;
+	wav = null;
+	clearInterval( w.timer );
+	if(play.on) stop();
+	var sr = rack.context.sampleRate;
+	rack.recordStop( Math.round( (Math.min( w.end || ctxTime(), w.stopped || ctxTime() ) - w.start) * sr ) ).then(function(res){
+		if(!res.L.length) { setStatus( "Nothing recorded" ); return; }
+		var blob = new Blob([ WR.encodeWav( res.L, res.R, res.sampleRate ) ], { type: "audio/wav" });
+		var d = new Date(), p2 = function(v){ return (v < 10 ? "0" : "") + v; };
+		var a = document.createElement( "a" );
+		a.href = URL.createObjectURL( blob );
+		a.download = "song " + d.getFullYear() + "-" + p2( d.getMonth() + 1 ) + "-" + p2( d.getDate() ) + " " + p2( d.getHours() ) + "-" + p2( d.getMinutes() ) + ".wav";
+		document.body.appendChild( a ); a.click(); a.remove();
+		setTimeout(function(){ URL.revokeObjectURL( a.href ); }, 2000);
+		var db = res.peak > 0 ? 20 * Math.log10( res.peak ) : -Infinity;
+		setStatus( a.download + ": " + (res.L.length / res.sampleRate).toFixed( 1 ) + " s, peak " + (isFinite( db ) ? db.toFixed( 1 ) + " dB" : "silent") + (res.peak >= 1 ? " (clipped: turn MASTER down)" : "") );
+	});
+}
+
 // after an edit while playing: what was scheduled ahead is scheduled again from now
 function reschedule()
 {
@@ -282,6 +344,9 @@ function drawBar( w )
 	btn( x + 68, 5, 50, 20, "SYNC", s.clock, function(){ s.clock = !s.clock; if(!s.clock && play.on) rack.post({ type: "midiStop" }); },
 		"Send MIDI clock and start / stop to the synths the MIDI reaches, so their sequencers follow the song" );
 	x += 128;
+	btn( x, 5, 96, 20, wav ? "■ WAV " + wavSeconds() : "EXPORT WAV", !!wav, exportWav,
+		wav ? "Recording the song: click to stop and save now" : "Play the song once from the start and save it as a WAV file", "#8a2a7a" );
+	x += 106;
 	if(view.hot_tip)
 		text( view.hot_tip, Math.max( x, w - 10 ), 15, 11, "#8c8a84", "right" );
 }
@@ -833,6 +898,6 @@ setInterval(function(){
 draw();
 
 // for the tests
-window.SEQ = { view: view, play: play, parseMidi: parseMidi, loadMidiFile: loadMidiFile, start: start, stop: stop, scheduleRange: scheduleRange, position: position, roll: function(){ return view.roll; } };
+window.SEQ = { view: view, play: play, exportWav: exportWav, wavTick: wavTick, wav: function(){ return wav; }, parseMidi: parseMidi, loadMidiFile: loadMidiFile, start: start, stop: stop, scheduleRange: scheduleRange, position: position, roll: function(){ return view.roll; } };
 
 })();

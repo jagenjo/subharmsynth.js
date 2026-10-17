@@ -303,6 +303,35 @@ class RackProcessor extends AudioWorkletProcessor {
 	}
 }
 
+// EXPORT WAV: the master output (its input) recorded in blocks of 4096 frames, posted to the page.
+// Registered before the rack processor
+class RecorderProcessor extends AudioWorkletProcessor {
+	constructor() {
+		super();
+		this.on = false;
+		this.fresh();
+		this.port.onmessage = (e) => {
+			if (e.data === "start") { this.on = true; this.fresh(); }
+			else if (e.data === "stop") { this.flush(); this.on = false; this.port.postMessage({ type: "done" }); }
+		};
+	}
+	fresh() { this.L = new Float32Array(4096); this.R = new Float32Array(4096); this.n = 0; }
+	flush() {
+		if (this.n) this.port.postMessage({ type: "chunk", L: this.L.slice(0, this.n), R: this.R.slice(0, this.n) });
+		this.fresh();
+	}
+	process(inputs) {
+		if (!this.on) return true;
+		const inp = inputs[0], l = inp && inp[0], r = inp && (inp[1] || inp[0]);
+		for (let i = 0; i < 128; i++) { // no input connected: silence, so the timing holds
+			this.L[this.n] = l ? l[i] : 0; this.R[this.n] = r ? r[i] : 0;
+			if (++this.n === 4096) this.flush();
+		}
+		return true;
+	}
+}
+registerProcessor("webrack-recorder", RecorderProcessor);
+
 registerProcessor("webrack", RackProcessor);
 
 if (typeof module !== "undefined")

@@ -425,6 +425,9 @@ The bar at the bottom of the page: **▲ SEQUENCER** raises it into a multitrack
   - The keys on the left play the note. The mouse wheel scrolls the notes.
 - **Recording:** with REC on while playing, notes from the on-screen keys, the QWERTY keys and a MIDI device go into the selected track, snapped to the grid.
 - **Timing:** notes are scheduled ahead into the audio engine with their sample position, so they don't depend on the page's frame rate.
+- **EXPORT WAV** plays the song once from the start and records the rack's output, then keeps recording until the sound has died away (at most 10 s more). It saves a stereo 16-bit WAV file at the audio device's sample rate.
+  - It records in real time, so it takes as long as the song. Click it again to stop early and save what is there.
+  - The status line shows the length and the peak level. If the recording clipped, it says so; turn MASTER down.
 - **Saved with the patch.** A new rack starts with a short arpeggio on channel 1.
 
 ## MIDI on the back

@@ -13,7 +13,7 @@ var WR = {
 	order: []
 };
 
-WR.VERSION = "20261017w"; // bump together with the ?v= in index.html so browsers reload the scripts
+WR.VERSION = "20261017x"; // bump together with the ?v= in index.html so browsers reload the scripts
 
 // def: {
 //   title, description,           names for menus and the panel
@@ -621,6 +621,76 @@ WRContext.prototype.updateIO = function()
 	this.master.gain.setTargetAtTime( WRContext.masterGain( this.io.master ), t, 0.02 );
 	this.input_gain.gain.setTargetAtTime( 4 * this.io.input_gain * this.io.input_gain, t, 0.02 ); // 0.5 = unity
 	this.saveIO();
+}
+
+// EXPORT WAV: records the master output from now; recordStop() resolves { sampleRate, L, R, peak }
+WRContext.prototype.recordStart = function()
+{
+	var ctx = this.context;
+	if(!this.recorder)
+	{
+		this.recorder = new AudioWorkletNode( ctx, "webrack-recorder", { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1],
+			channelCount: 2, channelCountMode: "explicit" } );
+		var mute = ctx.createGain(); // pulled by the destination, heard by nobody
+		mute.gain.value = 0;
+		this.master.connect( this.recorder );
+		this.recorder.connect( mute );
+		mute.connect( ctx.destination );
+	}
+	var rec = this._rec = { chunks: [], frames: 0, peak: 0, lastLoud: 0, done: null };
+	this.recorder.port.onmessage = function(e){
+		var m = e.data;
+		if(m.type == "chunk")
+		{
+			var p = 0;
+			for(var i = 0; i < m.L.length; ++i) p = Math.max( p, Math.abs( m.L[i] ), Math.abs( m.R[i] ) );
+			rec.chunks.push( m );
+			rec.frames += m.L.length;
+			rec.peak = Math.max( rec.peak, p );
+			if(p > 0.0005) rec.lastLoud = rec.frames; // -66 dB: the tail still rings
+		}
+		else if(m.type == "done" && rec.done)
+			rec.done();
+	};
+	this.recorder.port.postMessage( "start" );
+	return rec;
+}
+
+// minFrames: kept even if silent (the song); after it, the silent end is cut (0.1 s left)
+WRContext.prototype.recordStop = function( minFrames )
+{
+	var rec = this._rec, recorder = this.recorder, sr = this.context.sampleRate;
+	return new Promise(function(resolve){
+		rec.done = function(){
+			var n = Math.min( rec.frames, Math.max( minFrames || 0, rec.lastLoud + Math.round( sr * 0.1 ) ) );
+			var L = new Float32Array( n ), R = new Float32Array( n ), o = 0;
+			rec.chunks.forEach(function(c){
+				if(o >= n) return;
+				var k = Math.min( c.L.length, n - o );
+				L.set( c.L.subarray( 0, k ), o ); R.set( c.R.subarray( 0, k ), o );
+				o += k;
+			});
+			resolve({ sampleRate: sr, L: L, R: R, peak: rec.peak });
+		};
+		recorder.port.postMessage( "stop" );
+	});
+}
+
+// a stereo 16-bit WAV file of two channels (-1..1)
+WR.encodeWav = function( L, R, sampleRate )
+{
+	var n = L.length, buf = new ArrayBuffer( 44 + n * 4 ), v = new DataView( buf );
+	var str = function(o, t){ for(var i = 0; i < t.length; ++i) v.setUint8( o + i, t.charCodeAt( i ) ); };
+	str( 0, "RIFF" ); v.setUint32( 4, 36 + n * 4, true ); str( 8, "WAVE" );
+	str( 12, "fmt " ); v.setUint32( 16, 16, true ); v.setUint16( 20, 1, true ); v.setUint16( 22, 2, true );
+	v.setUint32( 24, sampleRate, true ); v.setUint32( 28, sampleRate * 4, true ); v.setUint16( 32, 4, true ); v.setUint16( 34, 16, true );
+	str( 36, "data" ); v.setUint32( 40, n * 4, true );
+	for(var i = 0, o = 44; i < n; ++i, o += 4)
+	{
+		v.setInt16( o, Math.round( Math.max( -1, Math.min( 1, L[i] ) ) * 32767 ), true );
+		v.setInt16( o + 2, Math.round( Math.max( -1, Math.min( 1, R[i] ) ) * 32767 ), true );
+	}
+	return buf;
 }
 
 // peak level of the master output since the last call, with a falling hold
