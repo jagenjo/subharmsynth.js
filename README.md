@@ -98,6 +98,10 @@ A 6 channel line mixer in the same panel style as the synths. Insert it from *Ad
 
 A replica of the ASM Hydrasynth, simplified to fit on one panel; named Mystic here. Patches that still use the old `hydra` name load as Mystic. It is the rack's only **polyphonic** synth: it plays every note of its MIDI channel on 8 voices (POLY), or one voice with legato and GLIDE (MONO). Play it from the keys, a MIDI device or the song sequencer. It has no sequencer of its own.
 
+- **Panel:** laid out as the Hydrasynth's. It has a matte black panel with red section titles, silver knobs with white LED rings (the LED RING knob style, which any device can use), and aluminium end cheeks.
+  - **CV / GATE and ARPEGGIATOR:** top left. **MAIN SYSTEMS** (bottom left) is an OLED with the two oscillators' waves after their mutants and the voices playing. MASTER VOLUME, POLY / MONO, GLIDE and VELOCITY are on the far left.
+  - **MASTER CONTROL:** 8 encoders around an OLED edit the module picked in **MODULE SELECT**, a diagram of the signal flow (OSC 1–3, MUTANT 1–4, RING-NOISE, MIXER, FILTER 1 / 2, AMP, ENV 1–3, LFO 1). PAGE ▲ ▼ steps through the modules, the white button under an encoder resets its parameter, and INIT resets the whole module.
+  - **FILTER CONTROLS:** CUTOFF, RESONANCE and DRIVE (MORPH on filter 2) for FILTER 1 or FILTER 2, plus ENV 1 and LFO 1 amounts to filter 1.
 - **OSC 1 and OSC 2:** each scans through 8 single-cycle waves (SINE, TRIANGLE, SAW, SQUARE, PULSE, ORGAN, VOX, DIGITAL) with **WAVSCAN**, plus SEMI and CENT.
 - **Mutators:** each of OSC 1 and OSC 2 goes through two (MUTATOR 1–4), each with a mode, RATIO, DEPTH and DRY/WET:
   - **FM-LIN:** phase modulation by a sine at RATIO × the oscillator.

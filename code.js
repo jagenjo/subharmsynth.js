@@ -53,7 +53,7 @@ var frame = { ox: 0, oy: 0, k: 1 };
 var id_prefix = "";
 // knob style of the device being drawn (its settings.knob_skin, else its type's, else the layout's)
 var knob_skin = null;
-var KNOB_SKIN_NAMES = { "": "DEVICE DEFAULT", aluminium: "ALUMINIUM CAP", classic: "CLASSIC", lm: "BLACK SKIRT", chrome: "CHROME", cream: "CREAM", soft: "SOFT TOUCH" };
+var KNOB_SKIN_NAMES = { "": "DEVICE DEFAULT", aluminium: "ALUMINIUM CAP", classic: "CLASSIC", lm: "BLACK SKIRT", chrome: "CHROME", cream: "CREAM", soft: "SOFT TOUCH", ledring: "LED RING" };
 
 function beginFrame( ox, oy, k )
 {
@@ -322,8 +322,9 @@ function knob( id, cx, cy, r, value, min, max, o )
 	if(skin != "classic" && skin != "aluminium")
 	{
 		var tk = o.ticks || steps || (style == "ring" ? 11 : 31);
-		drawKnobScale( cx, cy, r, tk, o.bipolar, style == "small" ? "small" : style );
-		drawSkinKnob( skin, cx, cy, r, clamp( toN(value), 0, 1 ), hover || ui.active === id );
+		if(skin != "ledring") // the LED ring is its own scale
+			drawKnobScale( cx, cy, r, tk, o.bipolar, style == "small" ? "small" : style );
+		drawSkinKnob( skin, cx, cy, r, clamp( toN(value), 0, 1 ), hover || ui.active === id, o.bipolar );
 		if(o.label)
 			drawLabel( o.label, cx, cy - (style == "small" ? r + 15 : (style == "ring" ? r * 1.2 + 16 : r * 1.12 + 18)), o.labelSize || 11 );
 	}
@@ -384,7 +385,7 @@ function drawKnobScale( cx, cy, r, ticks, bipolar, style )
 }
 
 // the other knob styles: LM (black skirt, black cap), CHROME, CREAM (ivory cap), SOFT (rubber, coloured cap)
-function drawSkinKnob( skin, cx, cy, r, n, highlight )
+function drawSkinKnob( skin, cx, cy, r, n, highlight, bipolar )
 {
 	var a = KNOB_A0 + n * KNOB_SWEEP, g, i;
 	var pointer = function(color, r0, r1, wd) {
@@ -446,6 +447,37 @@ function drawSkinKnob( skin, cx, cy, r, n, highlight )
 		ctx.strokeStyle = "rgba(90,70,40,0.35)"; ctx.lineWidth = 1;
 		ctx.beginPath(); ctx.arc( cx, cy, r * 0.86, 0, Math.PI * 2 ); ctx.stroke();
 		pointer( "#1c1a17", 0.12, 0.84, Math.max( 2, r * 0.11 ) );
+	}
+	else if(skin == "ledring")
+	{
+		// white LEDs around the knob, lit up to the value (from the centre when bipolar), and a
+		// machined silver knob
+		var leds = 15, rr = r + 6;
+		for(i = 0; i < leds; ++i)
+		{
+			var t = i / (leds - 1), b = KNOB_A0 + t * KNOB_SWEEP;
+			var on = bipolar ? (n >= 0.5 ? t >= 0.5 - 1e-6 && t <= n + 0.02 : t <= 0.5 + 1e-6 && t >= n - 0.02) : t <= n + 0.02;
+			var lx = cx + Math.cos(b) * rr, ly = cy + Math.sin(b) * rr;
+			if(on)
+			{
+				ctx.fillStyle = "rgba(220,235,255,0.25)";
+				ctx.beginPath(); ctx.arc( lx, ly, 3.6, 0, Math.PI * 2 ); ctx.fill();
+			}
+			ctx.fillStyle = on ? "#f4f8ff" : "#2a2b2d";
+			ctx.beginPath(); ctx.arc( lx, ly, 1.7, 0, Math.PI * 2 ); ctx.fill();
+		}
+		g = ctx.createRadialGradient( cx - r * 0.3, cy - r * 0.35, r * 0.05, cx, cy, r );
+		g.addColorStop( 0, "#ffffff" ); g.addColorStop( 0.5, highlight ? "#d4d6d8" : "#bfc2c5" ); g.addColorStop( 1, "#55585c" );
+		disc( r, g );
+		ridges( "rgba(30,30,32,0.45)", 0.84, 0.99, Math.max( 24, Math.round( r * 2 ) ) );
+		if(ctx.createConicGradient)
+		{
+			g = ctx.createConicGradient( -Math.PI * 0.25, cx, cy );
+			[[0, "#f2f3f4"], [0.25, "#9a9da1"], [0.5, "#eceef0"], [0.75, "#8e9195"], [1, "#f2f3f4"]].forEach(function(st){ g.addColorStop( st[0], st[1] ); });
+		}
+		else g = "#c8cacc";
+		disc( r * 0.78, g );
+		pointer( "#1a1a1a", 0.35, 0.74, Math.max( 1.6, r * 0.08 ) );
 	}
 	else // soft
 	{

@@ -13,7 +13,7 @@ var WR = {
 	order: []
 };
 
-WR.VERSION = "20261017h"; // bump together with the ?v= in index.html so browsers reload the scripts
+WR.VERSION = "20261017i"; // bump together with the ?v= in index.html so browsers reload the scripts
 
 // def: {
 //   title, description,           names for menus and the panel
@@ -56,7 +56,7 @@ WR.registerSynth = function( type, def )
 // patch bay ids: the rack's own jacks are plain, a module's are prefixed with its id
 WR.jackId = function( module_id, id ) { return module_id + "." + id; }
 // knob styles a device can have (code.js draws them); "" = the device's own default
-WR.KNOB_SKINS = ["", "aluminium", "classic", "lm", "chrome", "cream", "soft"];
+WR.KNOB_SKINS = ["", "aluminium", "classic", "lm", "chrome", "cream", "soft", "ledring"];
 
 // audio sockets on the back of the audio I/O row (line level, "ain" / "aout"): patched like the
 // front jacks, but only with each other. An audio input sums every cable plugged into it
