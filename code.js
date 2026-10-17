@@ -51,6 +51,9 @@ try { wheel_knobs = localStorage.getItem("SUBHARM_wheel") != "scroll"; } catch(e
 var frame = { ox: 0, oy: 0, k: 1 };
 // widget and jack ids get the id of the module being drawn in front ("dram2." + "cutoff")
 var id_prefix = "";
+// index.html?preview=<type>: draw only that device (tools/make-previews.sh takes the pictures)
+var PREVIEW_TYPE = (function(){ var m = /[?&]preview=([a-z0-9_]+)/.exec( typeof location != "undefined" ? location.search : "" ); return m && WR.types[ m[1] ] ? m[1] : null; })();
+window.PREVIEW_MODE = !!PREVIEW_TYPE;
 // knob style of the device being drawn (its settings.knob_skin, else its type's, else the layout's)
 var knob_skin = null;
 var KNOB_SKIN_NAMES = { "": "DEVICE DEFAULT", aluminium: "ALUMINIUM CAP", classic: "CLASSIC", lm: "BLACK SKIRT", chrome: "CHROME", cream: "CREAM", soft: "SOFT TOUCH", ledring: "LED RING", greycap: "GREY CAP", flat: "FLAT" };
@@ -2214,6 +2217,8 @@ function drawTooltips()
 
 function draw()
 {
+	if(PREVIEW_TYPE)
+		return drawPreview();
 	var w = canvas.clientWidth, h = canvas.clientHeight;
 	var dpr = window.devicePixelRatio || 1;
 	if(canvas.width != Math.round( w * dpr ) || canvas.height != Math.round( h * dpr ))
@@ -2527,6 +2532,7 @@ $("opt-wheel").addEventListener("change", function(e){ setWheelKnobs( e.target.c
 $("options").addEventListener("click", function(e){
 	$("options-panel").hidden = !$("options-panel").hidden;
 	if($("sessions-panel")) $("sessions-panel").hidden = true;
+	if(!$("add-panel").hidden) closeAddPanel();
 	e.stopPropagation();
 });
 $("options-panel").addEventListener("click", function(e){ e.stopPropagation(); });
@@ -2622,51 +2628,158 @@ $("randomize").addEventListener("click", function(){
 	setStatus( "Random sound on every synth in the rack (Save as\u2026 to keep it)" );
 });
 
-// inserts a new synth at the bottom of the rack
-// inserts a new device at the bottom of the rack: the menu is grouped by the devices' categories
+// ---------------------------------------------------------------------------
+// ADD DEVICE: a panel with every device by category: its preview (previews/<type>.jpg, made by
+// tools/make-previews.sh), name, description and what it is; a search box. A click adds it
+
 var DEVICE_CATEGORIES = ["Synths", "Modulation", "Mixing", "Effects"];
-function refreshAddSynth()
+
+function addDevice( type )
 {
-	var html = '<option value="">Add device\u2026</option>';
+	var def = WR.types[ type ];
+	if(!def)
+		return null;
+	var m = rack.addModule( type );
+	if(!m)
+	{
+		setStatus( "The rack can't hold more than " + def.max + " " + def.title + " devices" );
+		return null;
+	}
+	var how = def.midi_in ? ", MIDI cabled from the keys" : "";
+	if(def.mixer)
+		how = ": the synths' audio now goes through it (Tab shows the cables)";
+	else if(def.insert)
+		how = ": inserted before the speakers";
+	else if(def.rear_jacks && !def.audio_out)
+		how = ": patch its audio on the back (Tab)";
+	setStatus( "Added " + def.title + " (" + m.id + ") at the bottom of the rack" + how );
+	// show it: scroll to the bottom
+	view.sy = 1e9;
+	return m;
+}
+
+function escHtml( t ) { return String( t ).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;"); }
+
+function renderAddPanel()
+{
 	var cats = DEVICE_CATEGORIES.slice();
 	WR.order.forEach(function(type){
 		var c = WR.types[ type ].category || "Synths";
 		if(cats.indexOf( c ) == -1) cats.push( c );
 	});
+	var html = '<div class="add-head"><input id="add-search" type="search" placeholder="Search devices\u2026" autocomplete="off" />' +
+		'<span class="add-hint">Click a device to add it at the bottom of the rack</span></div>';
 	cats.forEach(function(c){
 		var types = WR.order.filter(function(type){ return (WR.types[ type ].category || "Synths") == c; });
 		if(!types.length)
 			return;
-		html += '<optgroup label="' + c + '">';
+		html += '<div class="add-cat" data-cat="' + escHtml( c ) + '"><h3>' + escHtml( c ) + '</h3><div class="add-grid">';
 		types.forEach(function(type){
-			var def = WR.types[ type ];
-			html += '<option value="' + type + '" title="' + def.description + '">' + def.title + '</option>';
+			var def = WR.types[ type ], n = rack.settings.modules.filter(function(m){ return m.type == type; }).length;
+			var desc = def.description.replace( new RegExp( "^" + def.title + ":\\s*", "i" ), "" );
+			var tags = [ def.half ? "HALF WIDTH" : "FULL WIDTH" ];
+			if(def.midi_in) tags.push( "MIDI" );
+			if(def.insert) tags.push( "INSERT FX" );
+			if(n) tags.push( n + " IN THE RACK" );
+			html += '<button class="add-card" data-type="' + type + '" data-search="' + escHtml( (def.title + " " + def.description + " " + (def.about || "") + " " + c).toLowerCase() ) + '">' +
+				'<div class="add-img' + (def.half ? " half" : "") + '"><img loading="lazy" src="previews/' + type + '.jpg?v=' + WR.VERSION + '" alt="" onerror="this.parentNode.classList.add(\'missing\')" />' +
+				'<span class="add-ph">' + escHtml( def.title ) + '</span></div>' +
+				'<div class="add-text"><div class="add-title">' + escHtml( def.title ) + '</div>' +
+				'<div class="add-desc">' + escHtml( desc ) + '</div>' +
+				(def.about ? '<div class="add-about">' + escHtml( def.about ) + '</div>' : '') +
+				'<div class="add-tags">' + tags.map(function(t){ return '<span>' + t + '</span>'; }).join("") + '</div></div></button>';
 		});
-		html += '</optgroup>';
+		html += '</div></div>';
 	});
-	$("add-synth").innerHTML = html;
+	$("add-panel").innerHTML = html;
+	$("add-search").addEventListener("input", filterAddPanel);
+	$("add-search").addEventListener("keydown", function(e){
+		if(e.key == "Enter") { var first = document.querySelector( ".add-card:not([hidden])" ); if(first) first.click(); }
+		if(e.key == "Escape") closeAddPanel();
+		e.stopPropagation();
+	});
 }
-refreshAddSynth();
-$("add-synth").addEventListener("change", function(e){
-	var type = e.target.value;
-	e.target.value = "";
-	e.target.blur();
-	var def = WR.types[ type ];
-	if(!def)
-		return;
-	var m = rack.addModule( type );
-	if(!m)
-	{
-		setStatus( "The rack can't hold more than " + def.max + " " + def.title + " devices" );
-		return;
-	}
-	var how = def.midi_in ? ", MIDI cabled from the keys" : "";
-	if(def.mixer)
-		how = ": the synths' audio now goes through it (Tab shows the cables)";
-	else if(def.rear_jacks && !def.audio_out)
-		how = ": patch its audio on the back (Tab)";
-	setStatus( "Added " + def.title + " (" + m.id + ") at the bottom of the rack" + how );
+
+function filterAddPanel()
+{
+	var q = $("add-search").value.trim().toLowerCase().split(/\s+/).filter(function(w){ return w; });
+	document.querySelectorAll( ".add-card" ).forEach(function(card){
+		var t = card.getAttribute( "data-search" );
+		card.hidden = !q.every(function(w){ return t.indexOf( w ) >= 0; });
+	});
+	document.querySelectorAll( ".add-cat" ).forEach(function(cat){
+		cat.hidden = !cat.querySelector( ".add-card:not([hidden])" );
+	});
+}
+
+function openAddPanel()
+{
+	renderAddPanel();
+	$("add-panel").hidden = false;
+	$("add-device").classList.add( "on" );
+	["options-panel", "sessions-panel"].forEach(function(id){ var p = $(id); if(p) p.hidden = true; });
+	setTimeout(function(){ var q = $("add-search"); if(q) q.focus(); }, 0);
+}
+function closeAddPanel() { $("add-panel").hidden = true; $("add-device").classList.remove( "on" ); }
+
+$("add-device").addEventListener("click", function(e){
+	e.stopPropagation();
+	if($("add-panel").hidden) openAddPanel(); else closeAddPanel();
 });
+$("add-panel").addEventListener("click", function(e){
+	e.stopPropagation();
+	var card = e.target.closest ? e.target.closest( ".add-card" ) : null;
+	if(!card)
+		return;
+	if(addDevice( card.getAttribute( "data-type" ) ))
+		closeAddPanel();
+});
+document.addEventListener("click", function(){ if(!$("add-panel").hidden) closeAddPanel(); });
+document.addEventListener("keydown", function(e){ if(e.key == "Escape" && !$("add-panel").hidden) closeAddPanel(); });
+canvas.addEventListener("pointerdown", function(){ if(!$("add-panel").hidden) closeAddPanel(); });
+
+// ---------------------------------------------------------------------------
+// PREVIEW mode (index.html?preview=<type>): only that device, filling the window's width, on a
+// magenta ground that tools/make-previews.sh trims away. No sessions, no audio
+
+function drawPreview()
+{
+	var m = rack.modules()[0];
+	if(!m)
+		return;
+	var w = canvas.clientWidth, h = canvas.clientHeight, dpr = window.devicePixelRatio || 1;
+	if(canvas.width != Math.round( w * dpr ) || canvas.height != Math.round( h * dpr ))
+	{
+		canvas.width = Math.round( w * dpr );
+		canvas.height = Math.round( h * dpr );
+	}
+	var size = m.def.size( layout ), k = w / size[0];
+	ctx.setTransform( 1, 0, 0, 1, 0, 0 );
+	ctx.fillStyle = "#ff00ff";
+	ctx.fillRect( 0, 0, canvas.width, canvas.height );
+	ctx.setTransform( dpr * k, 0, 0, dpr * k, 0, 0 );
+	view.scale = k; view.ox = 0; view.oy = 0; view.dpr = dpr;
+	jacks = {}; ui.hot = null; tooltips = [];
+	beginFrame( 0, 0, 1 );
+	id_prefix = m.id + ".";
+	knob_skin = m.settings.knob_skin || m.def.knob_skin || null;
+	m.def.draw( m );
+	knob_skin = null;
+	id_prefix = "";
+	endFrame();
+	document.title = "PREVIEW " + m.type + " " + size[0] + "x" + Math.round( size[1] );
+}
+
+// index.html#add opens the panel
+if(typeof location != "undefined" && location.hash == "#add" && !PREVIEW_TYPE)
+	setTimeout( openAddPanel, 300 );
+
+if(PREVIEW_TYPE)
+{
+	document.body.classList.add( "preview" );
+	document.documentElement.style.background = document.body.style.background = "#ff00ff";
+	rack.setSettings({ version: 5, modules: [{ id: PREVIEW_TYPE, type: PREVIEW_TYPE, settings: {} }], patches: [] });
+}
 
 $("patch-save").addEventListener("click", function(){
 	var name = window.prompt( "Save patch as:", $("patch-select").value.substr(0, 2) == "u:" ? currentPatchName() : "" );

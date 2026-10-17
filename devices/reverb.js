@@ -144,6 +144,7 @@ function draw( M )
 WR.registerSynth( "reverb", {
 	title: "REVERB",
 	description: "Convolution reverb, 12 rooms",
+	about: "Convolution reverb with 12 rooms, from drum rooms to churches, with pre-delay and tone. Half width.",
 	category: "Effects",
 	half: true,
 	max: 8, // one send / return slot of the rack processor each

@@ -672,6 +672,7 @@ function draw( mod )
 WR.registerSynth( "lunar", {
 	title: "LUNAR 21",
 	description: "LUNAR 21: ambient drone machine (Solar 42 style): 8 voices, dual effector, filters, sequencer",
+	about: "After the Elta Music Solar 42: six drone voices, two VCOs on touch plates, Polivoks filters and a dual effector with cartridges. Ambient machine.",
 	category: "Synths",
 	worklet: "devices/lunar-worklet.js",
 	jacks: JACKS,

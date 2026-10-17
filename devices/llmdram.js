@@ -355,11 +355,11 @@ function drawPanel( w, h )
 	ctx.fillStyle = PANEL;
 	ctx.fillRect( 22, 0, w - 44, h );
 	// the name: outlined serif, as the hardware's logo, and the subtitle
-	ctx.font = "italic 50px Georgia, 'Times New Roman', serif";
+	ctx.font = "italic 44px Georgia, 'Times New Roman', serif";
 	ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
 	ctx.strokeStyle = ORANGE; ctx.lineWidth = 1.6;
 	ctx.strokeText( "LLM Dram", X(104), Y(116) );
-	txt( "HYBRID 8/12-BIT SAMPLING DRUM MACHINE", X(345), Y(111), 13, ORANGE, "left", false );
+	txt( "HYBRID 8/12-BIT SAMPLING DRUM MACHINE", X(385), Y(111), 13, ORANGE, "left", false );
 	txt( "16 VOICES · 64 STEPS", X(1545), Y(98), 12, ORANGE, "right", false );
 }
 
@@ -675,6 +675,7 @@ function onState( m, state )
 WR.registerSynth( "llmdram", {
 	title: "LLM DRAM",
 	description: "LLM DRAM: 8/12-bit sampling drum machine (LinnDrum style), 16 pads, mixer and sequencer",
+	about: "After the Behringer LM Drum / LinnDrum: 24 gritty 8/12-bit sounds on 16 pads, a mixer, tuning, wave designer, filter and a 64-step sequencer.",
 	category: "Synths",
 	worklet: "devices/llmdram-worklet.js",
 	jacks: [],

@@ -9,6 +9,9 @@
 
 (function(){
 
+if(window.PREVIEW_MODE) // a device's picture is being taken: no sessions
+	return;
+
 var INDEX_KEY = "SUBHARM_sessions", DATA_KEY = "SUBHARM_session_", OPTS_KEY = "SUBHARM_session_opts";
 var MAX_SESSIONS = 30;
 var AUTOSAVE_MS = 3000;
@@ -240,6 +243,8 @@ document.getElementById("sessions").addEventListener("click", function(e){
 	}
 	panel.hidden = !panel.hidden;
 	document.getElementById("options-panel").hidden = true;
+	var ap = document.getElementById("add-panel");
+	if(ap && !ap.hidden) { ap.hidden = true; document.getElementById("add-device").classList.remove("on"); }
 });
 document.addEventListener("click", function(){ panel.hidden = true; });
 canvas.addEventListener("pointerdown", function(){ panel.hidden = true; });

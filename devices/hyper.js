@@ -68,6 +68,7 @@ function draw( M )
 WR.registerSynth( "hyper", {
 	title: "HYPER",
 	description: "HYPER: lo-fi distortion and bit crusher",
+	about: "Lo-fi distortion and bit crusher: tape wobble, 4 saturations, sample rate and bit reduction. Half width.",
 	category: "Effects",
 	half: true,
 	insert: true,

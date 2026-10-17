@@ -320,6 +320,7 @@ function drawPatchBay()
 WR.registerSynth( "maze", {
 	title: "MAZE",
 	description: "Maze: parallel generative synthesizer with two bit sequencers",
+	about: "After the Moog Labyrinth: two parallel bit-shift sequencers, two VCOs, a wavefolder and a state-variable filter. Generative patterns.",
 	category: "Synths",
 	worklet: "devices/maze-worklet.js",
 	jacks: JACKS,

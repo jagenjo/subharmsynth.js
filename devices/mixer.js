@@ -202,6 +202,7 @@ function drawPatchBay()
 WR.registerSynth( "mixer", {
 	title: "MIXER",
 	description: "6 channel mixer with aux send and return",
+	about: "Six mono channels with level, pan, mute / solo and an aux send / return, into the main stereo out.",
 	worklet: "devices/mixer-worklet.js",
 	jacks: JACKS,
 	rear_jacks: REAR_JACKS,

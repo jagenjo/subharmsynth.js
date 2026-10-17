@@ -41,6 +41,33 @@
 	#seq { flex: none; height: 30px; border-top: 1px solid #2c2c2a; }
 	#options-wrap, #sessions-wrap { position: relative; }
 	#options-panel[hidden], #sessions-panel[hidden] { display: none; } /* their display: flex would beat the hidden attribute */
+	/* ADD DEVICE */
+	#add-wrap { position: relative; }
+	#add-panel { position: fixed; top: 46px; left: 50%; transform: translateX(-50%); z-index: 30; width: min(1080px, 96vw); max-height: calc(100vh - 70px); overflow-y: auto;
+		background: #161615; border: 1px solid #3a3a37; border-radius: 8px; box-shadow: 0 18px 50px rgba(0,0,0,0.6); padding: 12px 16px 18px; }
+	#add-panel[hidden], .add-card[hidden], .add-cat[hidden] { display: none; }
+	.add-head { position: sticky; top: -12px; background: #161615; display: flex; align-items: center; gap: 14px; padding: 4px 0 10px; z-index: 1; }
+	#add-search { flex: 0 1 320px; padding: 6px 10px; font-size: 14px; }
+	.add-hint { color: #8c8a84; font-size: 12px; }
+	.add-cat h3 { font-size: 15px; font-weight: 700; color: #c9483a; letter-spacing: 0.08em; text-transform: uppercase; margin: 10px 0 8px; }
+	.add-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+	.add-card { display: flex; flex-direction: column; text-align: left; padding: 0; overflow: hidden; background: #22221f; border: 1px solid #3a3a37; border-radius: 6px; letter-spacing: 0.02em; }
+	.add-card:hover { background: #2b2b28; border-color: #c9483a; }
+	.add-card:hover .add-img img { transform: scale(1.03); }
+	.add-img { position: relative; aspect-ratio: 16 / 7; background: #0b0b0b; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+	.add-img img { max-width: 100%; max-height: 100%; object-fit: contain; transition: transform 0.15s; }
+	.add-img .add-ph { display: none; font-size: 22px; font-weight: 700; color: #4a4945; }
+	.add-img.missing img { display: none; }
+	.add-img.missing .add-ph { display: block; }
+	.add-text { padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 4px; }
+	.add-title { font-size: 16px; font-weight: 700; color: #f2eee6; }
+	.add-desc { font-size: 13px; color: #d8d4cb; }
+	.add-about { font: 12px/1.35 Arial, Helvetica, sans-serif; color: #9c9991; letter-spacing: 0; }
+	.add-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+	.add-tags span { font-size: 10px; color: #8c8a84; border: 1px solid #3a3a37; border-radius: 3px; padding: 0 5px; }
+	/* PREVIEW mode: only the device */
+	body.preview header, body.preview #seq { display: none; }
+	body.preview #panel { position: fixed; inset: 0; width: 100vw; height: 100vh; }
 	#sessions-panel { position: absolute; top: calc(100% + 6px); left: 0; z-index: 10; width: 460px; max-width: 92vw; padding: 10px 12px;
 		background: #1f1f1d; border: 1px solid #44443f; border-radius: 6px; box-shadow: 0 6px 18px rgba(0,0,0,0.5); }
 	#sessions-panel .head { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: #8c8a84; }
@@ -84,7 +111,10 @@
 		<button id="patch-import" title="Load a patch from a .json file">Import</button>
 		<input id="patch-file" type="file" accept=".json,application/json" hidden />
 	</div>
-	<select id="add-synth" title="Insert a synth (Subharm, DRAM, Brother-32, Maze, Mystic, LLM Dram, Lunar 21), mixer, LFO, compressor, reverb or delay at the bottom of the rack"></select>
+	<div id="add-wrap">
+		<button id="add-device" title="Add a device to the rack: synths, modulation, mixing, effects">Add device ▾</button>
+		<div id="add-panel" hidden></div>
+	</div>
 	<div class="group" title="Scale of the rack: 100% fills the window width">
 		Zoom
 		<button id="zoom-out" title="Smaller">&minus;</button>
@@ -115,24 +145,24 @@
 </header>
 <canvas id="panel"></canvas>
 <canvas id="seq"></canvas>
-<script src="webrack.js?v=20261017k"></script>
+<script src="webrack.js?v=20261017l"></script>
 <!-- synths: each registers itself in the rack (panel here, DSP in its -worklet.js) -->
-<script src="devices/subharm.js?v=20261017k"></script>
-<script src="devices/dram.js?v=20261017k"></script>
-<script src="devices/b32.js?v=20261017k"></script>
-<script src="devices/maze.js?v=20261017k"></script>
-<script src="devices/mystic.js?v=20261017k"></script>
-<script src="devices/llmdram.js?v=20261017k"></script>
-<script src="devices/lunar.js?v=20261017k"></script>
-<script src="devices/mixer.js?v=20261017k"></script>
-<script src="devices/lfo.js?v=20261017k"></script>
-<script src="devices/comp.js?v=20261017k"></script>
-<script src="devices/reverb.js?v=20261017k"></script>
-<script src="devices/delay.js?v=20261017k"></script>
-<script src="devices/universe.js?v=20261017k"></script>
-<script src="devices/hyper.js?v=20261017k"></script>
-<script src="code.js?v=20261017k"></script>
-<script src="sequencer.js?v=20261017k"></script>
-<script src="sessions.js?v=20261017k"></script>
+<script src="devices/subharm.js?v=20261017l"></script>
+<script src="devices/dram.js?v=20261017l"></script>
+<script src="devices/b32.js?v=20261017l"></script>
+<script src="devices/maze.js?v=20261017l"></script>
+<script src="devices/mystic.js?v=20261017l"></script>
+<script src="devices/llmdram.js?v=20261017l"></script>
+<script src="devices/lunar.js?v=20261017l"></script>
+<script src="devices/mixer.js?v=20261017l"></script>
+<script src="devices/lfo.js?v=20261017l"></script>
+<script src="devices/comp.js?v=20261017l"></script>
+<script src="devices/reverb.js?v=20261017l"></script>
+<script src="devices/delay.js?v=20261017l"></script>
+<script src="devices/universe.js?v=20261017l"></script>
+<script src="devices/hyper.js?v=20261017l"></script>
+<script src="code.js?v=20261017l"></script>
+<script src="sequencer.js?v=20261017l"></script>
+<script src="sessions.js?v=20261017l"></script>
 </body>
 </html>

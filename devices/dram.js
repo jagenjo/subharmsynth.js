@@ -269,6 +269,7 @@ function drawPatchBay()
 WR.registerSynth( "dram", {
 	title: "DRAM",
 	description: "DRAM: semi-modular analog percussion synthesizer",
+	about: "After the Moog DFAM: an 8-step analog percussion voice, 2 VCOs, noise, a ladder filter and decays per step. Kicks, toms, clanks.",
 	worklet: "devices/dram-worklet.js",
 	jacks: JACKS,
 	category: "Synths",

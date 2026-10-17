@@ -68,6 +68,7 @@ function draw( M )
 WR.registerSynth( "lfo", {
 	title: "DUAL LFO",
 	description: "Two low frequency oscillators, CV outputs",
+	about: "Two LFOs (sine, triangle, saw, ramp, square, S&H) with rate and level, and sync inputs. Half width.",
 	category: "Modulation",
 	half: true,
 	worklet: "devices/lfo-worklet.js",

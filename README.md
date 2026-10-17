@@ -23,6 +23,7 @@ Needs a browser with AudioWorklet support, served over `https://` or `localhost`
 | `devices/mystic.js`, `devices/mystic-worklet.js` | the Mystic (polyphonic) |
 | `devices/llmdram.js`, `devices/llmdram-worklet.js` | the LLM Dram drum machine |
 | `devices/lunar.js`, `devices/lunar-worklet.js` | the Lunar 21 drone machine |
+| `previews/`, `tools/make-previews.sh` | the devices' pictures for ADD DEVICE, and the script that makes them |
 | `devices/mixer.js`, `devices/mixer-worklet.js` | the 6 channel mixer |
 | `devices/lfo.js`, `devices/lfo-worklet.js` | the dual LFO |
 | `devices/comp.js`, `devices/comp-worklet.js` | the stereo compressor and its scope |
@@ -47,7 +48,9 @@ A new rack has a Subharm, an LFO and a compressor, then a reverb and a delay, ca
 
 One patch bay spans all of them: any output can be cabled to any input of any device. The front carries CV, gates and audio at ±5 V; the back carries the line-level audio between devices (see *Rear view*).
 
-- **Add device** (toolbar) inserts a new device at the bottom of the rack. The menu is grouped into synths (Subharm, DRAM, Brother-32, Maze, Mystic, LLM Dram, Lunar 21), modulation (dual LFO), mixing (mixer, compressor) and effects (reverb, delay, Universe, Hyper).
+- **Add device** (toolbar) opens a panel with every device, grouped into synths, modulation, mixing and effects. Each card shows the device's picture, what it is, and whether it is full or half width, takes MIDI, is an insert effect, or is already in the rack.
+  - Type in the search box to filter (Enter adds the first match); click a card to add that device at the bottom of the rack, which scrolls to it. `index.html#add` opens the panel.
+  - The pictures are in `previews/`, made by `tools/make-previews.sh` (headless Chrome and ImageMagick). It opens `index.html?preview=<type>`, which draws only that device, then trims and saves the picture. Run it again after changing a panel; give it device types to redo only those.
   - You can have several of the same kind (`dram`, `dram2`, …). Reverbs are limited to 8, one per send / return slot of the audio engine.
   - A new LFO, compressor, reverb or delay arrives unpatched: patch its audio on the back (Tab).
   - A new Universe or Hyper goes in just before the speakers (between the last device and MAIN IN), so you hear it right away.

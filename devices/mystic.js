@@ -461,6 +461,7 @@ function drawPanel()
 WR.registerSynth( "mystic", {
 	title: "MYSTIC",
 	description: "MYSTIC: polyphonic wave morphing synthesizer with mutators",
+	about: "After the ASM Hydrasynth: 8 voices, wave-scanning oscillators with mutants, two filters, three envelopes, an arpeggiator. Edit pages around an OLED.",
 	category: "Synths",
 	worklet: "devices/mystic-worklet.js",
 	jacks: JACKS,

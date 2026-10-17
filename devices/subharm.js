@@ -678,6 +678,7 @@ function drawHardwarePanel()
 WR.registerSynth( "subharm", {
 	title: "SUBHARM",
 	description: "Subharmonicon: polyrhythmic subharmonic synthesizer",
+	about: "After the Moog Subharmonicon: 2 VCOs with 4 subharmonics, 2 four-step sequencers and 4 polyrhythmic clock dividers. Polyrhythms that lock together.",
 	worklet: "devices/subharm-worklet.js",
 	jacks: JACKS,
 	category: "Synths",

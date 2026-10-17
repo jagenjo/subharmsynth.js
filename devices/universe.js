@@ -429,6 +429,7 @@ function draw( mod )
 WR.registerSynth( "universe", {
 	title: "UNIVERSE",
 	description: "UNIVERSE: granular micro loops, glitches, delays and a phrase looper",
+	about: "After the Hologram Microcosm: 11 granular, looping, glitch and delay effects x 4 variations, a reverb and a phrase looper. Half width.",
 	category: "Effects",
 	half: true,
 	insert: true,

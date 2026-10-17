@@ -367,6 +367,7 @@ function drawPatchBay()
 WR.registerSynth( "brother32", {
 	title: "BROTHER-32",
 	description: "Brother-32: semi-modular synthesizer with a 32 step sequencer",
+	about: "After the Moog Mother-32: a mono semi-modular synth with a 32-step sequencer, ladder filter, envelope and a compact keyboard.",
 	category: "Synths",
 	worklet: "devices/b32-worklet.js",
 	jacks: JACKS,
