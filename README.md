@@ -128,14 +128,25 @@ A replica of the ASM Hydrasynth, simplified to fit on one panel; named Mystic he
 A replica of the Hologram Microcosm granular / looper pedal, named Universe here. It is a half-width effect with stereo IN / OUT on the back.
 
 - **How it works:** it keeps the last 11 seconds of its input. Each effect plays small pieces of it ("grains") back, at other speeds, looped, reversed or bit-crushed, timed by the tempo.
-- **Effects:** 11 effects, each with variations A–D (44 presets). The variation's name shows on the display.
-  - **MICRO LOOP:** MOSAIC (overlapping loops at several speeds), SEQ (normal and half speed in turns), GLIDE (loops that glide in pitch).
-  - **GRANULES:** HAZE (clouds of grains), TUNNEL (drone loops that stretch and shrink), STRUM (chains of the notes you just played).
-  - **GLITCH:** BLOCKS (bursts of recent notes), INTERRUPT (glitches that cut into the dry signal), ARP (recent notes as arpeggios).
-  - **MULTIDELAY:** PATTERN (rhythmic delay taps; A is a classic delay), WARP (delay taps mixed with double-speed grains).
-  - STRUM, BLOCKS and ARP find the notes by detecting onsets in the input.
-- **Knobs:** ACTIVITY (how busy: more loops, grains, taps), REPEATS (feedback into the buffer), SHAPE (grain envelope: percussive, flat, swell), FILTER (resonant low pass on the effect), MIX, TIME (subdivision, 1/16 to 1/1), SPACE (reverb) and LOOP LEVEL.
-- **Secondary controls** (shift functions on the pedal) are the small knobs: MOD depth and RATE (pitch modulation), RES (filter resonance), TEMPO, DECAY (reverb time) and the looper SPEED (¼× to 4×).
+- **Effects:** 11 effects, each with variations A–D (44 presets). The display shows what the variation does. What each variation does, and what ACTIVITY and REPEATS do in each effect, follow the pedal's manual:
+
+  | Effect | A | B | C | D | ACTIVITY |
+  |---|---|---|---|---|---|
+  | MOSAIC | normal + double speed | normal + half speed | all loops double speed | half, normal, double, 4× | loopers active (1–4) |
+  | SEQ | filtered, shuffled random rhythms | normal / half speed, sustainer at full ACTIVITY | overlapping layers with filter sweeps | interlocking bit-crushed layers, crushed sub octave at full ACTIVITY | variation / layers |
+  | GLIDE | half ↔ normal | double ↔ half | normal ↔ double | both directions at once | glide speed (SHAPE: the glide pattern) |
+  | HAZE | short, diffuse, stretched | many random grains | normal + double speed grains | normal + half speed grains | density and spread |
+  | TUNNEL | drone compresses and lengthens | sub octave drone, filter sweeps | resonant band passes | envelope-triggered, per note | depth (REPEATS: drone decay) |
+  | STRUM | repeats the last note | overlapping copies: phasing | cascading chains of recent notes | chains + double speed grains | density |
+  | BLOCKS | rearranged + bursts of notes | rearranged, pitch-shifted | soft: filtered, fading samples | pitch-shifted + bit-crushed | variation |
+  | INTERRUPT | rearranged playing cuts in | pitch-shifted | filter sweeps and delay | bit-crushed, drastic | variation (REPEATS: how often) |
+  | ARP | arpeggios of the last note | pitch-shifted speed pattern | a random filter each step | bit-crushed | arpeggio steps |
+  | PATTERN | rhythm 1, classic delay | rhythm 2 | rhythm 3 | rhythm 4 | delay taps (REPEATS: feedback) |
+  | WARP | envelope filter on each tap | resonant band pass on each tap | pitch-shifted taps | taps + double speed grains | delay taps (REPEATS: feedback) |
+
+  STRUM, BLOCKS, INTERRUPT, ARP and TUNNEL D find the notes by detecting onsets in the input. **REV** plays the effect backwards (pressing the preset knob on the pedal).
+- **Knobs:** ACTIVITY ("more or less" of the effect), REPEATS (elsewhere: how many times each sample echoes), SHAPE (the samples' envelope: percussive, flat, swell), FILTER (resonant low pass on the effect), MIX, TIME (¼×, ½×, 1×, 2×, 4×, 8× the tempo), SPACE (reverb) and LOOP LEVEL.
+- **Secondary controls** (shift functions on the pedal) are the small knobs: MOD depth and RATE (pitch modulation), RES (filter resonance), VOL (effect volume), TEMPO, REVERB (ROOM, HALL, CATHEDRAL, AMBIENT WASH) and the looper SPEED (¼× to 4×).
 - **Tempo:** SYNC follows the rack's tempo. TAP (or TEMPO) sets its own and turns SYNC off. MIDI clock or a cable in CLOCK takes over.
 - **HOLD** freezes the buffer: the effect keeps playing what it holds while you play on top. **BYPASS** passes the dry signal.
 - **Phrase looper** (up to 60 s): REC → PLAY → DUB (overdub) → PLAY, STOP and ERASE, plus REVERSE, PRE-FX (record the dry input) and ONLY (the effect off, only the loop and the dry signal). The bar shows the loop's position.

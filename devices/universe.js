@@ -15,21 +15,25 @@ var EFFECTS = [
 	["MULTIDELAY", ["PATTERN", "WARP"]]
 ];
 var NAMES = ["MOSAIC", "SEQ", "GLIDE", "HAZE", "TUNNEL", "STRUM", "BLOCKS", "INTERRUPT", "ARP", "PATTERN", "WARP"];
-// what each variation does (from the pedal's manual)
+// what each variation does, and what ACTIVITY does in each effect (from the pedal's manual)
 var VARIATIONS = {
-	MOSAIC: ["NORMAL + DOUBLE SPEED", "+ HALF SPEED", "DOUBLE + 4X SPEED", "+ REVERSED"],
-	SEQ: ["NORMAL / HALF SPEED", "+ SUSTAINER LAYER", "BIT-CRUSHED", "+ CRUSHED SUB OCTAVE"],
-	GLIDE: ["HALF → NORMAL", "DOUBLE → HALF", "NORMAL → DOUBLE", "BOTH DIRECTIONS"],
-	HAZE: ["SMOOTH WASH", "+ OCTAVE UP", "+ OCTAVE DOWN", "+ REVERSED GRAINS"],
-	TUNNEL: ["DRONE", "+ OCTAVE UP", "+ OCTAVE DOWN", "+ REVERSED"],
-	STRUM: ["REPEATS THE LAST NOTE", "CASCADING NOTES", "+ DOUBLE SPEED", "+ REVERSED"],
-	BLOCKS: ["BURSTS OF RECENT NOTES", "PITCH-SHIFTED", "+ BIT-CRUSHED", "DRASTIC"],
-	INTERRUPT: ["GLITCHES CUT THE DRY", "PITCH-SHIFTED", "+ BIT-CRUSHED", "DRASTIC"],
-	ARP: ["ARPEGGIO UP", "UP / DOWN", "RANDOM", "BIT-CRUSHED"],
-	PATTERN: ["LINEAR (CLASSIC DELAY)", "RHYTHM 2", "RHYTHM 3", "RHYTHM 4"],
-	WARP: ["+ DOUBLE SPEED GRAINS", "MORE GRAINS", "MOSTLY GRAINS", "REVERSED GRAINS"]
+	MOSAIC: ["NORMAL + DOUBLE SPEED (OCTAVE UP)", "NORMAL + HALF SPEED (OCTAVE DOWN)", "ALL LOOPS AT DOUBLE SPEED", "HALF, NORMAL, DOUBLE AND 4X SPEED"],
+	SEQ: ["FILTERED, SHUFFLED RANDOM RHYTHMS", "NORMAL / HALF SPEED (+ SUSTAINER)", "OVERLAPPING LAYERS, FILTER SWEEPS", "INTERLOCKING, BIT-CRUSHED (+ SUB)"],
+	GLIDE: ["HALF \u2194 NORMAL SPEED", "DOUBLE \u2194 HALF SPEED", "NORMAL \u2194 DOUBLE SPEED", "BOTH DIRECTIONS AT ONCE"],
+	HAZE: ["SHORT, DIFFUSE, STRETCHED", "MANY RANDOM GRAINS", "NORMAL + DOUBLE SPEED GRAINS", "NORMAL + HALF SPEED GRAINS"],
+	TUNNEL: ["DRONE COMPRESSES AND LENGTHENS", "SUB OCTAVE DRONE, FILTER SWEEPS", "RESONANT BAND PASS FILTERS", "ENVELOPE-TRIGGERED, PER NOTE"],
+	STRUM: ["REPEATS THE LAST NOTE", "OVERLAPPING COPIES: PHASING", "CASCADING CHAINS OF NOTES", "CHAINS + DOUBLE SPEED GRAINS"],
+	BLOCKS: ["REARRANGED + BURSTS OF NOTES", "REARRANGED, PITCH-SHIFTED", "SOFT: FILTERED, FADING SAMPLES", "PITCH-SHIFTED + BIT-CRUSHED"],
+	INTERRUPT: ["REARRANGED PLAYING CUTS IN", "PITCH-SHIFTED INTERRUPTIONS", "FILTER SWEEPS AND DELAY", "BIT-CRUSHED, DRASTIC"],
+	ARP: ["ARPEGGIOS OF THE LAST NOTE", "PITCH-SHIFTED SPEED PATTERN", "A RANDOM FILTER EACH STEP", "BIT-CRUSHED ARPEGGIOS"],
+	PATTERN: ["RHYTHM 1: CLASSIC DELAY", "RHYTHM 2", "RHYTHM 3", "RHYTHM 4"],
+	WARP: ["ENVELOPE FILTER ON EACH TAP", "RESONANT BAND PASS ON EACH TAP", "PITCH-SHIFTED TAPS", "TAPS + DOUBLE SPEED GRAINS"]
 };
-var SUBDIVS = ["1/16", "1/8T", "1/8", "1/4T", "1/4", "1/2", "1/1"];
+var ACTIVITY = { MOSAIC: "LOOPERS ACTIVE", SEQ: "VARIATION / LAYERS", GLIDE: "GLIDE SPEED", HAZE: "DENSITY AND SPREAD", TUNNEL: "DEPTH OF THE CHANGES",
+	STRUM: "DENSITY", BLOCKS: "VARIATION", INTERRUPT: "VARIATION", ARP: "ARPEGGIO STEPS", PATTERN: "DELAY TAPS", WARP: "DELAY TAPS" };
+var REPEATS = { INTERRUPT: "HOW OFTEN", TUNNEL: "DRONE DECAY", PATTERN: "FEEDBACK", WARP: "FEEDBACK" }; // others: echoes of each sample
+var REVERBS = ["ROOM", "HALL", "CATHEDRAL", "AMBIENT WASH"];
+var TIMES = ["\u00bc\u00d7 (1 BAR)", "\u00bd\u00d7 (1/2)", "1\u00d7 (1/4, THE TEMPO)", "2\u00d7 (1/8)", "4\u00d7 (1/16)", "8\u00d7 (1/32)"];
 var LOOPER_SPEEDS = ["¼ X", "½ X", "1 X", "2 X", "4 X"];
 var JACKS = [
 	[["CLOCK","in","clock_in"], ["HOLD","in","hold_in"]],
@@ -45,16 +49,18 @@ function defaults()
 {
 	return {
 		preset: 0, activity: 0.5, repeats: 0.3, shape: 0.5, filter: 0.8, resonance: 0.2,
-		mix: 0.5, subdiv: 2, space: 0.3, reverb_time: 0.5, loop_level: 0.8, looper_speed: 2,
+		mix: 0.5, subdiv: 3, space: 0.3, reverb_mode: 1, loop_level: 0.8, looper_speed: 2, fx_volume: 1,
 		mod_depth: 0, mod_rate: 0.3, tempo: 120, sync: true,
-		hold: false, bypass: false, reverse: false, looper_pre: false, looper_only: false
+		hold: false, bypass: false, fx_reverse: false, reverse: false, looper_pre: false, looper_only: false
 	};
 }
 
 function validate( s )
 {
 	s.preset = Math.min( 43, Math.max( 0, Math.round( s.preset ) ) );
-	s.subdiv = Math.min( SUBDIVS.length - 1, Math.max( 0, Math.round( s.subdiv ) ) );
+	s.reverb_mode = Math.min( 3, Math.max( 0, Math.round( s.reverb_mode ) ) );
+	s.fx_volume = Math.min( 1.5, Math.max( 0, s.fx_volume ) );
+	s.subdiv = Math.min( TIMES.length - 1, Math.max( 0, Math.round( s.subdiv ) ) );
 	s.looper_speed = Math.min( LOOPER_SPEEDS.length - 1, Math.max( 0, Math.round( s.looper_speed ) ) );
 	s.tempo = Math.min( 300, Math.max( 30, s.tempo ) );
 }
@@ -65,7 +71,7 @@ function randomize( s )
 	s.preset = Math.floor( Math.random() * 44 );
 	s.activity = rnd( 0.2, 0.9 ); s.repeats = rnd( 0, 0.6 ); s.shape = rnd( 0, 1 );
 	s.filter = rnd( 0.5, 1 ); s.resonance = rnd( 0, 0.5 ); s.mix = rnd( 0.35, 0.75 );
-	s.subdiv = Math.floor( rnd( 1, 6 ) ); s.space = rnd( 0, 0.6 ); s.mod_depth = Math.random() < 0.3 ? rnd( 0, 0.5 ) : 0;
+	s.subdiv = Math.floor( rnd( 1, 5 ) ); s.reverb_mode = Math.floor( rnd( 0, 4 ) ); s.space = rnd( 0, 0.6 ); s.mod_depth = Math.random() < 0.3 ? rnd( 0, 0.5 ) : 0;
 }
 
 function send( msg )
@@ -115,28 +121,31 @@ function draw( mod )
 		});
 	});
 	var name = NAMES[ fx ];
-	drawLcd( 40, 124, right - 40 - 4 * 34 - 8, 22, name + " " + "ABCD"[v] + " · " + VARIATIONS[ name ][ v ], "left" );
+	drawLcd( 40, 124, right - 40 - 4 * 34 - 52, 22, (s.fx_reverse ? "\u25c0 " : "") + name + " " + "ABCD"[v] + " \u00b7 " + VARIATIONS[ name ][ v ], "left" );
+	if(button( "fx_reverse", right - 4 * 34 - 44, 124, 40, 22, "REV", s.fx_reverse ).clicked)
+		s.fx_reverse = !s.fx_reverse;
 	for(var j = 0; j < 4; j++)
 		if(button( "var" + j, right - (4 - j) * 34 + 4, 124, 30, 22, "ABCD"[j], j == v ).clicked)
 			s.preset = fx * 4 + j;
 
 	// knobs: two rows of four, the secondary controls beside them
 	var kx = function(i){ return 40 + colW * (i + 0.36); }, R1 = 204, R2 = 292;
-	s.activity = knob( "activity", kx(0), R1, 22, s.activity, 0, 1, { label: "ACTIVITY", def: 0.5, format: fmtPct } );
-	s.repeats = knob( "repeats", kx(1), R1, 22, s.repeats, 0, 1, { label: "REPEATS", def: 0.3, format: fmtPct } );
+	s.activity = knob( "activity", kx(0), R1, 22, s.activity, 0, 1, { label: "ACTIVITY", def: 0.5, format: function(v){ return fmtPct( v ) + " " + ACTIVITY[ name ]; } } );
+	s.repeats = knob( "repeats", kx(1), R1, 22, s.repeats, 0, 1, { label: "REPEATS", def: 0.3, format: function(v){ return REPEATS[ name ] ? fmtPct( v ) + " " + REPEATS[ name ] : Math.floor( v * 6.99 ) + " ECHOES OF EACH SAMPLE"; } } );
 	s.mod_depth = second( "mod_depth", kx(1) + 50, R1 - 30, s.mod_depth, 0, 1, { label: "MOD", def: 0, format: function(v){ return "PITCH MOD DEPTH " + Math.round( v * 100 ) + "%"; } } );
 	s.shape = knob( "shape", kx(2), R1, 22, s.shape, 0, 1, { label: "SHAPE", def: 0.5,
-		format: function(v){ return v < 0.25 ? "PERCUSSIVE" : (v > 0.75 ? "SWELL" : (Math.abs( v - 0.5 ) < 0.08 ? "FLAT" : fmtPct( v ))); } } );
+		format: function(v){ return name == "GLIDE" ? "GLIDE PATTERN: " + (v < 0.33 ? "RAMP" : (v < 0.66 ? "TRIANGLE" : "SMOOTH")) : (v < 0.25 ? "PERCUSSIVE" : (v > 0.75 ? "SWELL" : (Math.abs( v - 0.5 ) < 0.08 ? "FLAT" : fmtPct( v )))); } } );
 	s.mod_rate = second( "mod_rate", kx(2) + 50, R1 - 30, s.mod_rate, 0, 1, { label: "RATE", def: 0.3, format: function(v){ return "PITCH MOD " + (0.05 + v * 8).toFixed(2) + " Hz"; } } );
 	s.filter = knob( "filter", kx(3), R1, 22, s.filter, 0, 1, { label: "FILTER", def: 0.8, format: function(v){ return fmtHz( 150 * Math.pow( 120, v ) ); } } );
 	s.resonance = second( "resonance", kx(3) + 50, R1 - 30, s.resonance, 0, 1, { label: "RES", def: 0.2, format: function(v){ return "RESONANCE " + fmtPct( v ); } } );
 	s.mix = knob( "mix", kx(0), R2, 22, s.mix, 0, 1, { label: "MIX", def: 0.5,
 		format: function(v){ return v < 0.02 ? "DRY" : (v > 0.98 ? "WET" : Math.round( (1 - v) * 100 ) + " DRY / " + Math.round( v * 100 ) + " WET"); } } );
-	s.subdiv = knob( "subdiv", kx(1), R2, 22, s.subdiv, 0, SUBDIVS.length - 1, { label: "TIME", step: 1, style: "ring", def: 2,
-		format: function(v){ return SUBDIVS[v] + " at " + Math.round( st.tempo || (s.sync ? rack.tempo() : s.tempo) ) + " BPM"; } } );
+	s.fx_volume = second( "fx_volume", kx(0) + 50, R2 - 30, s.fx_volume, 0, 1.5, { label: "VOL", def: 1, format: function(v){ return "EFFECT VOLUME " + fmtPct( v ); } } );
+	s.subdiv = knob( "subdiv", kx(1), R2, 22, s.subdiv, 0, TIMES.length - 1, { label: "TIME", step: 1, style: "ring", def: 3,
+		format: function(v){ return TIMES[v] + " at " + Math.round( st.tempo || (s.sync ? rack.tempo() : s.tempo) ) + " BPM"; } } );
 	s.tempo = second( "tempo", kx(1) + 50, R2 - 30, s.tempo, 30, 300, { label: "TEMPO", def: 120, format: function(v){ return Math.round( v ) + " BPM" + (s.sync ? " (SYNC: THE RACK'S TEMPO)" : ""); } } );
 	s.space = knob( "space", kx(2), R2, 22, s.space, 0, 1, { label: "SPACE", def: 0.3, format: fmtPct } );
-	s.reverb_time = second( "reverb_time", kx(2) + 50, R2 - 30, s.reverb_time, 0, 1, { label: "DECAY", def: 0.5, format: function(v){ return "REVERB " + (0.4 + v * 9.6).toFixed(1) + " s"; } } );
+	s.reverb_mode = second( "reverb_mode", kx(2) + 50, R2 - 30, s.reverb_mode, 0, 3, { label: "REVERB", step: 1, def: 1, format: function(v){ return REVERBS[v]; } } );
 	s.loop_level = knob( "loop_level", kx(3), R2, 22, s.loop_level, 0, 1, { label: "LOOP LEVEL", def: 0.8, format: fmtPct } );
 	s.looper_speed = second( "looper_speed", kx(3) + 50, R2 - 30, s.looper_speed, 0, LOOPER_SPEEDS.length - 1, { label: "SPEED", step: 1, def: 2, format: function(v){ return "LOOPER " + LOOPER_SPEEDS[v]; } } );
 
