@@ -687,6 +687,8 @@ WR.registerSynth( "llmdram", {
 	worklet: "devices/llmdram-worklet.js",
 	jacks: [],
 	rear_jacks: REAR_JACKS,
+	audio_out: "out_l",      // cabled into the rack in stereo when it is added
+	audio_out_r: "out_r",
 	midi_in: "midi_in",
 	knob_skin: "lm",
 	defaults: defaults,
