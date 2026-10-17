@@ -1,6 +1,6 @@
 # subharmsynth.js
 
-**SYNTHS** is a browser rack of semi-modular synthesizers built on the WebAudio API: replicas of the Moog Subharmonicon (polyrhythmic synthesizer), DFAM (percussion synthesizer, here called DRAM), Mother-32 (synthesizer with a 32 step sequencer, here called Brother-32) Labyrinth (parallel generative synthesizer, here called Maze) and ASM Hydrasynth (polyphonic wave morphing synthesizer, here called Hydra), with a mixer, LFOs, compressors, reverbs and delays, all patchable with each other.
+**SYNTHS** is a browser rack of semi-modular synthesizers built on the WebAudio API: replicas of the Moog Subharmonicon (polyrhythmic synthesizer), DFAM (percussion synthesizer, here called DRAM), Mother-32 (synthesizer with a 32 step sequencer, here called Brother-32) Labyrinth (parallel generative synthesizer, here called Maze) and ASM Hydrasynth (polyphonic wave morphing synthesizer, here called Mystic), with a mixer, LFOs, compressors, reverbs and delays, all patchable with each other.
 
 All synthesis runs in real time in one `AudioWorkletProcessor` (`rack-worklet.js`), which hosts each synth's DSP and copies the patch cables between them every sample. Oscillators, filters, envelopes, clocks, sequencers and the cables are all computed per sample, so patching between synths is sample-accurate. The reverb and delay are native WebAudio nodes after it.
 
@@ -20,7 +20,7 @@ Needs a browser with AudioWorklet support, served over `https://` or `localhost`
 | `devices/dram.js`, `devices/dram-worklet.js` | the DRAM |
 | `devices/b32.js`, `devices/b32-worklet.js` | the Brother-32 |
 | `devices/maze.js`, `devices/maze-worklet.js` | the Maze |
-| `devices/hydra.js`, `devices/hydra-worklet.js` | the Hydra (polyphonic) |
+| `devices/mystic.js`, `devices/mystic-worklet.js` | the Mystic (polyphonic) |
 | `devices/mixer.js`, `devices/mixer-worklet.js` | the 6 channel mixer |
 | `devices/lfo.js`, `devices/lfo-worklet.js` | the dual LFO |
 | `devices/comp.js`, `devices/comp-worklet.js` | the stereo compressor and its scope |
@@ -43,7 +43,7 @@ A new rack has a Subharm, an LFO and a compressor, then a reverb and a delay, ca
 
 One patch bay spans all of them: any output can be cabled to any input of any device. The front carries CV, gates and audio at ±5 V; the back carries the line-level audio between devices (see *Rear view*).
 
-- **Add device** (toolbar) inserts a new device at the bottom of the rack. The menu is grouped into synths (Subharm, DRAM, Brother-32, Maze, Hydra), modulation (dual LFO), mixing (mixer, compressor) and effects (reverb, delay).
+- **Add device** (toolbar) inserts a new device at the bottom of the rack. The menu is grouped into synths (Subharm, DRAM, Brother-32, Maze, Mystic), modulation (dual LFO), mixing (mixer, compressor) and effects (reverb, delay).
   - You can have several of the same kind (`dram`, `dram2`, …). Reverbs are limited to 8, one per send / return slot of the audio engine.
   - A new LFO, compressor, reverb or delay arrives unpatched: patch its audio on the back (Tab).
   - A synth with a MIDI IN (Subharm, Brother-32, Maze) gets the keys' MIDI through **MASTER MIDI** instead of a long cable across the rack (see *MIDI on the back*).
@@ -90,9 +90,9 @@ A 6 channel line mixer in the same panel style as the synths. Insert it from *Ad
 - **Back:** IN 1–6, AUX SEND, AUX RET L / R, MAIN L / R.
 - **Reverb on an aux:** patch AUX SEND → REVERB IN L, REVERB OUT L / R → AUX RET L / R, and turn the reverb's **DRY** button off so it returns only the effect. The delay has the same DRY button. The *Mixer & Aux Reverb* factory patch is set up this way.
 
-## Hydra
+## Mystic
 
-A replica of the ASM Hydrasynth, simplified to fit on one panel; named Hydra here. It is the rack's only **polyphonic** synth: it plays every note of its MIDI channel on 8 voices (POLY), or one voice with legato and GLIDE (MONO). Play it from the keys, a MIDI device or the song sequencer. It has no sequencer of its own.
+A replica of the ASM Hydrasynth, simplified to fit on one panel; named Mystic here. Patches that still use the old `hydra` name load as Mystic. It is the rack's only **polyphonic** synth: it plays every note of its MIDI channel on 8 voices (POLY), or one voice with legato and GLIDE (MONO). Play it from the keys, a MIDI device or the song sequencer. It has no sequencer of its own.
 
 - **OSC 1 and OSC 2:** each scans through 8 single-cycle waves (SINE, TRIANGLE, SAW, SQUARE, PULSE, ORGAN, VOX, DIGITAL) with **WAVSCAN**, plus SEMI and CENT.
 - **Mutators:** each of OSC 1 and OSC 2 goes through two (MUTATOR 1–4), each with a mode, RATIO, DEPTH and DRY/WET:
@@ -275,7 +275,7 @@ As on the hardware, MIDI reaches the synth only through its MIDI IN jack, so the
   - The panel lists the sessions, newest first, with their devices and song, to **Load**, rename (✎) or delete (×). **New session** starts a fresh rack and keeps the current one.
   - The 30 most recent are kept; when the browser's storage is full, the oldest go first.
 - **Patches**: a patch is the whole rack, meaning its synths, all their settings, the shared devices and the cables.
-  - The toolbar menu has 24 factory patches (in `data/patches.json`), grouped as SUBHARM, DRAM, BROTHER-32, MAZE, HYDRA and RACK (several devices patched together), plus your own.
+  - The toolbar menu has 24 factory patches (in `data/patches.json`), grouped as SUBHARM, DRAM, BROTHER-32, MAZE, MYSTIC and RACK (several devices patched together), plus your own.
   - *Save as…* stores the rack under a name in the browser.
   - *Export* / *Import* write and read `.json` files, so patches can be shared or added to the repo.
   - Patches saved before the rack existed load as a rack with one Subharm.

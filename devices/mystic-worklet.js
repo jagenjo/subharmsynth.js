@@ -1,5 +1,5 @@
-// devices/hydra-worklet.js
-// HYDRA DSP (a replica of the ASM Hydrasynth, simplified), hosted by the rack processor. Polyphonic:
+// devices/mystic-worklet.js
+// MYSTIC DSP (a replica of the ASM Hydrasynth, simplified), hosted by the rack processor. Polyphonic:
 // it gets the raw MIDI notes of its channel (POLY) and plays them on 8 voices (or one, in MONO).
 // Per voice: OSC 1 and OSC 2 scan through 8 single cycle waves (WAVSCAN) and go through two mutators
 // each (FM-LIN, WAVSTACK, SYNC, PW-ASM, HARMONIC, PHAZDIST: transformations of the oscillator's phase
@@ -75,7 +75,7 @@ function newVoice() {
 	};
 }
 
-class HydraDSP {
+class MysticDSP {
 	constructor() {
 		this.s = null;
 		this.outs = new Float32Array(OUT_IDS.length);
@@ -480,12 +480,12 @@ class HydraDSP {
 		};
 	}
 }
-HydraDSP.OUT_IDS = OUT_IDS;
-HydraDSP.IN_IDS = IN_IDS;
-HydraDSP.MIDI_IN = "midi_in";
-HydraDSP.POLY = true; // gets the raw MIDI notes and plays them on its own voices
+MysticDSP.OUT_IDS = OUT_IDS;
+MysticDSP.IN_IDS = IN_IDS;
+MysticDSP.MIDI_IN = "midi_in";
+MysticDSP.POLY = true; // gets the raw MIDI notes and plays them on its own voices
 
 globalThis.WR_DSP = globalThis.WR_DSP || {};
-globalThis.WR_DSP.hydra = HydraDSP;
+globalThis.WR_DSP.mystic = MysticDSP;
 
 })();

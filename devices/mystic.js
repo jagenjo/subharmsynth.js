@@ -1,9 +1,9 @@
-// devices/hydra.js
-// HYDRA module, a replica of the ASM Hydrasynth (simplified to one panel): settings, a small CV patch
+// devices/mystic.js
+// MYSTIC module, a replica of the ASM Hydrasynth (simplified to one panel): settings, a small CV patch
 // bay and the panel: OSC 1 / OSC 2 with their two mutators each, FILTER 1 / FILTER 2, the amp and
 // filter envelopes, OSC 3, the mixer, the mod envelope, the LFO, the arpeggiator and a display with
 // the mutated waves. Polyphonic (8 voices): it plays every note of its MIDI channel, so it has no
-// sequencer of its own; the song or the keys play it. DSP in hydra-worklet.js.
+// sequencer of its own; the song or the keys play it. DSP in mystic-worklet.js.
 
 (function(){
 
@@ -111,8 +111,8 @@ function drawBackground()
 	ctx.textBaseline = "alphabetic";
 	ctx.font = "bold 30px " + FONT;
 	ctx.fillStyle = TEXT_COLOR;
-	ctx.fillText( "HYDRA", 46, 560 );
-	var tw = ctx.measureText( "HYDRA" ).width;
+	ctx.fillText( "MYSTIC", 46, 560 );
+	var tw = ctx.measureText( "MYSTIC" ).width;
 	ctx.fillRect( 54 + tw, 534, 1.5, 28 );
 	ctx.font = "11px " + FONT;
 	ctx.fillText( "POLYPHONIC WAVE MORPHING", 62 + tw, 546 );
@@ -284,11 +284,11 @@ function drawPatchBay()
 	});
 }
 
-WR.registerSynth( "hydra", {
-	title: "HYDRA",
-	description: "HYDRA: polyphonic wave morphing synthesizer with mutators (Hydrasynth)",
+WR.registerSynth( "mystic", {
+	title: "MYSTIC",
+	description: "MYSTIC: polyphonic wave morphing synthesizer with mutators",
 	category: "Synths",
-	worklet: "devices/hydra-worklet.js",
+	worklet: "devices/mystic-worklet.js",
 	jacks: JACKS,
 	rear_jacks: [["AUDIO OUT", "aout", "audio"]],
 	audio_out: "audio",
