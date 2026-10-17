@@ -3079,7 +3079,7 @@ $("randomize").addEventListener("click", function(){
 // ADD DEVICE: a panel with every device by category: its preview (previews/<type>.jpg, made by
 // tools/make-previews.sh), name, description and what it is; a search box. A click adds it
 
-var DEVICE_CATEGORIES = ["Synths", "Modulation", "Mixing", "Effects"];
+var DEVICE_CATEGORIES = ["Synths", "Modulation", "Mixing", "Effects", "Utility"];
 
 function addDevice( type )
 {

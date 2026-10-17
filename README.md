@@ -31,6 +31,7 @@ Needs a browser with AudioWorklet support, served over `https://` or `localhost`
 | `devices/universe.js`, `devices/universe-worklet.js` | Universe, the granular / looper effect |
 | `devices/hyper.js`, `devices/hyper-worklet.js` | Hyper, the distortion / bit crusher |
 | `devices/cosmos.js`, `devices/cosmos-worklet.js` | Cosmos, the 12 algorithm reverb |
+| `devices/reroute.js`, `devices/reroute-worklet.js` | Reroute, front to back and back again |
 | `devices/reverb.js`, `devices/reverb-worklet.js` | the convolution reverb: native nodes, bridged through a send / return slot |
 | `data/patches.json` | factory patches |
 | `old/` | the original version of this replica, as in the first commit |
@@ -182,6 +183,15 @@ A replica of the Hologram Microcosm granular / looper pedal, named Universe here
 - **Phrase looper** (up to 60 s): REC → PLAY → DUB (overdub) → PLAY, STOP and ERASE, plus REVERSE, PRE-FX (record the dry input), LOOPER ONLY (the effect off, only the loop and the dry signal), BURST, QUANTIZE (the loop trimmed to the nearest beat) and FADE TIME (STOP fades it out). The bar shows the loop's position.
 - **CV:** CLOCK, HOLD (a gate toggles it), ACTIVITY and MIX (±5 V) in; CLOCK (a pulse each step) and ENV (input level) out.
 - **Not the pedal's algorithms:** each effect follows the manual's description of what it does, but the sound is my own approximation. User presets are the rack's patches, and the loop is not saved with them.
+
+## Reroute
+
+A thin row of 8 channels to tidy up long cables. Each channel has two sockets on the front:
+
+- **TO BACK** (an input): what comes in goes out of the channel's OUT on the back.
+- **FROM BACK** (an output): what comes into the channel's IN on the back comes out here.
+
+Patch a signal into one Reroute's front, cable its back to another Reroute's back (Tab), and take the signal out of that one's front, anywhere in the rack. It is listed under Utility in Add device.
 
 ## Cosmos
 
