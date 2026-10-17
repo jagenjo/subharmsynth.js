@@ -513,6 +513,19 @@ canvas.addEventListener("contextmenu", function(e){ e.preventDefault(); });
 function hitCircle( cx, cy, r ) { var dx = ui.x - cx, dy = ui.y - cy; return dx*dx + dy*dy <= r*r; }
 function hitRect( x, y, w, h ) { return ui.x >= x && ui.x <= x + w && ui.y >= y && ui.y <= y + h; }
 
+// pads you can slide across: with the mouse held down since a pad of the group (ids: group + a
+// digit...), moving over another one presses it, and the one left is let go
+function padSlide( full, group, x, y, w, h )
+{
+	var a = ui.active;
+	if(ui.down && !cable_drag && typeof a == "string" && a !== full && a.indexOf( group ) == 0 && /\d/.test( a.charAt( group.length ) ) && hitRect( x, y, w, h ))
+	{
+		ui.active = full;
+		return true;
+	}
+	return false;
+}
+
 // ---------------------------------------------------------------------------
 // drawing primitives
 

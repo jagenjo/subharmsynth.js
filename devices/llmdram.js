@@ -205,6 +205,7 @@ function pad( id, cx, cy, number, lit, mark, tooltip )
 	if(hover) ui.hot = full;
 	var clicked = false;
 	if(hover && ui.pressed && ui.active === null) { ui.active = full; clicked = true; }
+	if(padSlide( full, id_prefix + "pad", x, y, w, w )) { hover = true; clicked = true; ui.hot = full; } // sliding over from another pad
 	var kb = keyButton( full, x, y, w, w );
 	clicked = clicked || kb.pressed;
 	var down = (ui.active === full && ui.down) || kb.held;

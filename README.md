@@ -80,6 +80,7 @@ One patch bay spans all of them: any output can be cabled to any input of any de
   - Each device's label says what it does with the audio, e.g. "100% WET (DRY OFF)". Hovering a socket lists its connections.
   - The front's CV cables are hidden while the rear is shown, and the rear cables while the front is.
 - **Space** starts every synth when none is running, otherwise stops them all.
+- **Pads** (LLM DRAM, MYSTIC, LUNAR 21): hold the mouse button down and slide across them to play each pad you pass over.
 - **MIDI learn** (Options): click a knob, fader or button, then move a MIDI controller or press a key / pad to map it.
   - **What it does:** a CC sets a knob or fader over its whole range. A CC (over 63) or a note presses a button and holds it while it lasts.
   - **Mapped MIDI:** it is no longer played as notes.

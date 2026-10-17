@@ -176,6 +176,7 @@ function hot( id, x, y, w, h )
 	if(hover) ui.hot = full;
 	var clicked = false;
 	if(hover && ui.pressed && ui.active === null) { ui.active = full; clicked = true; }
+	if(padSlide( full, id_prefix + "pad", x, y, w, h )) { hover = true; clicked = true; ui.hot = full; } // sliding over from another pad
 	var kb = keyButton( full, x, y, w, h ); // its key on the computer keyboard
 	return { hover: hover, clicked: clicked || kb.pressed, held: (ui.active === full && ui.down) || kb.held };
 }
