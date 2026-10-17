@@ -14,6 +14,7 @@ Needs a browser with AudioWorklet support, served over `https://` or `localhost`
 | `webrack.js` | the rack controller: synth registry, settings and patches, audio graph, post FX, Scala parser, Web MIDI, keys |
 | `rack-worklet.js` | the audio processor: hosts the synths' DSP, routes the cables, runs the keys outputs, LFOs, compressor and scope |
 | `sequencer.js` | the song sequencer in the bottom bar: tracks, piano roll, transport, recording, scheduling |
+| `sessions.js` | sessions: the rack autosaved in the browser, the Sessions panel |
 | `code.js` | the rack UI: canvas widgets (knobs, buttons, switches, jacks), cables, shared devices, scrolling and zoom, toolbar, keyboard shortcuts |
 | `devices/subharm.js`, `devices/subharm-worklet.js` | the Subharmonicon: panel, jacks and settings; DSP |
 | `devices/dram.js`, `devices/dram-worklet.js` | the DRAM |
@@ -236,6 +237,11 @@ As on the hardware, MIDI reaches the synth only through its MIDI IN jack, so the
 ## Beyond the hardware
 
 - **Scala scales.** Type a scale name in the toolbar to add a fifth quantize mode, SCALA. It uses the selected `.scl` file, rooted at C.
+- **Sessions** (toolbar): your work is saved automatically in this browser, a few seconds after every change and when you leave the page.
+  - A session is the whole rack (devices, settings, cables) and the song.
+  - Each visit reopens the last session; turn off *Reopen the last session at start* in the panel to start each visit with a fresh rack in a new session.
+  - The panel lists the sessions, newest first, with their devices and song, to **Load**, rename (✎) or delete (×). **New session** starts a fresh rack and keeps the current one.
+  - The 30 most recent are kept; when the browser's storage is full, the oldest go first.
 - **Patches**: a patch is the whole rack, meaning its synths, all their settings, the shared devices and the cables.
   - The toolbar menu has 21 factory patches (in `data/patches.json`), grouped as SUBHARM, DRAM, BROTHER-32, MAZE and RACK (several devices patched together), plus your own.
   - *Save as…* stores the rack under a name in the browser.

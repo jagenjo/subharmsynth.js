@@ -2351,6 +2351,7 @@ $("opt-wheel").addEventListener("change", function(e){ setWheelKnobs( e.target.c
 // the Options panel opens under its button and closes on a click anywhere else
 $("options").addEventListener("click", function(e){
 	$("options-panel").hidden = !$("options-panel").hidden;
+	if($("sessions-panel")) $("sessions-panel").hidden = true;
 	e.stopPropagation();
 });
 $("options-panel").addEventListener("click", function(e){ e.stopPropagation(); });

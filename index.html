@@ -39,7 +39,22 @@
 	#help { color: #8c8a84; font-size: 12px; }
 	canvas { flex: 1; display: block; width: 100%; min-height: 0; touch-action: none; }
 	#seq { flex: none; height: 30px; border-top: 1px solid #2c2c2a; }
-	#options-wrap { position: relative; }
+	#options-wrap, #sessions-wrap { position: relative; }
+	#sessions-panel { position: absolute; top: calc(100% + 6px); left: 0; z-index: 10; width: 460px; max-width: 92vw; padding: 10px 12px;
+		background: #1f1f1d; border: 1px solid #44443f; border-radius: 6px; box-shadow: 0 6px 18px rgba(0,0,0,0.5); }
+	#sessions-panel .head { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: #8c8a84; }
+	#sessions-panel .reopen { display: flex; align-items: center; gap: 8px; margin: 8px 0; cursor: pointer; }
+	#sessions-panel .reopen input { accent-color: #c9483a; width: 15px; height: 15px; margin: 0; padding: 0; }
+	#sessions-panel .list { max-height: 60vh; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+	#sessions-panel .item { display: flex; gap: 10px; align-items: center; padding: 7px 9px; background: #262624; border-radius: 4px; border-left: 3px solid #44443f; }
+	#sessions-panel .item.current { border-left-color: #c9483a; }
+	#sessions-panel .info { flex: 1; min-width: 0; }
+	#sessions-panel .name { font-size: 14px; }
+	#sessions-panel .tag { font-size: 10px; color: #fff; background: #a33a2e; border-radius: 3px; padding: 0 4px; }
+	#sessions-panel .meta { color: #8c8a84; font-size: 11px; }
+	#sessions-panel .sum { color: #b6b3ab; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	#sessions-panel .acts { display: flex; gap: 4px; flex: none; }
+	#sessions-panel .empty { color: #8c8a84; padding: 8px 0; }
 	#options-panel { position: absolute; top: calc(100% + 6px); left: 0; z-index: 10; min-width: 270px; padding: 10px 12px;
 		display: flex; flex-direction: column; gap: 10px; background: #1f1f1d; border: 1px solid #44443f; border-radius: 6px; box-shadow: 0 6px 18px rgba(0,0,0,0.5); }
 	#options-panel .row { display: flex; align-items: center; gap: 8px; }
@@ -53,6 +68,10 @@
 	<span class="title">SYNTHS</span>
 	<div class="group">
 		<button id="power" title="Start / suspend the audio engine">Audio off</button>
+	</div>
+	<div id="sessions-wrap">
+		<button id="sessions" title="Your sessions, saved automatically in this browser">Sessions &#9662;</button>
+		<div id="sessions-panel" hidden></div>
 	</div>
 	<div class="group">
 		Patch
@@ -95,18 +114,19 @@
 </header>
 <canvas id="panel"></canvas>
 <canvas id="seq"></canvas>
-<script src="webrack.js?v=20261016w"></script>
+<script src="webrack.js?v=20261016x"></script>
 <!-- synths: each registers itself in the rack (panel here, DSP in its -worklet.js) -->
-<script src="devices/subharm.js?v=20261016w"></script>
-<script src="devices/dram.js?v=20261016w"></script>
-<script src="devices/b32.js?v=20261016w"></script>
-<script src="devices/maze.js?v=20261016w"></script>
-<script src="devices/mixer.js?v=20261016w"></script>
-<script src="devices/lfo.js?v=20261016w"></script>
-<script src="devices/comp.js?v=20261016w"></script>
-<script src="devices/reverb.js?v=20261016w"></script>
-<script src="devices/delay.js?v=20261016w"></script>
-<script src="code.js?v=20261016w"></script>
-<script src="sequencer.js?v=20261016w"></script>
+<script src="devices/subharm.js?v=20261016x"></script>
+<script src="devices/dram.js?v=20261016x"></script>
+<script src="devices/b32.js?v=20261016x"></script>
+<script src="devices/maze.js?v=20261016x"></script>
+<script src="devices/mixer.js?v=20261016x"></script>
+<script src="devices/lfo.js?v=20261016x"></script>
+<script src="devices/comp.js?v=20261016x"></script>
+<script src="devices/reverb.js?v=20261016x"></script>
+<script src="devices/delay.js?v=20261016x"></script>
+<script src="code.js?v=20261016x"></script>
+<script src="sequencer.js?v=20261016x"></script>
+<script src="sessions.js?v=20261016x"></script>
 </body>
 </html>
