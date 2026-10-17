@@ -1,6 +1,6 @@
 # subharmsynth.js
 
-**SYNTHS** is a browser rack of semi-modular synthesizers built on the WebAudio API: replicas of the Moog Subharmonicon (polyrhythmic synthesizer), DFAM (percussion synthesizer, here called DRAM), Mother-32 (synthesizer with a 32 step sequencer, here called Brother-32) Labyrinth (parallel generative synthesizer, here called Maze) and ASM Hydrasynth (polyphonic wave morphing synthesizer, here called Mystic), with a mixer, LFOs, compressors, reverbs and delays, all patchable with each other.
+**SYNTHS** is a browser rack of semi-modular synthesizers built on the WebAudio API: replicas of the Moog Subharmonicon (polyrhythmic synthesizer), DFAM (percussion synthesizer, here called DRAM), Mother-32 (synthesizer with a 32 step sequencer, here called Brother-32) Labyrinth (parallel generative synthesizer, here called Maze) and ASM Hydrasynth (polyphonic wave morphing synthesizer, here called Mystic), plus the Hologram Microcosm (granular looper pedal, here called Universe), with a mixer, LFOs, compressors, reverbs and delays, all patchable with each other.
 
 All synthesis runs in real time in one `AudioWorkletProcessor` (`rack-worklet.js`), which hosts each synth's DSP and copies the patch cables between them every sample. Oscillators, filters, envelopes, clocks, sequencers and the cables are all computed per sample, so patching between synths is sample-accurate. The reverb and delay are native WebAudio nodes after it.
 
@@ -25,6 +25,7 @@ Needs a browser with AudioWorklet support, served over `https://` or `localhost`
 | `devices/lfo.js`, `devices/lfo-worklet.js` | the dual LFO |
 | `devices/comp.js`, `devices/comp-worklet.js` | the stereo compressor and its scope |
 | `devices/delay.js`, `devices/delay-worklet.js` | the stereo / ping-pong delay |
+| `devices/universe.js`, `devices/universe-worklet.js` | Universe, the granular / looper effect |
 | `devices/reverb.js`, `devices/reverb-worklet.js` | the convolution reverb: native nodes, bridged through a send / return slot |
 | `data/patches.json` | factory patches |
 | `old/` | the original version of this replica, as in the first commit |
@@ -37,15 +38,16 @@ The page is a rack. From the top:
 
 1. The **AUDIO I/O** device.
 2. The **KEYS** device.
-3. The devices, in the order you choose. Synths and mixers take a full row. The half-width devices (dual LFO, compressor, reverb, delay) sit side by side when two are next to each other.
+3. The devices, in the order you choose. Synths and mixers take a full row. The half-width devices (dual LFO, compressor, reverb, delay, Universe) sit side by side when two are next to each other.
 
 A new rack has a Subharm, an LFO and a compressor, then a reverb and a delay, cabled as the default audio path.
 
 One patch bay spans all of them: any output can be cabled to any input of any device. The front carries CV, gates and audio at ±5 V; the back carries the line-level audio between devices (see *Rear view*).
 
-- **Add device** (toolbar) inserts a new device at the bottom of the rack. The menu is grouped into synths (Subharm, DRAM, Brother-32, Maze, Mystic), modulation (dual LFO), mixing (mixer, compressor) and effects (reverb, delay).
+- **Add device** (toolbar) inserts a new device at the bottom of the rack. The menu is grouped into synths (Subharm, DRAM, Brother-32, Maze, Mystic), modulation (dual LFO), mixing (mixer, compressor) and effects (reverb, delay, Universe).
   - You can have several of the same kind (`dram`, `dram2`, …). Reverbs are limited to 8, one per send / return slot of the audio engine.
   - A new LFO, compressor, reverb or delay arrives unpatched: patch its audio on the back (Tab).
+  - A new Universe goes in just before the speakers (between the last device and MAIN IN), so you hear it right away.
   - A synth with a MIDI IN (Subharm, Brother-32, Maze) gets the keys' MIDI through **MASTER MIDI** instead of a long cable across the rack (see *MIDI on the back*).
   - A new synth's audio goes to the first free mixer channel; with no mixer, to wherever the other synths go (or the compressor).
   - A new mixer takes over the synths that weren't on a mixer: they move onto its channels, and its MAIN L / R go where they went.
@@ -120,6 +122,25 @@ A replica of the ASM Hydrasynth, simplified to fit on one panel; named Mystic he
 - **Factory patches:** *Glass Pad*, *FM Bells* and *Mutant Arp*.
 - **Simplified:** the original's mod matrix, macros, extra envelopes and LFOs, and effects are replaced by the fixed routings above, and the waves are 8 instead of 219.
 - **CPU:** it is the heaviest device. In tests, 8 voices took about 13% of a CPU core, up to 30% with all four mutators stacking.
+
+## Universe
+
+A replica of the Hologram Microcosm granular / looper pedal, named Universe here. It is a half-width effect with stereo IN / OUT on the back.
+
+- **How it works:** it keeps the last 11 seconds of its input. Each effect plays small pieces of it ("grains") back, at other speeds, looped, reversed or bit-crushed, timed by the tempo.
+- **Effects:** 11 effects, each with variations A–D (44 presets). The variation's name shows on the display.
+  - **MICRO LOOP:** MOSAIC (overlapping loops at several speeds), SEQ (normal and half speed in turns), GLIDE (loops that glide in pitch).
+  - **GRANULES:** HAZE (clouds of grains), TUNNEL (drone loops that stretch and shrink), STRUM (chains of the notes you just played).
+  - **GLITCH:** BLOCKS (bursts of recent notes), INTERRUPT (glitches that cut into the dry signal), ARP (recent notes as arpeggios).
+  - **MULTIDELAY:** PATTERN (rhythmic delay taps; A is a classic delay), WARP (delay taps mixed with double-speed grains).
+  - STRUM, BLOCKS and ARP find the notes by detecting onsets in the input.
+- **Knobs:** ACTIVITY (how busy: more loops, grains, taps), REPEATS (feedback into the buffer), SHAPE (grain envelope: percussive, flat, swell), FILTER (resonant low pass on the effect), MIX, TIME (subdivision, 1/16 to 1/1), SPACE (reverb) and LOOP LEVEL.
+- **Secondary controls** (shift functions on the pedal) are the small knobs: MOD depth and RATE (pitch modulation), RES (filter resonance), TEMPO, DECAY (reverb time) and the looper SPEED (¼× to 4×).
+- **Tempo:** SYNC follows the rack's tempo. TAP (or TEMPO) sets its own and turns SYNC off. MIDI clock or a cable in CLOCK takes over.
+- **HOLD** freezes the buffer: the effect keeps playing what it holds while you play on top. **BYPASS** passes the dry signal.
+- **Phrase looper** (up to 60 s): REC → PLAY → DUB (overdub) → PLAY, STOP and ERASE, plus REVERSE, PRE-FX (record the dry input) and ONLY (the effect off, only the loop and the dry signal). The bar shows the loop's position.
+- **CV:** CLOCK, HOLD (a gate toggles it), ACTIVITY and MIX (±5 V) in; CLOCK (a pulse each step) and ENV (input level) out.
+- **Not the pedal's algorithms:** each effect follows the manual's description of what it does, but the sound is my own approximation. User presets are the rack's patches, and the loop is not saved with them.
 
 ## Maze
 

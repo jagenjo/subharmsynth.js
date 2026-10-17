@@ -13,7 +13,7 @@ var WR = {
 	order: []
 };
 
-WR.VERSION = "20261017b"; // bump together with the ?v= in index.html so browsers reload the scripts
+WR.VERSION = "20261017c"; // bump together with the ?v= in index.html so browsers reload the scripts
 
 // def: {
 //   title, description,           names for menus and the panel
@@ -27,6 +27,7 @@ WR.VERSION = "20261017b"; // bump together with the ?v= in index.html so browser
 //   worklet,                      DSP file, registers globalThis.WR_DSP[type]
 //   jacks,                        patch bay rows of [label, "in"|"out"|"midiin", id]
 //   midi_in,                      id of its MIDI IN jack, if it has one
+//   insert,                       an effect (in_l / in_r / out_l / out_r) put in before the speakers when added
 //   defaults(),                   settings of a new module
 //   validate(s, data),            fix-ups after a load (ranges, enums, old saves)
 //   randomize(s, rack),
@@ -217,6 +218,13 @@ WRContext.routeAudio = function( s, m )
 		var right = /_l$/.test( dest ) && types[ dest.replace(/_l$/, "_r") ] ? dest.replace(/_l$/, "_r") : dest;
 		s.patches.push([ WR.jackId( m.id, "main_l" ), dest, 1 ]);
 		s.patches.push([ WR.jackId( m.id, "main_r" ), right, 5 ]);
+		return;
+	}
+	if(def.insert) // an effect: goes in just before the speakers
+	{
+		var outs = { io_main_l: "out_l", io_main_r: "out_r" }, ins = { io_main_l: "in_l", io_main_r: "in_r" };
+		var last = s.patches.filter(function(p){ return outs[ p[1] ]; });
+		last.forEach(function(p){ s.patches.push([ WR.jackId( m.id, outs[ p[1] ] ), p[1], p[2] ]); p[1] = WR.jackId( m.id, ins[ p[1] ] ); });
 		return;
 	}
 	if(!def.audio_out)
