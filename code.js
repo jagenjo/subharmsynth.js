@@ -83,6 +83,137 @@ function endFrame()
 function rackX( x ) { return frame.ox + x * frame.k; }
 function rackY( y ) { return frame.oy + y * frame.k; }
 
+// ---------------------------------------------------------------------------
+// KEYBOARD CONTROL: the device in the middle of the screen gets its buttons (not its knobs) on the
+// computer keyboard, in the order it draws them: 1..0, Q..P, A..', Z../, [ ] - = \ (more than 47
+// buttons: banks, ` switches). Holding SHIFT shows the keys on the buttons. Every button widget calls
+// keyButton(): it registers the button and gets the key's press (a click) and hold (held down)
+
+var KEY_CODES = ["Digit1","Digit2","Digit3","Digit4","Digit5","Digit6","Digit7","Digit8","Digit9","Digit0",
+	"KeyQ","KeyW","KeyE","KeyR","KeyT","KeyY","KeyU","KeyI","KeyO","KeyP",
+	"KeyA","KeyS","KeyD","KeyF","KeyG","KeyH","KeyJ","KeyK","KeyL","Semicolon","Quote",
+	"KeyZ","KeyX","KeyC","KeyV","KeyB","KeyN","KeyM","Comma","Period","Slash",
+	"BracketLeft","BracketRight","Minus","Equal","Backslash"];
+var KEY_LABELS = { Semicolon: ";", Quote: "'", Comma: ",", Period: ".", Slash: "/", BracketLeft: "[", BracketRight: "]", Minus: "-", Equal: "=", Backslash: "\\" };
+function keyLabel( code ) { return KEY_LABELS[ code ] || code.replace( /^(Key|Digit)/, "" ); }
+var keyctl = {
+	target: null,      // the device the keys go to (a module id, "io" or "keys")
+	device: null,      // the device being drawn now
+	list: [],          // the target's buttons drawn this frame: { id, x, y, w, h } (rack coordinates)
+	ids: [],           // ... the last complete frame's ids, in order (key index -> button)
+	pressed: {},       // button id -> pressed (a click this frame)
+	held: {},          // button id -> its key is down
+	down: {},          // key code -> the button id it pressed
+	flash: {},         // button id -> time of the last key press (a highlight)
+	bank: 0,
+	overlay: false,    // SHIFT held: show the keys
+	rects: []          // the devices' rectangles this frame: the target is the one in the middle
+};
+var NOKEY = { pressed: false, held: false };
+function keyButton( full, x, y, w, h )
+{
+	if(keyctl.device === null || keyctl.device !== keyctl.target || show_rear)
+		return NOKEY;
+	keyctl.list.push({ id: full, x: rackX( x ), y: rackY( y ), w: w * frame.k, h: h * frame.k });
+	var pressed = !!keyctl.pressed[ full ];
+	delete keyctl.pressed[ full ];
+	return { pressed: pressed, held: !!keyctl.held[ full ] };
+}
+// a device starts / ends drawing (its rectangle in rack coordinates: the target is chosen from them)
+function keyDeviceBegin( id, x, y, w, h ) { keyctl.device = id; keyctl.rects.push({ id: id, x: x, y: y, w: w, h: h }); }
+function keyDeviceEnd() { keyctl.device = null; }
+// after a frame: the buttons it drew are the keys' targets; the device in the middle is next
+function keyFrameEnd( cx, cy )
+{
+	keyctl.ids = keyctl.list.map(function(b){ return b.id; });
+	keyctl.drawn = keyctl.list;
+	keyctl.list = [];
+	keyctl.pressed = {};
+	var best = null, bd = Infinity;
+	keyctl.rects.forEach(function(r){
+		var dx = cx < r.x ? r.x - cx : (cx > r.x + r.w ? cx - r.x - r.w : 0);
+		var dy = cy < r.y ? r.y - cy : (cy > r.y + r.h ? cy - r.y - r.h : 0);
+		var d = dx * 0.25 + dy; // the row first, then the side
+		if(d < bd) { bd = d; best = r; }
+	});
+	var t = best ? best.id : null;
+	if(t !== keyctl.target) { keyReleaseAll(); keyctl.bank = 0; }
+	keyctl.target = t;
+	keyctl.targetRect = best;
+	keyctl.rects = [];
+}
+function keyReleaseAll() { keyctl.held = {}; keyctl.down = {}; }
+// a key: press the button it is mapped to; true when it was taken
+function keyDown( code )
+{
+	var n = KEY_CODES.length, banks = Math.max( 1, Math.ceil( keyctl.ids.length / n ) );
+	if(code == "Backquote")
+	{
+		if(banks > 1) { keyctl.bank = (keyctl.bank + 1) % banks; setStatus( "Keys: bank " + (keyctl.bank + 1) + " of " + banks + " (hold SHIFT to see them)" ); }
+		return banks > 1;
+	}
+	var i = KEY_CODES.indexOf( code );
+	if(i < 0)
+		return false;
+	var id = keyctl.ids[ keyctl.bank * n + i ];
+	if(!id)
+		return true; // no button on that key: still ours, not the browser's
+	keyctl.pressed[ id ] = true;
+	keyctl.held[ id ] = true;
+	keyctl.down[ code ] = id;
+	keyctl.flash[ id ] = performance.now();
+	return true;
+}
+function keyUp( code )
+{
+	var id = keyctl.down[ code ];
+	if(id === undefined)
+		return false;
+	delete keyctl.down[ code ];
+	delete keyctl.held[ id ];
+	return true;
+}
+// SHIFT: the keys over the buttons, the target outlined (rack coordinates, the rack's transform)
+function drawKeyOverlay()
+{
+	var now = performance.now(), n = KEY_CODES.length, r = keyctl.targetRect;
+	(keyctl.drawn || []).forEach(function(b, i){
+		var f = keyctl.flash[ b.id ];
+		if(f && now - f < 180)
+		{
+			ctx.strokeStyle = "rgba(255,214,90," + (1 - (now - f) / 180) + ")"; ctx.lineWidth = 3;
+			ctx.strokeRect( b.x - 2, b.y - 2, b.w + 4, b.h + 4 );
+		}
+	});
+	if(!keyctl.overlay || !r || show_rear)
+		return;
+	ctx.strokeStyle = "#ffd65a"; ctx.lineWidth = 3;
+	ctx.setLineDash && ctx.setLineDash([ 10, 6 ]);
+	ctx.strokeRect( r.x + 2, r.y + 2, r.w - 4, r.h - 4 );
+	ctx.setLineDash && ctx.setLineDash([]);
+	var banks = Math.max( 1, Math.ceil( (keyctl.drawn || []).length / n ) );
+	ctx.font = "bold 13px " + FONT;
+	ctx.textBaseline = "middle"; ctx.textAlign = "center";
+	(keyctl.drawn || []).forEach(function(b, i){
+		if(Math.floor( i / n ) != keyctl.bank)
+			return;
+		var label = keyLabel( KEY_CODES[ i % n ] ), cx = b.x + b.w / 2, cy = b.y + b.h / 2, w = Math.max( 18, ctx.measureText( label ).width + 8 );
+		ctx.fillStyle = keyctl.held[ b.id ] ? "#ffd65a" : "rgba(10,10,10,0.88)";
+		ctx.beginPath(); ctx.roundRect( cx - w / 2, cy - 10, w, 20, 4 ); ctx.fill();
+		ctx.strokeStyle = "#ffd65a"; ctx.lineWidth = 1.5; ctx.stroke();
+		ctx.fillStyle = keyctl.held[ b.id ] ? "#111" : "#ffd65a";
+		ctx.fillText( label, cx, cy + 1 );
+	});
+	var name = r.id == "io" ? "AUDIO I/O" : (r.id == "keys" ? "KEYS" : ((rack.modules().find(function(m){ return m.id == r.id; }) || {}).def || { title: r.id }).title);
+	var tag = "KEYS \u2192 " + name + " (" + (keyctl.drawn || []).length + " BUTTONS" + (banks > 1 ? ", BANK " + (keyctl.bank + 1) + "/" + banks + ": ` NEXT" : "") + ")";
+	ctx.font = "bold 14px " + FONT;
+	var tw = ctx.measureText( tag ).width + 20;
+	ctx.fillStyle = "#ffd65a";
+	ctx.fillRect( r.x + 8, r.y + 8, tw, 22 );
+	ctx.fillStyle = "#111"; ctx.textAlign = "left";
+	ctx.fillText( tag, r.x + 18, r.y + 19 );
+}
+
 // tooltip at x, y of the current frame
 function tip( text, x, y ) { tooltips.push([ text, rackX( x ), rackY( y ) ]); }
 
@@ -630,7 +761,9 @@ function button( id, x, y, w, h, text, lit )
 		ui.active = id;
 		clicked = true;
 	}
-	var held = ui.active === id && ui.down;
+	var kb = keyButton( id, x, y, w, h );
+	clicked = clicked || kb.pressed;
+	var held = (ui.active === id && ui.down) || kb.held;
 	if(layout == "classic")
 	{
 		classicButtonFace( x, y, w, h, text, lit, hover, held );
@@ -851,6 +984,11 @@ function leverSwitch( id, x, y, value, options, label )
 		pos = clamp( Math.floor( (ui.y - y) / (h / n) ), 0, n - 1 );
 		value = options[ pos ][0];
 	}
+	if(keyButton( id, x - 6, y - 4, w + 62, h + 8 ).pressed) // a key: the next position
+	{
+		pos = (pos + 1) % n;
+		value = options[ pos ][0];
+	}
 	if(label)
 		drawLabel( label, x + w * 0.5 + 18, y - 16, 11 );
 
@@ -1010,6 +1148,8 @@ function tinyButton( id, x, y, w, h, text, on, tooltip )
 	var clicked = hover && ui.pressed;
 	if(clicked)
 		ui.active = id;
+	if(keyButton( id, x, y, w, h ).pressed)
+		clicked = true;
 	ctx.fillStyle = on ? "#c9483a" : (hover ? "#4a4a46" : "#2c2c2a");
 	ctx.beginPath(); ctx.roundRect( x, y, w, h, 3 ); ctx.fill();
 	ctx.font = "bold 8px " + FONT;
@@ -1328,7 +1468,9 @@ function drawDevice( id, x, y, w, h, name, jack_rows, draw )
 		drawCollapsedBar( id, x, y, w, name, jack_rows );
 		return;
 	}
+	keyDeviceBegin( id, rackX( x ), rackY( y ), w * frame.k, h * frame.k );
 	draw( x, y, w, h );
+	keyDeviceEnd();
 	collapseButton( id, x + 36, y + 11 );
 }
 
@@ -1488,7 +1630,9 @@ function drawModules( y0 )
 				beginFrame( x, y, fit.k );
 				id_prefix = m.id + ".";
 				knob_skin = m.settings.knob_skin || m.def.knob_skin || null;
+				keyDeviceBegin( m.id, x, y, fit.w * fit.k, fit.h * fit.k );
 				m.def.draw( m );
+				keyDeviceEnd();
 				knob_skin = null;
 				id_prefix = "";
 				skinButton( m, fit.w - 11, 20 + 3 * 22 );
@@ -2268,6 +2412,8 @@ function draw()
 	y += drawModules( y );
 	updateCables(); // front or rear: only the jacks of the side shown are registered
 	drawCables();
+	drawKeyOverlay();
+	keyFrameEnd( (vw * 0.5 - view.ox) / view.scale, (vh * 0.5 - view.oy) / view.scale );
 	drawTooltips();
 	drawScrollbars( w, h );
 	updatePan();
@@ -2425,26 +2571,36 @@ window.addEventListener("keydown", function(e){
 		setRear( !show_rear );
 		return;
 	}
-	switch(e.code)
+	if(e.code == "Space")
 	{
-		case "Space": act(function(){ rack.transport( "play" ); }); break;
-		case "KeyR": act(function(){ rack.transport( "reset" ); }); break;
-		case "KeyN": act(function(){ rack.transport( "next" ); }); break;
-		case "KeyT": act(function(){ rack.transport( "trigger", true ); }); break;
-		default: return;
+		act(function(){ rack.transport( "play" ); });
+		e.preventDefault();
+		return;
 	}
-	e.preventDefault();
+	// the buttons of the device in the middle of the screen
+	if(keyDown( e.code ))
+	{
+		act(function(){});
+		e.preventDefault();
+	}
 });
 window.addEventListener("keyup", function(e){
 	if(e.code == "Space" && !isTextField( e.target ))
 		e.preventDefault();
 	if(piano.down[ e.code ] !== undefined)
 		pianoNoteOff( e.code );
-	else if(e.code == "KeyT")
-		act(function(){ rack.transport( "trigger", false ); });
+	else
+		keyUp( e.code );
+	if(e.key == "Shift")
+		keyctl.overlay = false;
+});
+// SHIFT shows the keys on the buttons (not while typing)
+window.addEventListener("keydown", function(e){
+	if(e.key == "Shift" && !isTextField( e.target ))
+		keyctl.overlay = true;
 });
 // keys released while the window is not focused never send keyup
-window.addEventListener("blur", pianoAllOff);
+window.addEventListener("blur", function(){ pianoAllOff(); keyReleaseAll(); keyctl.overlay = false; });
 
 // ---------------------------------------------------------------------------
 // toolbar

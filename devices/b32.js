@@ -234,9 +234,9 @@ function drawSequencer()
 			tip( "STEP " + (i + 1) + "  " + noteName( step.note ) + (step.gate ? "" : "  REST") + (step.accent ? "  ACCENT" : "") + (step.glide ? "  GLIDE" : "") +
 				(u.sel == i ? "  (CLICK: REST ON / OFF)" : "  (CLICK: SELECT)"), cx + CELL_W * 0.5, cy - 10 );
 		}
-		if(hover && ui.pressed)
+		if((hover && ui.pressed) | keyButton( id, cx, cy, CELL_W, CELL_H ).pressed)
 		{
-			ui.active = id;
+			if(hover && ui.pressed) ui.active = id;
 			if(u.sel == i)
 				step.gate = !step.gate;
 			else

@@ -77,7 +77,12 @@ One patch bay spans all of them: any output can be cabled to any input of any de
   - The reverbs run in native WebAudio nodes outside the audio processor, so their returns come back one render quantum (128 samples) later. You won't hear that on a reverb. The delay runs inside the processor.
   - Each device's label says what it does with the audio, e.g. "100% WET (DRY OFF)". Hovering a socket lists its connections.
   - The front's CV cables are hidden while the rear is shown, and the rear cables while the front is.
-- **Space** starts every synth when none is running, otherwise stops them all. **R**, **N** and **T** reset, step (NEXT / ADVANCE) and trigger every synth.
+- **Space** starts every synth when none is running, otherwise stops them all.
+- **Keyboard control:** the device in the middle of the screen gets its buttons (not its knobs) on the computer keyboard. Scroll to choose the device.
+  - **Keys:** 1–0, Q–P, A–', Z–/, [ ] - = \, assigned in the order the device draws its buttons.
+  - **Held keys:** they hold the button down, so momentary buttons work (drone voices, pads, plates, footswitches). A lever switch moves to its next position.
+  - **Seeing the keys:** hold **Shift** to show each button's key on it, with the device outlined. A device with more buttons than keys has banks; **`** switches between them.
+  - **QWERTY piano:** when it is on (keys device), the letters play notes instead.
 - **Adding another synth:** register it from a pair of files in `devices/`:
   - The main thread file calls `WR.registerSynth(type, { title, worklet, jacks, defaults, size, draw, … })`. The fields are documented in `webrack.js`.
   - The worklet file sets `globalThis.WR_DSP[type]` to a class with `outs` / `ins` / `patched` arrays, plus `setSettings`, `message`, `beginBlock`, `tick` and `state`.
@@ -410,7 +415,7 @@ As on the hardware, MIDI reaches the synth only through its MIDI IN jack, so the
 
 - Drag knobs vertically; hold Shift for fine control. The mouse wheel also works, and double-clicking a knob resets it.
 - Drag from a jack to patch. Drag a cable off an input to move or remove it. Double-click or right-click a jack to unplug it.
-- Keys: `Space` play/stop, `R` reset, `N` next step, `T` trigger (on every synth in the rack).
+- Keys: `Space` play/stop (every synth); the other keys press the buttons of the device in the middle of the screen (hold `Shift` to see them, `` ` `` switches banks).
 
 ## Approximations
 

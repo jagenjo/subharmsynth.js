@@ -170,7 +170,9 @@ function lmButton( id, cx, cy, w, h, text, lit, tooltip, color )
 	if(hover) ui.hot = full;
 	var clicked = false;
 	if(hover && ui.pressed && ui.active === null) { ui.active = full; clicked = true; }
-	var down = ui.active === full && ui.down, dy = down ? 1 : 0;
+	var kb = keyButton( full, x, y, w, h );
+	clicked = clicked || kb.pressed;
+	var down = (ui.active === full && ui.down) || kb.held, dy = down ? 1 : 0;
 	ctx.fillStyle = "rgba(0,0,0,0.6)";
 	ctx.beginPath(); ctx.roundRect( x + 1, y + 3, w, h, 4 ); ctx.fill();
 	if(color && lit) // the transport buttons glow
@@ -203,7 +205,9 @@ function pad( id, cx, cy, number, lit, mark, tooltip )
 	if(hover) ui.hot = full;
 	var clicked = false;
 	if(hover && ui.pressed && ui.active === null) { ui.active = full; clicked = true; }
-	var down = ui.active === full && ui.down;
+	var kb = keyButton( full, x, y, w, w );
+	clicked = clicked || kb.pressed;
+	var down = (ui.active === full && ui.down) || kb.held;
 	if(lit)
 	{
 		var gl = ctx.createRadialGradient( x + w / 2, y + w / 2, w * 0.3, x + w / 2, y + w / 2, w * 0.85 );

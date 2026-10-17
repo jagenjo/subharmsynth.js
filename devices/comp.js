@@ -40,9 +40,9 @@ function drawScope( x, y, w, h, data )
 		ui.hot = id;
 		tip( "CLICK: TIME BASE (" + fmtScopeTime( s.scope_time ) + ")", x + w * 0.5, y + h + 12 );
 	}
-	if(hover && ui.pressed && ui.active === null)
+	if((hover && ui.pressed && ui.active === null) | keyButton( id, x, y, w, h ).pressed)
 	{
-		ui.active = id;
+		if(ui.pressed) ui.active = id;
 		s.scope_time = SCOPE_TIMES[ (SCOPE_TIMES.indexOf( s.scope_time ) + 1) % SCOPE_TIMES.length ];
 	}
 

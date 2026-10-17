@@ -241,11 +241,14 @@ function drawSequencers()
 				ui.hot = id;
 				tip( "BIT " + (i + 1) + (q.bits[i] ? "  ON  " + (q.cv[i] > 0 ? "+" : "") + q.cv[i].toFixed(2) + " V" : "  OFF") + "  (CLICK: FLIP)", bx, y - 26 );
 			}
+			var kb = keyButton( id, bx - 16, y - 16, 32, 32 ); // every frame: the keys keep their order
 			if(hover && ui.pressed)
 			{
 				ui.active = id;
 				send({ type: "flip", seq: k, bit: i });
 			}
+			else if(kb.pressed)
+				send({ type: "flip", seq: k, bit: i });
 			// bit LED: red when on, green ring on the play head, dim beyond the length
 			ctx.fillStyle = "#050505";
 			ctx.beginPath(); ctx.arc( bx, y, 14, 0, Math.PI * 2 ); ctx.fill();

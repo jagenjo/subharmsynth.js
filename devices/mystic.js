@@ -131,7 +131,8 @@ function hot( id, x, y, w, h )
 	if(hover) ui.hot = full;
 	var clicked = false;
 	if(hover && ui.pressed && ui.active === null) { ui.active = full; clicked = true; }
-	return { hover: hover, clicked: clicked, held: ui.active === full && ui.down };
+	var kb = keyButton( full, x, y, w, h ); // its key on the computer keyboard
+	return { hover: hover, clicked: clicked || kb.pressed, held: (ui.active === full && ui.down) || kb.held };
 }
 
 // a black square-edged button with a bevel; access buttons have orange letters (lit: glowing),
