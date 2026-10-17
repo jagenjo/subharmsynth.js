@@ -13,7 +13,7 @@ var WR = {
 	order: []
 };
 
-WR.VERSION = "20261017q"; // bump together with the ?v= in index.html so browsers reload the scripts
+WR.VERSION = "20261017r"; // bump together with the ?v= in index.html so browsers reload the scripts
 
 // def: {
 //   title, description,           names for menus and the panel
@@ -927,6 +927,10 @@ WRContext.prototype.setSettings = function( data )
 	s.kb.octave = Math.min( 2, Math.max( -2, Math.round( s.kb.octave ) ) );
 	s.kb.channel = Math.min( 16, Math.max( 1, Math.round( s.kb.channel ) ) );
 	s.song = WR.validateSong( data.song );
+	// MIDI learn: [kind ("cc" / "note"), channel 1..16, number 0..127, control id]
+	s.midi_map = (Array.isArray( data.midi_map ) ? data.midi_map : []).filter(function(m){
+		return Array.isArray( m ) && (m[0] == "cc" || m[0] == "note") && m[1] >= 1 && m[1] <= 16 && m[2] >= 0 && m[2] <= 127 && typeof m[3] == "string" && m[3].length < 120;
+	}).map(function(m){ return [ m[0], m[1] | 0, m[2] | 0, m[3] ]; }).slice( 0, 512 );
 
 	// modules: known types only, unique ids, settings validated by their synth
 	s.modules = [];
@@ -1216,6 +1220,9 @@ WRContext.prototype.onMIDIMessage = function( data )
 		return;
 
 	var cmd = st & 0xF0, channel = (st & 0x0F) + 1;
+	// MIDI learn: a CC or note mapped to a knob or button (or being learnt) goes there instead
+	if((cmd == 0xB0 || cmd == 0x90 || cmd == 0x80) && WR.midiControl && WR.midiControl( cmd, channel, data[1], data[2] ))
+		return;
 	if(cmd == 0x90 && data[2] > 0)
 		this.noteOn( data[1], channel, data[2] / 127 );
 	else if(cmd == 0x80 || cmd == 0x90)

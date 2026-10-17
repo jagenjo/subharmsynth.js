@@ -175,14 +175,112 @@ var keyctl = {
 	rects: []          // the devices' rectangles this frame: the target is the one in the middle
 };
 var NOKEY = { pressed: false, held: false };
+
+// ---------------------------------------------------------------------------
+// MIDI LEARN: a CC or a note mapped to a knob, fader or button (rack.settings.midi_map: [kind,
+// channel, number, control id]). Options > MIDI learn: click a control, then move a controller or
+// press a key / pad. Knobs and faders take the CC over their range; buttons are pressed by a CC over
+// 63 or a note, and held while it lasts
+var midictl = {
+	learn: false, target: null,
+	kind: {},          // control id -> "knob" / "fader" / "button" (seen while drawing)
+	pending: {},       // knob / fader id -> 0..1 from MIDI, taken by the widget
+	pressed: {}, held: {}, ccHigh: {},
+	drawn: []          // in learn mode: the controls drawn this frame { id, kind, x, y, w, h } (rack coordinates)
+};
+function midiNote( id, x, y, w, h, kind )
+{
+	midictl.kind[ id ] = kind;
+	if(midictl.learn && !show_rear)
+		midictl.drawn.push({ id: id, kind: kind, x: rackX( x ), y: rackY( y ), w: w * frame.k, h: h * frame.k });
+}
+function controlName( id )
+{
+	var dot = id.indexOf( "." ), dev = id.substr( 0, dot ), m = rack.settings.modules.find(function(o){ return o.id == dev; });
+	return ((m && WR.types[ m.type ] ? WR.types[ m.type ].title : dev) + " " + id.substr( dot + 1 ).replace( /_/g, " " )).toUpperCase();
+}
+function mapLabel( m ) { return (m[0] == "cc" ? "CC" : "NOTE ") + m[2] + (m[1] != 1 ? " CH" + m[1] : ""); }
+WR.midiControl = function( cmd, ch, num, val )
+{
+	var kind = cmd == 0xB0 ? "cc" : "note", on = cmd == 0x90 && val > 0;
+	var map = rack.settings.midi_map = rack.settings.midi_map || [];
+	if(midictl.learn && midictl.target && (kind == "cc" || on))
+	{
+		var t = midictl.target;
+		rack.settings.midi_map = map.filter(function(m){ return m[3] != t && !(m[0] == kind && m[1] == ch && m[2] == num); });
+		rack.settings.midi_map.push([ kind, ch, num, t ]);
+		setStatus( "MIDI learn: " + mapLabel([ kind, ch, num ]) + " \u2192 " + controlName( t ), true );
+		midictl.target = null;
+		renderMidiMap();
+		return true;
+	}
+	var m = map.find(function(e){ return e[0] == kind && e[1] == ch && e[2] == num; });
+	if(!m)
+		return false;
+	var id = m[3], k = midictl.kind[ id ];
+	if(k == "knob" || k == "fader")
+	{
+		if(kind == "cc" || on) midictl.pending[ id ] = val / 127;
+	}
+	else
+	{
+		var key = kind + ch + "_" + num, down = kind == "cc" ? val >= 64 : on;
+		if(down && !midictl.ccHigh[ key ]) { midictl.pressed[ id ] = true; midictl.held[ id ] = true; }
+		if(!down) delete midictl.held[ id ];
+		midictl.ccHigh[ key ] = down;
+	}
+	act(function(){});
+	return true;
+};
+// learn mode: every control outlined, the mapped ones labelled, the one waiting for MIDI pulsing
+function drawMidiLearn()
+{
+	if(!midictl.learn)
+		return;
+	var map = rack.settings.midi_map || [], t = (performance.now() % 800) / 800;
+	ctx.font = "bold 11px " + FONT; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+	midictl.drawn.forEach(function(c){
+		var m = map.find(function(e){ return e[3] == c.id; }), sel = midictl.target == c.id;
+		ctx.strokeStyle = sel ? "rgba(255,214,90," + (0.5 + 0.5 * Math.sin( t * Math.PI * 2 )) + ")" : (m ? "#5ad1ff" : "rgba(90,209,255,0.35)");
+		ctx.lineWidth = sel ? 3 : 1.5;
+		ctx.beginPath();
+		if(c.kind == "knob") ctx.arc( c.x, c.y, c.w + 4, 0, Math.PI * 2 ); else ctx.rect( c.x - 2, c.y - 2, c.w + 4, c.h + 4 );
+		ctx.stroke();
+		if(m)
+		{
+			var label = mapLabel( m ), lx = c.kind == "knob" ? c.x : c.x + c.w / 2, ly = c.kind == "knob" ? c.y - c.w - 10 : c.y - 8, tw = ctx.measureText( label ).width + 8;
+			ctx.fillStyle = "#5ad1ff"; ctx.beginPath(); ctx.roundRect( lx - tw / 2, ly - 7, tw, 14, 3 ); ctx.fill();
+			ctx.fillStyle = "#06222c"; ctx.fillText( label, lx, ly + 1 );
+		}
+	});
+	midictl.drawn = [];
+}
+function setMidiLearn( on )
+{
+	midictl.learn = on; midictl.target = null;
+	$("opt-midilearn").classList.toggle( "on", on );
+	$("opt-midilearn").textContent = on ? "MIDI learn: ON" : "MIDI learn";
+	setStatus( on ? "MIDI learn: click a knob, fader or button, then move a controller (or press a key / pad)" : "MIDI learn off", on );
+}
+function renderMidiMap()
+{
+	var el = $("opt-midimap");
+	if(!el) return;
+	var map = rack.settings.midi_map || [];
+	el.innerHTML = map.length ? map.map(function(m, i){ return '<div class="mm"><span>' + mapLabel( m ) + '</span><span>\u2192 ' + controlName( m[3] ) + '</span><button data-i="' + i + '" title="Remove">\u00d7</button></div>'; }).join("") +
+		'<button data-i="all">Clear all</button>' : '<div class="mm none">No MIDI mappings</div>';
+}
 function keyButton( full, x, y, w, h )
 {
+	midiNote( full, x, y, w, h, "button" );
+	var mp = !!midictl.pressed[ full ], mh = !!midictl.held[ full ];
+	delete midictl.pressed[ full ];
 	if(keyctl.device === null || keyctl.device !== keyctl.target || show_rear)
-		return NOKEY;
+		return mp || mh ? { pressed: mp, held: mh } : NOKEY;
 	keyctl.list.push({ id: full, x: rackX( x ), y: rackY( y ), w: w * frame.k, h: h * frame.k });
 	var pressed = !!keyctl.pressed[ full ];
 	delete keyctl.pressed[ full ];
-	return { pressed: pressed, held: !!keyctl.held[ full ] };
+	return { pressed: pressed || mp, held: !!keyctl.held[ full ] || mh };
 }
 // a device starts / ends drawing (its rectangle in rack coordinates: the target is chosen from them)
 function keyDeviceBegin( id, x, y, w, h ) { keyctl.device = id; keyctl.rects.push({ id: id, x: x, y: y, w: w, h: h }); }
@@ -531,6 +629,12 @@ function knob( id, cx, cy, r, value, min, max, o )
 		value = fromN( clamp( toN(value) + dn, 0, 1 ) );
 		ui.wheel = 0;
 	}
+	if(midictl.pending[ id ] !== undefined) // MIDI learn: a CC over the knob's range
+	{
+		value = fromN( clamp( midictl.pending[ id ], 0, 1 ) );
+		delete midictl.pending[ id ];
+	}
+	midiNote( id, cx, cy, r, r, "knob" );
 	if(o.step)
 		value = Math.round( value / o.step ) * o.step;
 	value = clamp( value, min, max );
@@ -1136,6 +1240,8 @@ function fader( id, x, y, h, value, o )
 		value = clamp( value - ui.wheel * (ui.shift ? 0.005 : 0.02), 0, 1 );
 		ui.wheel = 0;
 	}
+	if(midictl.pending[ id ] !== undefined) { value = clamp( midictl.pending[ id ], 0, 1 ); delete midictl.pending[ id ]; }
+	midiNote( id, x - capW * 0.5, y - capH * 0.5, capW, h + capH, "fader" );
 
 	// printed scale
 	ctx.strokeStyle = "#a9a69e";
@@ -2522,6 +2628,13 @@ function draw()
 	drawControlJacks();
 	hover_control = null;
 	drawKeyOverlay();
+	// MIDI learn: the control clicked waits for its MIDI
+	if(midictl.learn && ui.pressed && ui.active && midictl.kind[ ui.active ])
+	{
+		midictl.target = ui.active;
+		setStatus( "MIDI learn: " + controlName( ui.active ) + " \u2014 now move a controller or press a key / pad", true );
+	}
+	drawMidiLearn();
 	keyFrameEnd( (vw * 0.5 - view.ox) / view.scale, (vh * 0.5 - view.oy) / view.scale );
 	drawTooltips();
 	drawScrollbars( w, h );
@@ -3071,6 +3184,18 @@ $("add-panel").addEventListener("click", function(e){
 document.addEventListener("click", function(){ if(!$("add-panel").hidden) closeAddPanel(); });
 document.addEventListener("keydown", function(e){ if(e.key == "Escape" && !$("add-panel").hidden) closeAddPanel(); });
 canvas.addEventListener("pointerdown", function(){ if(!$("add-panel").hidden) closeAddPanel(); });
+
+// MIDI LEARN in the Options panel: the button, the list of mappings (each removable)
+$("opt-midilearn").addEventListener("click", function(e){ e.stopPropagation(); setMidiLearn( !midictl.learn ); });
+$("opt-midimap").addEventListener("click", function(e){
+	e.stopPropagation();
+	var b = e.target.closest ? e.target.closest( "button[data-i]" ) : null;
+	if(!b) return;
+	var i = b.getAttribute( "data-i" );
+	rack.settings.midi_map = i == "all" ? [] : (rack.settings.midi_map || []).filter(function(m, k){ return k != +i; });
+	renderMidiMap();
+});
+$("options").addEventListener("click", function(){ renderMidiMap(); });
 
 // HELP: a panel with everything above (in index.html)
 $("help-btn").addEventListener("click", function(e){

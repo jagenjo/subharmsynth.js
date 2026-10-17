@@ -79,6 +79,10 @@ One patch bay spans all of them: any output can be cabled to any input of any de
   - Each device's label says what it does with the audio, e.g. "100% WET (DRY OFF)". Hovering a socket lists its connections.
   - The front's CV cables are hidden while the rear is shown, and the rear cables while the front is.
 - **Space** starts every synth when none is running, otherwise stops them all.
+- **MIDI learn** (Options): click a knob, fader or button, then move a MIDI controller or press a key / pad to map it.
+  - **What it does:** a CC sets a knob or fader over its whole range. A CC (over 63) or a note presses a button and holds it while it lasts.
+  - **Mapped MIDI:** it is no longer played as notes.
+  - **The mappings:** listed in Options, each with a button to remove it, and saved with the rack. In learn mode every control is outlined and the mapped ones show their CC or note.
 - **Keyboard control:** the device in the middle of the screen gets its buttons (not its knobs) on the computer keyboard. Scroll to choose the device.
   - **Keys:** 1–0, Q–P, A–', Z–/, [ ] - = \. The buttons used most (play, trigger, pads, steps, footswitches) get keys first, then mode and performance switches; configuration buttons (MIDI, DUMP, SAVE, the reset buttons under encoders) get none. Each button takes the free key nearest to where it is on the panel, so the keyboard is a map of the device. The priorities are each device's `key_prio` table.
   - **Held keys:** they hold the button down, so momentary buttons work (drone voices, pads, plates, footswitches). A lever switch moves to its next position.
