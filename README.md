@@ -1,6 +1,6 @@
 # subharmsynth.js
 
-**SYNTHS** is a browser rack of semi-modular synthesizers built on the WebAudio API: replicas of the Moog Subharmonicon (polyrhythmic synthesizer), DFAM (percussion synthesizer, here called DRAM), Mother-32 (synthesizer with a 32 step sequencer, here called Brother-32) Labyrinth (parallel generative synthesizer, here called Maze) ASM Hydrasynth (polyphonic wave morphing synthesizer, here called Mystic) Behringer LM Drum (LinnDrum-style sampling drum machine, here called LLM Dram) and Elta Music Solar 42 (ambient drone machine, here called Lunar 21), plus the Hologram Microcosm (granular looper pedal, here called Universe), with a mixer, LFOs, compressors, reverbs and delays, all patchable with each other.
+**SYNTHS** is a browser rack of semi-modular synthesizers built on the WebAudio API: replicas of the Moog Subharmonicon (polyrhythmic synthesizer), DFAM (percussion synthesizer, here called DRAM), Mother-32 (synthesizer with a 32 step sequencer, here called Brother-32) Labyrinth (parallel generative synthesizer, here called Maze) ASM Hydrasynth (polyphonic wave morphing synthesizer, here called Mystic) Behringer LM Drum (LinnDrum-style sampling drum machine, here called LLM Dram) and Elta Music Solar 42 (ambient drone machine, here called Lunar 21), plus the Hologram Microcosm (granular looper pedal, here called Universe) and the Eventide Space (reverb pedal, here called Cosmos), with a mixer, LFOs, compressors, reverbs and delays, all patchable with each other.
 
 All synthesis runs in real time in one `AudioWorkletProcessor` (`rack-worklet.js`), which hosts each synth's DSP and copies the patch cables between them every sample. Oscillators, filters, envelopes, clocks, sequencers and the cables are all computed per sample, so patching between synths is sample-accurate. The reverb and delay are native WebAudio nodes after it.
 
@@ -30,6 +30,7 @@ Needs a browser with AudioWorklet support, served over `https://` or `localhost`
 | `devices/delay.js`, `devices/delay-worklet.js` | the stereo / ping-pong delay |
 | `devices/universe.js`, `devices/universe-worklet.js` | Universe, the granular / looper effect |
 | `devices/hyper.js`, `devices/hyper-worklet.js` | Hyper, the distortion / bit crusher |
+| `devices/cosmos.js`, `devices/cosmos-worklet.js` | Cosmos, the 12 algorithm reverb |
 | `devices/reverb.js`, `devices/reverb-worklet.js` | the convolution reverb: native nodes, bridged through a send / return slot |
 | `data/patches.json` | factory patches |
 | `old/` | the original version of this replica, as in the first commit |
@@ -42,7 +43,7 @@ The page is a rack. From the top:
 
 1. The **AUDIO I/O** device.
 2. The **KEYS** device.
-3. The devices, in the order you choose. Synths and mixers take a full row. The half-width devices (dual LFO, compressor, reverb, delay, Universe, Hyper) sit side by side when two are next to each other.
+3. The devices, in the order you choose. Synths and mixers take a full row. The half-width devices (dual LFO, compressor, reverb, delay, Universe, Hyper, Cosmos) sit side by side when two are next to each other.
 
 A new rack has a Subharm, an LFO and a compressor, then a reverb and a delay, cabled as the default audio path.
 
@@ -53,7 +54,7 @@ One patch bay spans all of them: any output can be cabled to any input of any de
   - The pictures are in `previews/`, made by `tools/make-previews.sh` (headless Chrome and ImageMagick). It opens `index.html?preview=<type>`, which draws only that device, then trims and saves the picture. Run it again after changing a panel; give it device types to redo only those.
   - You can have several of the same kind (`dram`, `dram2`, …). Reverbs are limited to 8, one per send / return slot of the audio engine.
   - A new LFO, compressor, reverb or delay arrives unpatched: patch its audio on the back (Tab).
-  - A new Universe or Hyper goes in just before the speakers (between the last device and MAIN IN), so you hear it right away.
+  - A new Universe, Hyper or Cosmos goes in just before the speakers (between the last device and MAIN IN), so you hear it right away.
   - A synth with a MIDI IN (Subharm, Brother-32, Maze) gets the keys' MIDI through **MASTER MIDI** instead of a long cable across the rack (see *MIDI on the back*).
   - A new synth's audio goes to the first free mixer channel; with no mixer, to wherever the other synths go (or the compressor).
   - A new mixer takes over the synths that weren't on a mixer: they move onto its channels, and its MAIN L / R go where they went.
@@ -176,6 +177,29 @@ A replica of the Hologram Microcosm granular / looper pedal, named Universe here
 - **Phrase looper** (up to 60 s): REC → PLAY → DUB (overdub) → PLAY, STOP and ERASE, plus REVERSE, PRE-FX (record the dry input), LOOPER ONLY (the effect off, only the loop and the dry signal), BURST, QUANTIZE (the loop trimmed to the nearest beat) and FADE TIME (STOP fades it out). The bar shows the loop's position.
 - **CV:** CLOCK, HOLD (a gate toggles it), ACTIVITY and MIX (±5 V) in; CLOCK (a pulse each step) and ENV (input level) out.
 - **Not the pedal's algorithms:** each effect follows the manual's description of what it does, but the sound is my own approximation. User presets are the rack's patches, and the loop is not saved with them.
+
+## Cosmos
+
+A replica of the Eventide Space reverb pedal, named Cosmos here. It is a half-width device with stereo IN / OUT on the back. The panel is laid out as the pedal's (the Space user guide's overview), with a 12 character, 14 segment display.
+
+- **The 12 algorithms:**
+  - **HALL:** 3 bands, with low and high decay multipliers and band levels.
+  - **ROOM:** early reflections and late reverb, diffusion.
+  - **PLATE:** damping and tone, distance.
+  - **SPRING:** tension, 1–3 springs, resonance, an input tremolo.
+  - **DUALVERB:** two reverbs, A / B mix.
+  - **REVERSE:** reversed windows, a forward reverb, feedback, late dry.
+  - **MODECHOVERB:** a reverb into an echo, with swept verb / flanger / chorus.
+  - **BLACKHOLE:** huge; gravity or inverse gravity, feedback.
+  - **MANGLEDVERB:** a reverb into EQ and distortion, wobble.
+  - **TREMOLOVERB:** 9 tremolo shapes, mono or stereo.
+  - **DYNAVERB:** an Omnipressor-style gate / expander / compressor / limiter / reverser on the reverb, its side chain from the input or the reverb.
+  - **SHIMMER:** two pitch shifters in the feedback.
+- **Knobs:** MIX, DECAY, SIZE, DELAY, LOW, HIGH, XNOB, YNOB, FXMIX and CONTOUR. What each does depends on the algorithm, as in the guide; the display names the parameter and its value as you turn it. A decay knob's top is [INF], then [FREEZE].
+- **PRESET encoder:** turn it for the presets (30 of the factory presets, from Eventide's list). Click it for ALGORITHM mode, where turning it chooses an algorithm. EDITED lights when a knob was turned.
+- **TEMPO:** the DELAY knobs in note values of the tempo tapped on TAP.
+- **Footswitches:** ACTIVE (bypass with the tails ringing on), HOTSWITCH (freeze the reverb) and TAP.
+- **Not the pedal's algorithms:** they follow the guide's description of each; the sound is my own. The HotSwitch is a freeze here, not a programmable set of knob positions. No expression pedal or MIDI.
 
 ## Hyper
 
