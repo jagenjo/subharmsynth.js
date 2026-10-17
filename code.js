@@ -256,6 +256,11 @@ function drawKeyOverlay()
 			ctx.strokeRect( b.x - 2, b.y - 2, b.w + 4, b.h + 4 );
 		}
 	});
+	if(r && !show_rear) // the device the keys go to: a thin line on its left
+	{
+		ctx.fillStyle = keyctl.overlay ? "#ffd65a" : "rgba(255,214,90,0.75)";
+		ctx.fillRect( r.x > 6 ? r.x - 5 : r.x + 1, r.y + 4, 3, r.h - 8 );
+	}
 	if(!keyctl.overlay || !r || show_rear)
 		return;
 	ctx.strokeStyle = "#ffd65a"; ctx.lineWidth = 3;
@@ -498,6 +503,8 @@ function knob( id, cx, cy, r, value, min, max, o )
 	var hover = !cable_drag && (ui.active === null || ui.active === id) && hitCircle( cx, cy, Math.max( r * 1.2, 16 ) );
 	if(hover)
 		ui.hot = id;
+	if(hover || ui.active === id)
+		hover_control = id; // its sockets light up
 	if(hover && ui.pressed && ui.active === null)
 	{
 		ui.active = id;
@@ -1103,6 +1110,8 @@ function fader( id, x, y, h, value, o )
 	var hover = !cable_drag && (ui.active === null || ui.active === id) && hitRect( x - capW * 0.5, y - capH * 0.5, capW, h + capH );
 	if(hover)
 		ui.hot = id;
+	if(hover || ui.active === id)
+		hover_control = id;
 	if(hover && ui.pressed && ui.active === null)
 	{
 		ui.active = id;
@@ -1357,8 +1366,30 @@ function fmtDiv( v ) { return "÷" + v; }
 var DEVICE_GAP = 10; // between two half width devices in a row
 
 // wood cheeks + black panel, shared by the main panel and the devices
+// whether the device being drawn has wooden sides (Moog style: its def.wood); the others fill the
+// rack's whole width, their ends as rack ears with screws
+var casing_wood = false;
 function drawCasing( x, y, w, h )
 {
+	if(!casing_wood)
+	{
+		var gp = layout == "classic" ? ctx.createLinearGradient( 0, y, 0, y + h ) : ctx.createLinearGradient( x, y, x + w, y + h );
+		gp.addColorStop( 0, layout == "classic" ? "#1c1c1b" : "#1f1f1e" );
+		gp.addColorStop( 1, layout == "classic" ? "#121212" : "#151515" );
+		ctx.fillStyle = gp;
+		ctx.fillRect( x, y, w, h );
+		ctx.strokeStyle = "rgba(255,255,255,0.05)"; ctx.lineWidth = 1;
+		ctx.strokeRect( x + 0.5, y + 0.5, w - 1, h - 1 );
+		ctx.beginPath(); ctx.moveTo( x + 22.5, y ); ctx.lineTo( x + 22.5, y + h ); ctx.moveTo( x + w - 22.5, y ); ctx.lineTo( x + w - 22.5, y + h ); ctx.stroke();
+		[x + 11, x + w - 11].forEach(function(cx){ // the rack screws in the ears
+			[y + 12, y + h - 12].forEach(function(cy){
+				if(h < 40 && cy != y + 12) return;
+				ctx.fillStyle = "#0a0a0a"; ctx.beginPath(); ctx.roundRect( cx - 6, cy - 4, 12, 8, 4 ); ctx.fill();
+				ctx.fillStyle = "#8c8c88"; ctx.beginPath(); ctx.arc( cx, cy, 3.2, 0, Math.PI * 2 ); ctx.fill();
+			});
+		});
+		return;
+	}
 	[x, x + w - 22].forEach(function(cx){
 		var g = ctx.createLinearGradient( cx, 0, cx + 22, 0 );
 		g.addColorStop( 0, "#4a2c18" );
@@ -1705,11 +1736,12 @@ function drawModules( y0 )
 				id_prefix = m.id + ".";
 				knob_skin = m.settings.knob_skin || m.def.knob_skin || null;
 				keyDeviceBegin( m.id, x, y, fit.w * fit.k, fit.h * fit.k );
+				casing_wood = !!m.def.wood;
 				m.def.draw( m );
+				casing_wood = false;
 				keyDeviceEnd();
 				knob_skin = null;
 				id_prefix = "";
-				skinButton( m, fit.w - 11, 20 + 3 * 22 );
 				collapseButton( m.id, 36, 11 );
 				// on the right wood cheek
 				moduleButtons( m, i, mods.length, function(k){ return [ fit.w - 11, 20 + k * 22 ]; } );
@@ -2472,6 +2504,7 @@ function draw()
 	ctx.fillStyle = "#0b0b0b";
 	ctx.fillRect( 0, 0, canvas.width, canvas.height );
 	ctx.setTransform( dpr * view.scale, 0, 0, dpr * view.scale, dpr * view.ox, dpr * view.oy );
+	drawRackRails();
 
 	ui.hot = null;
 	jacks = {}; // filled again by every row as it draws its jacks
@@ -2486,6 +2519,8 @@ function draw()
 	y += drawModules( y );
 	updateCables(); // front or rear: only the jacks of the side shown are registered
 	drawCables();
+	drawControlJacks();
+	hover_control = null;
 	drawKeyOverlay();
 	keyFrameEnd( (vw * 0.5 - view.ox) / view.scale, (vh * 0.5 - view.oy) / view.scale );
 	drawTooltips();
@@ -2499,6 +2534,73 @@ function draw()
 
 	var grab = ui.active === "pan" ? "grabbing" : (ui.active === null && onRackSide( ui.px, ui.py ) && (view.max_sx || view.max_sy) ? "grab" : null);
 	canvas.style.cursor = cable_drag ? "grabbing" : (grab || (ui.hot || jackAt( ui.x, ui.y ) ? "pointer" : "default"));
+}
+
+// ---------------------------------------------------------------------------
+// a knob (or fader) under the mouse lights the sockets that modulate it: by name (cutoff ->
+// cutoff_in, vco1_freq -> vco1_cv / vco1_pitch / vco1_in, resonance -> res_in, ...), or the device's
+// knob_jacks table [[knob regex, [jack ids]], ...]
+var hover_control = null;
+var JACK_ALIASES = { resonance: ["res"], volume: ["vca"], level: ["vca", "level"] };
+function controlJacks( device, kid, ids )
+{
+	var m = rack.settings.modules.find(function(o){ return o.id == device; });
+	var def = m ? WR.types[ m.type ] : null;
+	var table = (def && def.knob_jacks) || [];
+	for(var i = 0; i < table.length; ++i)
+	{
+		var mm = new RegExp( table[i][0] ).exec( kid );
+		if(mm)
+			return (typeof table[i][1] == "function" ? table[i][1]( mm ) : table[i][1]).filter(function(j){ return ids.indexOf( j ) >= 0; });
+	}
+	var names = [ kid ], plain = kid.replace( /\d+$/, "" );
+	if(plain != kid && plain.length > 2) names.push( plain );
+	(JACK_ALIASES[ kid ] || []).forEach(function(a){ names.push( a ); });
+	var out = ids.filter(function(j){
+		return names.some(function(n){ return j == n || j == n + "_in" || j == n + "_cv" || j == n + "_ctrl" || j == n + "_mod"; });
+	});
+	var base = kid.replace( /_?freq$/, "" );
+	if(base != kid) // a frequency: the pitch inputs
+		ids.forEach(function(j){ if((j == base + "_cv" || j == base + "_pitch" || j == base + "_in") && out.indexOf( j ) < 0) out.push( j ); });
+	return out;
+}
+function drawControlJacks()
+{
+	var id = hover_control;
+	if(!id || show_rear || cable_drag)
+		return;
+	var dot = id.indexOf( "." );
+	if(dot < 0)
+		return;
+	var device = id.substr( 0, dot ), kid = id.substr( dot + 1 ), prefix = device + ".";
+	var ids = Object.keys( jacks ).filter(function(j){ return j.indexOf( prefix ) == 0; }).map(function(j){ return j.substr( prefix.length ); });
+	var t = (performance.now() % 1000) / 1000;
+	controlJacks( device, kid, ids ).forEach(function(j){
+		var p = jacks[ prefix + j ];
+		ctx.strokeStyle = "rgba(255,214,90," + (0.55 + 0.45 * Math.sin( t * Math.PI * 2 )) + ")";
+		ctx.lineWidth = 3;
+		ctx.beginPath(); ctx.arc( p.x, p.y, 17, 0, Math.PI * 2 ); ctx.stroke();
+		ctx.fillStyle = "rgba(255,214,90,0.18)";
+		ctx.beginPath(); ctx.arc( p.x, p.y, 17, 0, Math.PI * 2 ); ctx.fill();
+	});
+}
+
+// the rack behind the devices: the two rails with their holes, the whole height
+function drawRackRails()
+{
+	var h = PANEL_H, y0 = Math.max( 0, -view.oy / view.scale - 20 ), y1 = Math.min( h, y0 + view.vh / view.scale + 40 );
+	ctx.fillStyle = "#070707";
+	ctx.fillRect( 0, 0, PANEL_W, h );
+	[0, PANEL_W - 22].forEach(function(x){
+		var g = ctx.createLinearGradient( x, 0, x + 22, 0 );
+		g.addColorStop( 0, "#3a3b3e" ); g.addColorStop( 0.5, "#57585c" ); g.addColorStop( 1, "#2e2f32" );
+		ctx.fillStyle = g;
+		ctx.fillRect( x, 0, 22, h );
+		ctx.fillStyle = "#0a0a0a";
+		// rack holes: three to a unit (44.45 mm here 26 px), only where they show
+		for(var u = Math.floor( y0 / 26 ) * 26; u < y1; u += 26)
+			[3, 13, 22].forEach(function(o){ ctx.beginPath(); ctx.roundRect( x + 7, u + o, 8, 4, 2 ); ctx.fill(); });
+	});
 }
 
 // the wood cheeks on the sides of every row (and the middle ones of the two device rows), or
@@ -2726,6 +2828,8 @@ function updatePanelHeight()
 	PANEL_H = deviceH( "io", IO_H ) + KB_GAP + deviceH( "keys", KB_H ) + KB_GAP + modulesH() - KB_GAP;
 	if(show_rear)
 		PANEL_H += 50; // room for the rear cables hanging below the bottom row
+	if(!PREVIEW_TYPE && canvas.clientHeight) // half a screen of empty rack after the last device
+		PANEL_H += canvas.clientHeight * 0.5 / (view.scale || 1);
 }
 
 function setLayout( name )
@@ -2968,6 +3072,19 @@ document.addEventListener("click", function(){ if(!$("add-panel").hidden) closeA
 document.addEventListener("keydown", function(e){ if(e.key == "Escape" && !$("add-panel").hidden) closeAddPanel(); });
 canvas.addEventListener("pointerdown", function(){ if(!$("add-panel").hidden) closeAddPanel(); });
 
+// HELP: a panel with everything above (in index.html)
+$("help-btn").addEventListener("click", function(e){
+	e.stopPropagation();
+	var p = $("help-panel");
+	p.hidden = !p.hidden;
+	$("help-btn").classList.toggle( "on", !p.hidden );
+	if(!p.hidden) { ["options-panel", "sessions-panel"].forEach(function(id){ if($(id)) $(id).hidden = true; }); if(!$("add-panel").hidden) closeAddPanel(); }
+});
+$("help-panel").addEventListener("click", function(e){ e.stopPropagation(); });
+document.addEventListener("click", function(){ $("help-panel").hidden = true; $("help-btn").classList.remove( "on" ); });
+document.addEventListener("keydown", function(e){ if(e.key == "Escape") { $("help-panel").hidden = true; $("help-btn").classList.remove( "on" ); } });
+canvas.addEventListener("pointerdown", function(){ $("help-panel").hidden = true; $("help-btn").classList.remove( "on" ); });
+
 // ---------------------------------------------------------------------------
 // PREVIEW mode (index.html?preview=<type>): only that device, filling the window's width, on a
 // magenta ground that tools/make-previews.sh trims away. No sessions, no audio
@@ -3038,8 +3155,16 @@ $("patch-delete").addEventListener("click", function(){
 	setStatus( "Deleted patch: " + name );
 });
 
-$("patch-export").addEventListener("click", function(){
+$("patch-export").addEventListener("click", function(e){
 	var name = currentPatchName() || "synths-patch";
+	if(e.shiftKey) // SHIFT + EXPORT: the patch on the clipboard instead of a file
+	{
+		var json = rack.exportPatch( name );
+		(navigator.clipboard && navigator.clipboard.writeText ? navigator.clipboard.writeText( json ) : Promise.reject())
+			.then(function(){ setStatus( "Patch copied to the clipboard (" + Math.round( json.length / 1024 ) + " kB)" ); },
+				function(){ setStatus( "Could not copy to the clipboard" ); });
+		return;
+	}
 	var blob = new Blob([ rack.exportPatch( name ) ], { type: "application/json" });
 	var a = document.createElement("a");
 	a.href = URL.createObjectURL( blob );

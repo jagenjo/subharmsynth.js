@@ -370,7 +370,10 @@ WR.registerSynth( "brother32", {
 	about: "After the Moog Mother-32: a mono semi-modular synth with a 32-step sequencer, ladder filter, envelope and a compact keyboard.",
 	// keys: 3 played / triggered, 2 often, 1 sometimes, 0 no key (code.js: keyAssign)
 	key_prio: [["^(run|reset|next|rec)$", 3], ["^step\\d+$", 3], ["^(rest|accent|glide_step|oct_down|oct_up)$", 2], ["^(assign|sustain)$", 0], ["", 1]],
+	// a knob's sockets, lit when the mouse is over it (code.js: controlJacks)
+	knob_jacks: [["^freq$", ["pitch_in", "lin_fm"]], ["^mix$", ["mix_cv", "mix1", "mix2"]], ["^gate_length$", ["gate_in"]]],
 	category: "Synths",
+	wood: true, // wooden sides
 	worklet: "devices/b32-worklet.js",
 	jacks: JACKS,
 	rear_jacks: [["AUDIO OUT", "aout", "audio"]],

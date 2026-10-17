@@ -10,9 +10,9 @@
 
 (function(){
 
-var SIZE = [1568, 850];
+var SIZE = [1568, 790]; // from the logo to the bottom of the mixer, no empty bands
 var ORANGE = "#e3692c", PANEL = "#292929", LM_FONT = "Arial, Helvetica, sans-serif";
-var X = function(x){ return x - 8; }, Y = function(y){ return y - 25; };
+var X = function(x){ return x - 8; }, Y = function(y){ return y - 50; };
 
 // pad sounds (slots) and their mixer channels; worklet: SLOT_CH, LIBRARY
 var SLOT_NAMES = ["BASS 1", "BASS 2", "SNARE 1", "SNARE 2", "SNARE 3", "SIDESTICK", "HI HAT 1", "HI HAT 2", "HI HAT OPEN",
@@ -683,6 +683,7 @@ WR.registerSynth( "llmdram", {
 	// keys: 3 played / triggered, 2 often, 1 sometimes, 0 no key (code.js: keyAssign)
 	key_prio: [["^pad\\d+$", 3], ["^(play|stop|rec|tap)$", 3], ["^(mute|solo|step_repeat|note_repeat|auto_fill|trigger)$", 2], ["^mode_", 2], ["^voice\\d+$", 2], ["^(prev|next)$", 2], ["^(midi|usb|dump|save|samp|bank|length|quan|copy)$", 0], ["", 1]],
 	category: "Synths",
+	wood: true, // wooden sides
 	worklet: "devices/llmdram-worklet.js",
 	jacks: [],
 	rear_jacks: REAR_JACKS,

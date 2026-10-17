@@ -676,6 +676,8 @@ WR.registerSynth( "lunar", {
 	about: "After the Elta Music Solar 42: six drone voices, two VCOs on touch plates, Polivoks filters and a dual effector with cartridges. Ambient machine.",
 	// keys: 3 played / triggered, 2 often, 1 sometimes, 0 no key (code.js: keyAssign)
 	key_prio: [["^dv\\d$", 3], ["^plate\\d+$", 3], ["^pad\\d$", 0], ["^(hold\\d|nhold\\d|kbhold|oct_dn|oct_up)$", 2], ["^(stages|link|kbmode|fx_edit)$", 0], ["", 1]],
+	// a knob's sockets, lit when the mouse is over it (code.js: controlJacks)
+	knob_jacks: [["^volt(\\d)$", function(m){ return ["v" + [1, 2, 6, 7][+m[1]] + "_cv"]; }], ["^pitch(\\d)$", function(m){ return ["v" + [3, 8][+m[1]] + "_fm"]; }], ["^fl_freq$|^fr_freq$", ["filt_cv"]], ["^fx_([xyz])$", function(m){ return ["fx_cv" + m[1]]; }], ["^shape(\\d)$", function(m){ return ["v" + (4 + +m[1]) + "_shape"]; }], ["^fm(\\d)$", function(m){ return ["v" + (4 + +m[1]) + "_fm"]; }], ["^tune(\\d)$", function(m){ return ["v" + (4 + +m[1]) + "_voct"]; }]],
 	category: "Synths",
 	worklet: "devices/lunar-worklet.js",
 	jacks: JACKS,

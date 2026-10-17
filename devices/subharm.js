@@ -681,9 +681,12 @@ WR.registerSynth( "subharm", {
 	about: "After the Moog Subharmonicon: 2 VCOs with 4 subharmonics, 2 four-step sequencers and 4 polyrhythmic clock dividers. Polyrhythms that lock together.",
 	// keys: 3 played / triggered, 2 often, 1 sometimes, 0 no key (code.js: keyAssign)
 	key_prio: [["^(play|trigger|reset|next)$", 3], ["^r\\ds\\d$", 2], ["^assign", 2], ["^(quantize|seq_oct|eg)$", 1]],
+	// a knob's sockets, lit when the mouse is over it (code.js: controlJacks)
+	knob_jacks: [["^rhythm(\\d)$", function(m){ return ["rhythm" + (+m[1] + 1) + "_in"]; }], ["^tempo$", ["clock_in"]], ["^vco(\\d)_pw", function(m){ return ["vco" + m[1] + "_pwm"]; }]],
 	worklet: "devices/subharm-worklet.js",
 	jacks: JACKS,
 	category: "Synths",
+	wood: true, // wooden sides
 	midi_in: "midi_in",
 	rear_jacks: [["AUDIO OUT", "aout", "audio"]], // line level, on the back
 	audio_out: "audio",

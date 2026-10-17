@@ -58,7 +58,7 @@ One patch bay spans all of them: any output can be cabled to any input of any de
   - A synth with a MIDI IN (Subharm, Brother-32, Maze) gets the keys' MIDI through **MASTER MIDI** instead of a long cable across the rack (see *MIDI on the back*).
   - A new synth's audio goes to the first free mixer channel; with no mixer, to wherever the other synths go (or the compressor).
   - A new mixer takes over the synths that weren't on a mixer: they move onto its channels, and its MAIN L / R go where they went.
-- Each synth has three buttons on its right wood cheek: **move up**, **move down** and **remove**. A full-width device moves past a whole row: a pair of half-width devices stays together. The fourth button (◎) changes that device's **knob style**: aluminium cap, classic, black skirt, chrome, cream or soft touch (it cycles; "device default" goes back to its own). Each device keeps its own style, saved with the rack, so two devices can look different. Removing asks first and unplugs that device's cables. When an effect (compressor, reverb, delay, Universe, Hyper) or a mixer is removed, what came into it is cabled on to where it went (IN L → OUT L, IN R → OUT R, mixer channels → MAIN), so the audio keeps reaching the speakers.
+- Each synth has three buttons on its right wood cheek: **move up**, **move down** and **remove**. A full-width device moves past a whole row: a pair of half-width devices stays together. Removing asks first and unplugs that device's cables. When an effect (compressor, reverb, delay, Universe, Hyper) or a mixer is removed, what came into it is cabled on to where it went (IN L → OUT L, IN R → OUT R, mixer channels → MAIN), so the audio keeps reaching the speakers.
 - The chevron on the top left folds a synth into a slim bar like the other devices. Its jacks stay on the bar, so cables stay connected.
 - **Scale:** the rack fills the window width; more devices make it taller and it scrolls vertically.
   - Zoom **−** / **+** (toolbar) change the scale; the percentage button goes back to 100%. The zoom is remembered in the browser.
@@ -82,6 +82,7 @@ One patch bay spans all of them: any output can be cabled to any input of any de
 - **Keyboard control:** the device in the middle of the screen gets its buttons (not its knobs) on the computer keyboard. Scroll to choose the device.
   - **Keys:** 1–0, Q–P, A–', Z–/, [ ] - = \. The buttons used most (play, trigger, pads, steps, footswitches) get keys first, then mode and performance switches; configuration buttons (MIDI, DUMP, SAVE, the reset buttons under encoders) get none. Each button takes the free key nearest to where it is on the panel, so the keyboard is a map of the device. The priorities are each device's `key_prio` table.
   - **Held keys:** they hold the button down, so momentary buttons work (drone voices, pads, plates, footswitches). A lever switch moves to its next position.
+  - **Which device:** a thin yellow line on its left shows the device the keys go to.
   - **Seeing the keys:** hold **Shift** to show each button's key on it, with the device outlined. A device with more buttons than keys has banks; **`** switches between them.
   - **QWERTY piano:** when it is on (keys device), the letters play notes instead.
 - **Adding another synth:** register it from a pair of files in `devices/`:

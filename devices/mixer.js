@@ -205,6 +205,8 @@ WR.registerSynth( "mixer", {
 	about: "Six mono channels with level, pan, mute / solo and an aux send / return, into the main stereo out.",
 	// keys: 3 played / triggered, 2 often, 1 sometimes, 0 no key (code.js: keyAssign)
 	key_prio: [["^(mute|solo)\\d$", 2]],
+	// a knob's sockets, lit when the mouse is over it (code.js: controlJacks)
+	knob_jacks: [["^level(\\d)$", function(m){ return ["cv" + (+m[1] + 1)]; }]],
 	worklet: "devices/mixer-worklet.js",
 	jacks: JACKS,
 	rear_jacks: REAR_JACKS,

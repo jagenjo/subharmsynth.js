@@ -729,6 +729,8 @@ WR.registerSynth( "mystic", {
 	about: "After the ASM Hydrasynth: 8 voices, wave-scanning oscillators with mutants, two filters, three envelopes, an arpeggiator. Edit pages around an OLED.",
 	// keys: 3 played / triggered, 2 often, 1 sometimes, 0 no key (code.js: keyAssign)
 	key_prio: [["^pad\\d_\\d$", 3], ["^(arp_on|arp_latch|arp_tap|home|prev|next)$", 2], ["^(shift|random|arp_trip|filt[12]|page_up|page_down|exit)$", 1], ["^mod_", 1], ["^(encbtn\\d|save|sysset|browse|init|macro|modmatrix|voice)$", 0]],
+	// a knob's sockets, lit when the mouse is over it (code.js: controlJacks)
+	knob_jacks: [["^fc_cut$", ["mod1_in"]], ["^enc\\d$", []]],
 	category: "Synths",
 	worklet: "devices/mystic-worklet.js",
 	jacks: JACKS,

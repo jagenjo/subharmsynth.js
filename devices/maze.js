@@ -327,6 +327,7 @@ WR.registerSynth( "maze", {
 	// keys: 3 played / triggered, 2 often, 1 sometimes, 0 no key (code.js: keyAssign)
 	key_prio: [["^(run|reset|advance|trigger)$", 3], ["^bit\\d_\\d$", 3], ["^(length|flip|shift)\\d$", 2], ["", 1]],
 	category: "Synths",
+	wood: true, // wooden sides
 	worklet: "devices/maze-worklet.js",
 	jacks: JACKS,
 	rear_jacks: [["AUDIO OUT", "aout", "audio"]],

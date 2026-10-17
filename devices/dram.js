@@ -272,9 +272,12 @@ WR.registerSynth( "dram", {
 	about: "After the Moog DFAM: an 8-step analog percussion voice, 2 VCOs, noise, a ladder filter and decays per step. Kicks, toms, clanks.",
 	// keys: 3 played / triggered, 2 often, 1 sometimes, 0 no key (code.js: keyAssign)
 	key_prio: [["^(run|trigger|advance)$", 3], ["", 1]],
+	// a knob's sockets, lit when the mouse is over it (code.js: controlJacks)
+	knob_jacks: [["^vco_decay$", ["vco_decay_in"]], ["^vcf_eg_amt$", ["vcf_mod"]], ["^tempo$", ["tempo_in"]]],
 	worklet: "devices/dram-worklet.js",
 	jacks: JACKS,
 	category: "Synths",
+	wood: true, // wooden sides
 	midi_in: null,
 	rear_jacks: [["AUDIO OUT", "aout", "audio"]], // line level, on the back
 	audio_out: "audio",

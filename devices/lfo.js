@@ -71,6 +71,8 @@ WR.registerSynth( "lfo", {
 	about: "Two LFOs (sine, triangle, saw, ramp, square, S&H) with rate and level, and sync inputs. Half width.",
 	// keys: 3 played / triggered, 2 often, 1 sometimes, 0 no key (code.js: keyAssign)
 	key_prio: [["", 1]],
+	// a knob's sockets, lit when the mouse is over it (code.js: controlJacks)
+	knob_jacks: [["^rate(\\d)$", function(m){ return ["rate" + (+m[1] + 1)]; }]],
 	category: "Modulation",
 	half: true,
 	worklet: "devices/lfo-worklet.js",
