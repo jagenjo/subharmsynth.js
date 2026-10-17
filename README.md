@@ -1,6 +1,6 @@
 # subharmsynth.js
 
-**SYNTHS** is a browser rack of semi-modular synthesizers built on the WebAudio API: replicas of the Moog Subharmonicon (polyrhythmic synthesizer), DFAM (percussion synthesizer, here called DRAM), Mother-32 (synthesizer with a 32 step sequencer, here called Brother-32) Labyrinth (parallel generative synthesizer, here called Maze) ASM Hydrasynth (polyphonic wave morphing synthesizer, here called Mystic) and Behringer LM Drum (LinnDrum-style sampling drum machine, here called LLM Dram), plus the Hologram Microcosm (granular looper pedal, here called Universe), with a mixer, LFOs, compressors, reverbs and delays, all patchable with each other.
+**SYNTHS** is a browser rack of semi-modular synthesizers built on the WebAudio API: replicas of the Moog Subharmonicon (polyrhythmic synthesizer), DFAM (percussion synthesizer, here called DRAM), Mother-32 (synthesizer with a 32 step sequencer, here called Brother-32) Labyrinth (parallel generative synthesizer, here called Maze) ASM Hydrasynth (polyphonic wave morphing synthesizer, here called Mystic) Behringer LM Drum (LinnDrum-style sampling drum machine, here called LLM Dram) and Elta Music Solar 42 (ambient drone machine, here called Lunar 21), plus the Hologram Microcosm (granular looper pedal, here called Universe), with a mixer, LFOs, compressors, reverbs and delays, all patchable with each other.
 
 All synthesis runs in real time in one `AudioWorkletProcessor` (`rack-worklet.js`), which hosts each synth's DSP and copies the patch cables between them every sample. Oscillators, filters, envelopes, clocks, sequencers and the cables are all computed per sample, so patching between synths is sample-accurate. The reverb and delay are native WebAudio nodes after it.
 
@@ -22,6 +22,7 @@ Needs a browser with AudioWorklet support, served over `https://` or `localhost`
 | `devices/maze.js`, `devices/maze-worklet.js` | the Maze |
 | `devices/mystic.js`, `devices/mystic-worklet.js` | the Mystic (polyphonic) |
 | `devices/llmdram.js`, `devices/llmdram-worklet.js` | the LLM Dram drum machine |
+| `devices/lunar.js`, `devices/lunar-worklet.js` | the Lunar 21 drone machine |
 | `devices/mixer.js`, `devices/mixer-worklet.js` | the 6 channel mixer |
 | `devices/lfo.js`, `devices/lfo-worklet.js` | the dual LFO |
 | `devices/comp.js`, `devices/comp-worklet.js` | the stereo compressor and its scope |
@@ -46,7 +47,7 @@ A new rack has a Subharm, an LFO and a compressor, then a reverb and a delay, ca
 
 One patch bay spans all of them: any output can be cabled to any input of any device. The front carries CV, gates and audio at ±5 V; the back carries the line-level audio between devices (see *Rear view*).
 
-- **Add device** (toolbar) inserts a new device at the bottom of the rack. The menu is grouped into synths (Subharm, DRAM, Brother-32, Maze, Mystic, LLM Dram), modulation (dual LFO), mixing (mixer, compressor) and effects (reverb, delay, Universe, Hyper).
+- **Add device** (toolbar) inserts a new device at the bottom of the rack. The menu is grouped into synths (Subharm, DRAM, Brother-32, Maze, Mystic, LLM Dram, Lunar 21), modulation (dual LFO), mixing (mixer, compressor) and effects (reverb, delay, Universe, Hyper).
   - You can have several of the same kind (`dram`, `dram2`, …). Reverbs are limited to 8, one per send / return slot of the audio engine.
   - A new LFO, compressor, reverb or delay arrives unpatched: patch its audio on the back (Tab).
   - A new Universe or Hyper goes in just before the speakers (between the last device and MAIN IN), so you hear it right away.
@@ -200,6 +201,30 @@ A replica of the Behringer LM Drum (itself after the Linn LM-1 and LinnDrum), na
   - **Tempo:** RATE and TAP, or SYNC (MIDI clock, else the rack's tempo). Swing from 50 to 75%.
 - **On the back:** OUT L / R, IN, MIDI IN (notes play the pads on the General MIDI drum map, and are recorded) and 16 individual outputs. A cabled individual output takes its channel out of the mix.
 - **Not here:** MIDI, USB and DUMP only show a message; there is no sampling from the input.
+
+## Lunar 21
+
+A replica of the Elta Music Solar 42 ambient drone machine, named Lunar 21 here. Its panel is laid out as the original's: cream with black print, black, red and blue knobs (the FLAT knob style), mini jacks, the touch plates and the drone buttons.
+
+- **Drone voices 1, 2, 6 and 7:** 5 reed-like oscillators each.
+  - **Per oscillator:** MUTE, TUNE (−12 to +24 semitones, fine enough for microtonal chords) and MOD (a slow drift of its own, for beating).
+  - **Per voice:** VOLT (the pitch), ATT / RLS, a CV (1 V/oct) and a GATE input, and an ENV output.
+  - **Playing them:** each is played by its button in DRONE VOICES or its round pad. **HOLD** makes them latch.
+- **Voices 3 and 8:** a square oscillator (PITCH, RANGE) with a sub DIVIDER and NOISE.
+  - **Modulator:** a triangle (rate, ×10) doing FM and / or AM, with its own MOD OUT (0–12 V).
+  - **S&H:** IN (else the noise) sampled on CLOCK (else the modulator).
+- **Voices 4 and 5 (VCO 1 / 2):** OCTAVE (LO, 64' to 1'), TUNE, FINE, SHAPE (sine → triangle → saw → square), PW and FM, with V/OCT, FM, SHAPE (and SYNC on VCO 2) inputs.
+  - **Playing them:** from the touch plates or MIDI, through **EG VCA 1 / 2** (ADSR; HOLD keeps them open, LOOP repeats attack / decay).
+- **Touch plates:** the 12 notes of an octave, with OCTAVE ▽ △ and a HOLD button. The display switches SINGLE (both VCOs on the last note) or TWIN (the last two notes). They output V/OCT and GATE ×2.
+- **Mixer:** PAN and VOL for the 8 voices, EXT.AUDIO and PREAMP.
+- **FILTER L / R:** 12 dB, Polivoks-like: driven, and resonant up to whistling. They have CV FREQ with its amount, and LINK.
+- **DUAL EFFECTOR:** a cartridge on each side, with X / Y / Z, CV X / Y / Z, BLEND and MASTER VOLUME.
+  - **Cartridges:** 10 of the original's, with their 3 programs each, from the original's cartridge chart: CATHEDRAL, TIME, MAGIC, INFINITY, VIBROTREM, VIBE, PITCH SHIFTER, STRING RINGER, DIGITAL and FILTER.
+  - **Editing:** click the slot for the next cartridge. The L/R switch picks the side that the knobs and the program buttons edit.
+  - **What's different:** the programs are my own versions of what the chart names. SYNTEX-1 and GENERATOR are left out.
+- **CV sources:** LFO A / B (WAVE triangle → square, RATE, 0–10 V), the **JOYSTICK** (drag it; X / Y with offsets), the **5 STEP SEQUENCER** (PULSER clock or CLOCK in, STAGES 4 / 5, a gate switch per step, CV and GATE out), the **PREAMP** and the **ENVELOPE FOLLOWER** (ENVELOPE and GATE out).
+- **On the back:** OUT L / R (cabled into the rack in stereo when it is added), DRY OUT 4 / 5, EXT AUDIO and PREAMP IN. The front EXT. SOURCE jack takes a CV-level signal into the preamp.
+- **CPU:** in tests, about 8% of a core idle and 19% with every voice and both effects running. Silent effects sleep after 4 seconds.
 
 ## Maze
 

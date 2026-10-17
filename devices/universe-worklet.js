@@ -367,10 +367,10 @@ class UniverseDSP {
 				let len = L * 0.5, rate = 1, filter = null;
 				if (v === 0) len *= 1 - act * 0.85 * (0.5 + 0.5 * Math.sin(t * 0.9)); // A: compresses and lengthens
 				if (v === 1) { rate = 0.5; const fc = 400 * Math.pow(2, act * 3 * (1 + Math.sin(t * 0.6))); filter = [F_LP, fc, fc, 1]; } // B: sub octave, filter sweeps
-				if (v === 2) { const fc = pick([250, 500, 1000, 2000]) * (1 + 0.5 * act * Math.sin(t * 0.4)); filter = [F_BP, fc, fc, 0.5 - act * 0.3]; } // C: resonant band passes
+				if (v === 2) { const fc = pick([250, 500, 1000, 2000]) * (1 + 0.5 * act * Math.sin(t * 0.4)); filter = [F_BP, fc, fc, 0.5 - act * 0.3]; } // C: resonant band passes (louder below)
 				if (v === 3) len *= 0.1 + 0.9 * Math.min(1, (this.sampleCount - this.lastOnset) / (L * (2 + act * 6))); // D: per note
 				if (d.level > 0.003)
-					this.spawn(d.off, Math.max(256, len), rate, { loop: true, life: L * 1.2, gain: (v === 2 ? 1.2 : 0.5) * d.level, filter: filter, echoes: 0, flat: true });
+					this.spawn(d.off, Math.max(256, len), rate, { loop: true, life: L * 1.2, gain: (v === 2 ? 2 : 0.5) * d.level, filter: filter, echoes: 0, flat: true });
 			}
 		}
 	}

@@ -13,7 +13,7 @@ var WR = {
 	order: []
 };
 
-WR.VERSION = "20261017j"; // bump together with the ?v= in index.html so browsers reload the scripts
+WR.VERSION = "20261017k"; // bump together with the ?v= in index.html so browsers reload the scripts
 
 // def: {
 //   title, description,           names for menus and the panel
@@ -22,6 +22,7 @@ WR.VERSION = "20261017j"; // bump together with the ?v= in index.html so browser
 //   max                           how many fit in a rack
 //   rear_jacks                    audio sockets on the back: [label, "ain"|"aout", id]
 //   audio_out                     id of its main audio output socket (routed when it is added)
+//   audio_out_r                   a stereo synth's right output (routed to the R of the same pair)
 //   native { build(ctx), update(graph, s, rack) }  DSP in native nodes, fed by a send / return slot
 //   rear_note(s)                  what the rear label says about its audio
 //   worklet,                      DSP file, registers globalThis.WR_DSP[type]
@@ -56,7 +57,7 @@ WR.registerSynth = function( type, def )
 // patch bay ids: the rack's own jacks are plain, a module's are prefixed with its id
 WR.jackId = function( module_id, id ) { return module_id + "." + id; }
 // knob styles a device can have (code.js draws them); "" = the device's own default
-WR.KNOB_SKINS = ["", "aluminium", "classic", "lm", "chrome", "cream", "soft", "ledring", "greycap"];
+WR.KNOB_SKINS = ["", "aluminium", "classic", "lm", "chrome", "cream", "soft", "ledring", "greycap", "flat"];
 
 // audio sockets on the back of the audio I/O row (line level, "ain" / "aout"): patched like the
 // front jacks, but only with each other. An audio input sums every cable plugged into it
@@ -207,7 +208,8 @@ WRContext.routeAudio = function( s, m )
 {
 	var def = WR.types[ m.type ];
 	var has = function(dst){ return s.patches.some(function(p){ return p[1] == dst; }); };
-	var synthAudio = function(id){ return /\.audio$/.test( id ); };
+	var outs = s.modules.map(function(o){ var d = WR.types[ o.type ]; return d && d.audio_out ? WR.jackId( o.id, d.audio_out ) : null; });
+	var synthAudio = function(id){ return /\.audio$/.test( id ) || outs.indexOf( id ) >= 0; };
 	if(def.mixer)
 	{
 		var loose = s.patches.filter(function(p){ return synthAudio( p[0] ) && !WR.isMixerInput( s, p[1] ); });
@@ -248,7 +250,11 @@ WRContext.routeAudio = function( s, m )
 		}
 	var other = s.patches.find(function(p){ return synthAudio( p[0] ) && p[0] != src; });
 	var comp = s.modules.find(function(o){ return o.type == "comp"; });
-	s.patches.push([ src, other ? other[1] : (comp ? WR.jackId( comp.id, "in_l" ) : "io_main_l"), color ]);
+	var dst = other ? other[1] : (comp ? WR.jackId( comp.id, "in_l" ) : "io_main_l");
+	s.patches.push([ src, dst, color ]);
+	// a stereo synth: its right output into the R of the same pair
+	if(def.audio_out_r && /_l$/.test( dst ))
+		s.patches.push([ WR.jackId( m.id, def.audio_out_r ), dst.replace(/_l$/, "_r"), color ]);
 }
 
 WRContext.prototype.init = function()

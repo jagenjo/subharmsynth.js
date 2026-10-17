@@ -55,7 +55,9 @@ class DelayDSP {
 	read(buf, d) {
 		let p = this.pos - d;
 		while (p < 0) p += this.size;
-		const i = p | 0, f = p - i;
+		let i = p | 0;
+		if (i >= this.size) i -= this.size; // p a hair under 0, wrapped, rounds to size
+		const f = p - Math.floor(p);
 		const a = buf[i], b = buf[i + 1 < this.size ? i + 1 : 0];
 		return a + (b - a) * f;
 	}

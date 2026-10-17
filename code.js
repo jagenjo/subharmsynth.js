@@ -53,7 +53,9 @@ var frame = { ox: 0, oy: 0, k: 1 };
 var id_prefix = "";
 // knob style of the device being drawn (its settings.knob_skin, else its type's, else the layout's)
 var knob_skin = null;
-var KNOB_SKIN_NAMES = { "": "DEVICE DEFAULT", aluminium: "ALUMINIUM CAP", classic: "CLASSIC", lm: "BLACK SKIRT", chrome: "CHROME", cream: "CREAM", soft: "SOFT TOUCH", ledring: "LED RING", greycap: "GREY CAP" };
+var KNOB_SKIN_NAMES = { "": "DEVICE DEFAULT", aluminium: "ALUMINIUM CAP", classic: "CLASSIC", lm: "BLACK SKIRT", chrome: "CHROME", cream: "CREAM", soft: "SOFT TOUCH", ledring: "LED RING", greycap: "GREY CAP", flat: "FLAT" };
+// the cap colour for the FLAT knobs (a panel with coloured knobs sets it per knob)
+var knob_tint = null;
 // the colour of the knobs' printed scale (a light panel sets it dark while it draws)
 var knob_scale_color = null;
 
@@ -449,6 +451,21 @@ function drawSkinKnob( skin, cx, cy, r, n, highlight, bipolar )
 		ctx.strokeStyle = "rgba(90,70,40,0.35)"; ctx.lineWidth = 1;
 		ctx.beginPath(); ctx.arc( cx, cy, r * 0.86, 0, Math.PI * 2 ); ctx.stroke();
 		pointer( "#1c1a17", 0.12, 0.84, Math.max( 2, r * 0.11 ) );
+	}
+	else if(skin == "flat")
+	{
+		// a flat moulded knob, black or coloured, a white line
+		var base = knob_tint || "#16161a";
+		// the colour, lighter towards the light and darker at the edge
+		var mixc = function(hex, t) { // t > 0: towards white, < 0: towards black
+			var n = parseInt( hex.slice( 1 ), 16 ), c = [n >> 16, (n >> 8) & 255, n & 255];
+			return "rgb(" + c.map(function(v){ return Math.round( t > 0 ? v + (255 - v) * t : v * (1 + t) ); }).join(",") + ")";
+		};
+		disc( r, "#050506" );
+		g = ctx.createRadialGradient( cx - r * 0.3, cy - r * 0.35, r * 0.05, cx, cy, r * 0.92 );
+		g.addColorStop( 0, mixc( base, highlight ? 0.38 : 0.25 ) ); g.addColorStop( 0.5, base ); g.addColorStop( 1, mixc( base, -0.35 ) );
+		disc( r * 0.92, g );
+		pointer( "#f6f4ee", 0.15, 0.9, Math.max( 1.6, r * 0.11 ) );
 	}
 	else if(skin == "greycap")
 	{
