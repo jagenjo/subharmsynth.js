@@ -53,7 +53,9 @@ var frame = { ox: 0, oy: 0, k: 1 };
 var id_prefix = "";
 // knob style of the device being drawn (its settings.knob_skin, else its type's, else the layout's)
 var knob_skin = null;
-var KNOB_SKIN_NAMES = { "": "DEVICE DEFAULT", aluminium: "ALUMINIUM CAP", classic: "CLASSIC", lm: "BLACK SKIRT", chrome: "CHROME", cream: "CREAM", soft: "SOFT TOUCH", ledring: "LED RING" };
+var KNOB_SKIN_NAMES = { "": "DEVICE DEFAULT", aluminium: "ALUMINIUM CAP", classic: "CLASSIC", lm: "BLACK SKIRT", chrome: "CHROME", cream: "CREAM", soft: "SOFT TOUCH", ledring: "LED RING", greycap: "GREY CAP" };
+// the colour of the knobs' printed scale (a light panel sets it dark while it draws)
+var knob_scale_color = null;
 
 function beginFrame( ox, oy, k )
 {
@@ -350,7 +352,7 @@ function drawKnobScale( cx, cy, r, ticks, bipolar, style )
 {
 	var a;
 	// scale printed on the panel
-	ctx.strokeStyle = "#d8d5ce";
+	ctx.strokeStyle = knob_scale_color || "#d8d5ce";
 	ctx.lineWidth = 1.2;
 	ctx.beginPath();
 	if(style == "ring")
@@ -447,6 +449,18 @@ function drawSkinKnob( skin, cx, cy, r, n, highlight, bipolar )
 		ctx.strokeStyle = "rgba(90,70,40,0.35)"; ctx.lineWidth = 1;
 		ctx.beginPath(); ctx.arc( cx, cy, r * 0.86, 0, Math.PI * 2 ); ctx.stroke();
 		pointer( "#1c1a17", 0.12, 0.84, Math.max( 2, r * 0.11 ) );
+	}
+	else if(skin == "greycap")
+	{
+		// a tall black knurled knob with a light grey top, its pointer a dark line on the top
+		g = ctx.createLinearGradient( cx - r, cy, cx + r, cy );
+		g.addColorStop( 0, "#2a2c33" ); g.addColorStop( 0.35, highlight ? "#4a4d57" : "#3a3d46" ); g.addColorStop( 1, "#0c0d10" );
+		disc( r, g );
+		ridges( "rgba(0,0,0,0.55)", 0.82, 0.99, Math.max( 22, Math.round( r * 1.7 ) ) );
+		g = ctx.createRadialGradient( cx - r * 0.3, cy - r * 0.35, r * 0.05, cx, cy, r * 0.8 );
+		g.addColorStop( 0, "#f4f5f7" ); g.addColorStop( 0.7, highlight ? "#dfe2e7" : "#cfd3d9" ); g.addColorStop( 1, "#a9aeb6" );
+		disc( r * 0.8, g );
+		pointer( "#22252d", 0.25, 0.78, Math.max( 1.8, r * 0.09 ) );
 	}
 	else if(skin == "ledring")
 	{

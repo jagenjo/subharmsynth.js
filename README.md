@@ -133,6 +133,12 @@ A replica of the ASM Hydrasynth, simplified to fit on one panel; named Mystic he
 
 A replica of the Hologram Microcosm granular / looper pedal, named Universe here. It is a half-width effect with stereo IN / OUT on the back.
 
+- **Panel:** laid out as the pedal's. It is a light grey enclosure with navy print and black knobs with grey tops (the GREY CAP knob style), on a dark rack shelf. The CV jacks are on its top edge.
+  - **Knobs:** ACTIVITY, SHAPE, FILTER, MIX on top; TIME (on its blue ¼×…8× scale), REPEATS, SPACE, LOOP LEVEL below. **SHIFT** switches them to the secondary controls printed in grey: MOD FREQ, RESONANCE, EFFECT VOLUME, LOOPER SPEED, MOD DEPTH, REVERB TIME and FADE TIME.
+  - **SELECT:** sets whether TIME is the subdivision (SUBDIV light) or the tempo (TEMPO light).
+  - **Preset knob:** turns through all 44 presets, among the four outlined groups whose LEDs pick an effect. FWD/REV plays the effect backwards. The four A–D lights show and pick the variation.
+  - **PHRASE LOOPER box:** PRE-FX, LOOPER ONLY, BURST, QUANTIZE and REVERSE. Its centre button engages the looper.
+  - **Footswitches:** TAP (with the looper: REC / PLAY / DUB, or with BURST, record while held), bypass, and HOLD (with the looper: STOP, held a second to ERASE).
 - **How it works:** it keeps the last 11 seconds of its input. Each effect plays small pieces of it ("grains") back, at other speeds, looped, reversed or bit-crushed, timed by the tempo.
 - **Effects:** 11 effects, each with variations A–D (44 presets). The display shows what the variation does. What each variation does, and what ACTIVITY and REPEATS do in each effect, follow the pedal's manual:
 
@@ -155,7 +161,7 @@ A replica of the Hologram Microcosm granular / looper pedal, named Universe here
 - **Secondary controls** (shift functions on the pedal) are the small knobs: MOD depth and RATE (pitch modulation), RES (filter resonance), VOL (effect volume), TEMPO, REVERB (ROOM, HALL, CATHEDRAL, AMBIENT WASH) and the looper SPEED (¼× to 4×).
 - **Tempo:** SYNC follows the rack's tempo. TAP (or TEMPO) sets its own and turns SYNC off. MIDI clock or a cable in CLOCK takes over.
 - **HOLD** freezes the buffer: the effect keeps playing what it holds while you play on top. **BYPASS** passes the dry signal.
-- **Phrase looper** (up to 60 s): REC → PLAY → DUB (overdub) → PLAY, STOP and ERASE, plus REVERSE, PRE-FX (record the dry input) and ONLY (the effect off, only the loop and the dry signal). The bar shows the loop's position.
+- **Phrase looper** (up to 60 s): REC → PLAY → DUB (overdub) → PLAY, STOP and ERASE, plus REVERSE, PRE-FX (record the dry input), LOOPER ONLY (the effect off, only the loop and the dry signal), BURST, QUANTIZE (the loop trimmed to the nearest beat) and FADE TIME (STOP fades it out). The bar shows the loop's position.
 - **CV:** CLOCK, HOLD (a gate toggles it), ACTIVITY and MIX (±5 V) in; CLOCK (a pulse each step) and ENV (input level) out.
 - **Not the pedal's algorithms:** each effect follows the manual's description of what it does, but the sound is my own approximation. User presets are the rack's patches, and the loop is not saved with them.
 

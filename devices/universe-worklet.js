@@ -85,7 +85,11 @@ class UniverseDSP {
 	message(m) {
 		switch (m.type) {
 			case "looper": this.looperFoot(); break;
-			case "loopStop": if (this.loopState === "playing" || this.loopState === "overdub") this.loopState = "stopped"; else if (this.loopState === "recording") this.closeLoop(), this.loopState = "stopped"; break;
+			case "loopStop":
+				// FADE TIME (LOOP LEVEL's secondary): the loop fades out before it stops
+				if (this.loopState === "playing" || this.loopState === "overdub") { this.loopState = this.s.loop_fade > 0.01 ? "fading" : "stopped"; this.fade = 1; }
+				else if (this.loopState === "recording") this.closeLoop(), this.loopState = "stopped";
+				break;
 			case "loopErase": this.loopState = "empty"; this.loopLen = 0; this.loopPos = 0; break;
 			case "clearHold": this.grains = []; break;
 			case "midiClock": this.midiTickTimes.push(this.sampleCount); if (this.midiTickTimes.length > 25) this.midiTickTimes.shift(); this.lastMidiClock = this.sampleCount; break;
@@ -106,12 +110,16 @@ class UniverseDSP {
 			case "recording": this.closeLoop(); this.loopState = "playing"; break;
 			case "playing": this.loopState = "overdub"; break;
 			case "overdub": this.loopState = "playing"; break;
-			case "stopped": this.loopState = "playing"; this.loopPos = 0; break;
+			case "stopped": case "fading": this.loopState = "playing"; this.loopPos = 0; break;
 		}
 	}
 
 	closeLoop() {
 		this.loopLen = Math.max(1, Math.floor(this.loopPos));
+		if (this.s.loop_quantize) { // QUANTIZE: to the nearest beat
+			const beat = 60 / this.tempo * sampleRate;
+			this.loopLen = Math.min(Math.floor(this.loopPos), Math.max(Math.round(beat), Math.round(Math.round(this.loopLen / beat) * beat))) || this.loopLen;
+		}
 		this.loopPos = 0;
 	}
 
@@ -524,13 +532,18 @@ class UniverseDSP {
 				if (i < max) { this.loopL[i] = recL; this.loopR[i] = recR; this.loopPos++; }
 				else { this.closeLoop(); this.loopState = "playing"; }
 			}
-			else if (this.loopState === "playing" || this.loopState === "overdub") {
+			else if (this.loopState === "playing" || this.loopState === "overdub" || this.loopState === "fading") {
 				const len = this.loopLen, sp = LOOPER_SPEEDS[clamp(s.looper_speed | 0, 0, LOOPER_SPEEDS.length - 1)] * (s.reverse ? -1 : 1);
 				const p = ((this.loopPos % len) + len) % len;
 				const i = Math.floor(p), j = (i + 1) % len, fr = p - i;
 				const pl = this.loopL[i] + (this.loopL[j] - this.loopL[i]) * fr, pr = this.loopR[i] + (this.loopR[j] - this.loopR[i]) * fr;
 				if (this.loopState === "overdub") { this.loopL[i] = clamp(this.loopL[i] + recL * 0.8, -2, 2); this.loopR[i] = clamp(this.loopR[i] + recR * 0.8, -2, 2); }
-				const lv = s.loop_level;
+				let lv = s.loop_level;
+				if (this.loopState === "fading") {
+					this.fade -= 1 / (Math.max(0.01, s.loop_fade) * sampleRate);
+					if (this.fade <= 0) { this.fade = 0; this.loopState = "stopped"; }
+					lv *= this.fade;
+				}
 				ol += pl * lv; or += pr * lv;
 				this.loopPos = p + sp;
 			}
