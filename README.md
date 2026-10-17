@@ -103,7 +103,7 @@ A replica of the ASM Hydrasynth, simplified to fit on one panel; named Mystic he
   - **MASTER CONTROL:** 8 encoders around an OLED edit the module picked in **MODULE SELECT**, a diagram of the signal flow (OSC 1–3, MUTANT 1–4, RING-NOISE, MIXER, FILTER 1 / 2, AMP, ENV 1–3, LFO 1). PAGE ▲ ▼ steps through the modules, the white button under an encoder resets its parameter, and INIT resets the whole module.
   - **FILTER CONTROLS:** CUTOFF, RESONANCE and DRIVE (MORPH on filter 2) for FILTER 1 or FILTER 2, plus ENV 1 and LFO 1 amounts to filter 1.
 - **OSC 1 and OSC 2:** each scans through 8 single-cycle waves (SINE, TRIANGLE, SAW, SQUARE, PULSE, ORGAN, VOX, DIGITAL) with **WAVSCAN**, plus SEMI and CENT.
-- **Mutators:** each of OSC 1 and OSC 2 goes through two (MUTATOR 1–4), each with a mode, RATIO, DEPTH and DRY/WET:
+- **Mutators:** each of OSC 1 and OSC 2 goes through two (MUTANT 1–4 on the panel, as on the Hydrasynth), each with a mode, RATIO, DEPTH and DRY/WET:
   - **FM-LIN:** phase modulation by a sine at RATIO × the oscillator.
   - **WAVSTACK:** three detuned copies; RATIO sets the spread.
   - **OSC SYNC:** a hard-synced slave up to RATIO × 2.
