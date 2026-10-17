@@ -1,6 +1,6 @@
 # subharmsynth.js
 
-**SYNTHS** is a browser rack of semi-modular synthesizers built on the WebAudio API: replicas of the Moog Subharmonicon (polyrhythmic synthesizer), DFAM (percussion synthesizer, here called DRAM), Mother-32 (synthesizer with a 32 step sequencer, here called Brother-32) and Labyrinth (parallel generative synthesizer, here called Maze), with a mixer, LFOs, compressors, reverbs and delays, all patchable with each other.
+**SYNTHS** is a browser rack of semi-modular synthesizers built on the WebAudio API: replicas of the Moog Subharmonicon (polyrhythmic synthesizer), DFAM (percussion synthesizer, here called DRAM), Mother-32 (synthesizer with a 32 step sequencer, here called Brother-32) Labyrinth (parallel generative synthesizer, here called Maze) and ASM Hydrasynth (polyphonic wave morphing synthesizer, here called Hydra), with a mixer, LFOs, compressors, reverbs and delays, all patchable with each other.
 
 All synthesis runs in real time in one `AudioWorkletProcessor` (`rack-worklet.js`), which hosts each synth's DSP and copies the patch cables between them every sample. Oscillators, filters, envelopes, clocks, sequencers and the cables are all computed per sample, so patching between synths is sample-accurate. The reverb and delay are native WebAudio nodes after it.
 
@@ -20,6 +20,7 @@ Needs a browser with AudioWorklet support, served over `https://` or `localhost`
 | `devices/dram.js`, `devices/dram-worklet.js` | the DRAM |
 | `devices/b32.js`, `devices/b32-worklet.js` | the Brother-32 |
 | `devices/maze.js`, `devices/maze-worklet.js` | the Maze |
+| `devices/hydra.js`, `devices/hydra-worklet.js` | the Hydra (polyphonic) |
 | `devices/mixer.js`, `devices/mixer-worklet.js` | the 6 channel mixer |
 | `devices/lfo.js`, `devices/lfo-worklet.js` | the dual LFO |
 | `devices/comp.js`, `devices/comp-worklet.js` | the stereo compressor and its scope |
@@ -42,7 +43,7 @@ A new rack has a Subharm, an LFO and a compressor, then a reverb and a delay, ca
 
 One patch bay spans all of them: any output can be cabled to any input of any device. The front carries CV, gates and audio at ±5 V; the back carries the line-level audio between devices (see *Rear view*).
 
-- **Add device** (toolbar) inserts a new device at the bottom of the rack. The menu is grouped into synths (Subharm, DRAM, Brother-32, Maze), modulation (dual LFO), mixing (mixer, compressor) and effects (reverb, delay).
+- **Add device** (toolbar) inserts a new device at the bottom of the rack. The menu is grouped into synths (Subharm, DRAM, Brother-32, Maze, Hydra), modulation (dual LFO), mixing (mixer, compressor) and effects (reverb, delay).
   - You can have several of the same kind (`dram`, `dram2`, …). Reverbs are limited to 8, one per send / return slot of the audio engine.
   - A new LFO, compressor, reverb or delay arrives unpatched: patch its audio on the back (Tab).
   - A synth with a MIDI IN (Subharm, Brother-32, Maze) gets the keys' MIDI through **MASTER MIDI** instead of a long cable across the rack (see *MIDI on the back*).
@@ -88,6 +89,37 @@ A 6 channel line mixer in the same panel style as the synths. Insert it from *Ad
 - **Front:** LEVEL CV 1–6 inputs act as a VCA on each channel (5 V = the fader's level), and a MIX output carries the mono mix at ±5 V, e.g. for the scope.
 - **Back:** IN 1–6, AUX SEND, AUX RET L / R, MAIN L / R.
 - **Reverb on an aux:** patch AUX SEND → REVERB IN L, REVERB OUT L / R → AUX RET L / R, and turn the reverb's **DRY** button off so it returns only the effect. The delay has the same DRY button. The *Mixer & Aux Reverb* factory patch is set up this way.
+
+## Hydra
+
+A replica of the ASM Hydrasynth, simplified to fit on one panel; named Hydra here. It is the rack's only **polyphonic** synth: it plays every note of its MIDI channel on 8 voices (POLY), or one voice with legato and GLIDE (MONO). Play it from the keys, a MIDI device or the song sequencer. It has no sequencer of its own.
+
+- **OSC 1 and OSC 2:** each scans through 8 single-cycle waves (SINE, TRIANGLE, SAW, SQUARE, PULSE, ORGAN, VOX, DIGITAL) with **WAVSCAN**, plus SEMI and CENT.
+- **Mutators:** each of OSC 1 and OSC 2 goes through two (MUTATOR 1–4), each with a mode, RATIO, DEPTH and DRY/WET:
+  - **FM-LIN:** phase modulation by a sine at RATIO × the oscillator.
+  - **WAVSTACK:** three detuned copies; RATIO sets the spread.
+  - **OSC SYNC:** a hard-synced slave up to RATIO × 2.
+  - **PW-ASM:** squeezes the first half of the wave.
+  - **HARMONIC:** sweeps to the upper harmonics.
+  - **PHAZDIST:** phase distortion.
+- **OSC 3:** one wave, with SEMI and CENT.
+- **Mixer:** OSC 1–3, RING MOD (OSC 1 × OSC 2) and NOISE.
+- **FILTER 1:** LP LADDER 24, LP 12, BAND PASS, HIGH PASS, VOWEL (two formants, CUTOFF moves through A E I O U) or COMB. It has CUTOFF, RESONANCE (feedback for COMB), DRIVE, ENV 1 AMT and KEYTRACK.
+- **FILTER 2:** a state-variable filter whose MORPH goes low pass → band pass → high pass, with CUTOFF and RESONANCE. **ROUTING** puts the filters in series or parallel.
+- **Envelopes:**
+  - **AMP ENV** (ADSR, with VELOCITY sensitivity).
+  - **FILTER ENV (ENV 1)** (ADSR).
+  - **MOD ENV (ENV 3)** (attack / decay), sent to the mutators' depth and to WAVSCAN.
+- **LFO:** RATE, SHAPE (SINE, TRIANGLE, SAW, SQUARE, S&H), sent to PITCH, WAVSCAN, CUTOFF and MUTATORS.
+- **ARPEGGIATOR:** UP, DOWN, UP/DOWN, RANDOM or AS PLAYED, with DIVISION (1/4 to 1/32), OCTAVES (1–4), GATE, LATCH and TEMPO. MIDI clock (or a cable in CLOCK) takes over from TEMPO.
+- **Display:** OSC 1 and OSC 2 after their mutators, the voices playing and the arpeggio.
+- **CV / GATE patch bay:**
+  - Inputs: PITCH CV (1 V/oct on every voice), GATE (plays C4), MOD 1 (cutoff, 1 V/oct), MOD 2 (WAVSCAN, ±5 V) and CLOCK (arpeggiator steps).
+  - Outputs: GATE, ENV 1, MOD ENV and LFO.
+  - MIDI and audio are on the back.
+- **Factory patches:** *Glass Pad*, *FM Bells* and *Mutant Arp*.
+- **Simplified:** the original's mod matrix, macros, extra envelopes and LFOs, and effects are replaced by the fixed routings above, and the waves are 8 instead of 219.
+- **CPU:** it is the heaviest device. In tests, 8 voices took about 13% of a CPU core, up to 30% with all four mutators stacking.
 
 ## Maze
 
@@ -243,7 +275,7 @@ As on the hardware, MIDI reaches the synth only through its MIDI IN jack, so the
   - The panel lists the sessions, newest first, with their devices and song, to **Load**, rename (✎) or delete (×). **New session** starts a fresh rack and keeps the current one.
   - The 30 most recent are kept; when the browser's storage is full, the oldest go first.
 - **Patches**: a patch is the whole rack, meaning its synths, all their settings, the shared devices and the cables.
-  - The toolbar menu has 21 factory patches (in `data/patches.json`), grouped as SUBHARM, DRAM, BROTHER-32, MAZE and RACK (several devices patched together), plus your own.
+  - The toolbar menu has 24 factory patches (in `data/patches.json`), grouped as SUBHARM, DRAM, BROTHER-32, MAZE, HYDRA and RACK (several devices patched together), plus your own.
   - *Save as…* stores the rack under a name in the browser.
   - *Export* / *Import* write and read `.json` files, so patches can be shared or added to the repo.
   - Patches saved before the rack existed load as a rack with one Subharm.

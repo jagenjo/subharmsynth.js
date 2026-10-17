@@ -71,14 +71,20 @@ class RackProcessor extends AudioWorkletProcessor {
 	}
 
 	// modules the MIDI of `channel` reaches: cabled (or MASTER MIDI), listening to it or OMNI (0)
-	toChannel(channel, msg, omni) {
+	// mono modules (poly: the polyphonic ones get the raw notes instead, see noteEvent)
+	toChannel(channel, msg, omni, poly) {
 		for (const mod of this.modules)
-			if (mod.dsp.midiConnected && (omni ? mod.midiChannel === 0 : mod.midiChannel === channel && channel > 0))
+			if (mod.dsp.midiConnected && !!mod.dsp.constructor.POLY === !!poly &&
+				(omni ? mod.midiChannel === 0 : mod.midiChannel === channel && channel > 0))
 				mod.dsp.message(msg);
 	}
 
 	noteEvent(m) {
 		const ch = Math.max(1, Math.min(16, m.channel | 0));
+		// polyphonic modules allocate their own voices: every note on / off of their channel (or all)
+		for (const mod of this.modules)
+			if (mod.dsp.midiConnected && mod.dsp.constructor.POLY && (mod.midiChannel === 0 || mod.midiChannel === ch))
+				mod.dsp.message({ type: "note", note: m.note, on: !!m.on, vel: m.vel === undefined ? 1 : m.vel });
 		for (const k of [ch, 0]) {
 			const st = this.stacks[k];
 			const i = st.indexOf(m.note);
@@ -99,7 +105,7 @@ class RackProcessor extends AudioWorkletProcessor {
 	notesOff() {
 		for (const st of this.stacks) st.length = 0;
 		for (const mod of this.modules)
-			if (mod.dsp.midiConnected) mod.dsp.message({ type: "midi", gate: false });
+			if (mod.dsp.midiConnected) mod.dsp.message(mod.dsp.constructor.POLY ? { type: "allNotesOff" } : { type: "midi", gate: false });
 	}
 
 	schedule(m) {
@@ -120,8 +126,10 @@ class RackProcessor extends AudioWorkletProcessor {
 			case "bend": {
 				const ch = Math.max(1, Math.min(16, m.channel | 0));
 				const msg = { type: "bend", value: m.value };
-				this.toChannel(ch, msg, false);
-				this.toChannel(ch, msg, true);
+				for (const poly of [false, true]) {
+					this.toChannel(ch, msg, false, poly);
+					this.toChannel(ch, msg, true, poly);
+				}
 				break;
 			}
 			case "notesOff": this.notesOff(); break;
