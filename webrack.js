@@ -13,7 +13,7 @@ var WR = {
 	order: []
 };
 
-WR.VERSION = "20261017e"; // bump together with the ?v= in index.html so browsers reload the scripts
+WR.VERSION = "20261017f"; // bump together with the ?v= in index.html so browsers reload the scripts
 
 // def: {
 //   title, description,           names for menus and the panel
@@ -340,9 +340,61 @@ WRContext.prototype.addModule = function( type )
 	return m;
 }
 
+// which audio inputs pass to which outputs, to cable around a device when it is removed: an effect's
+// IN L / R -> OUT L / R, a mixer's channels -> MAIN L / R. null for devices that make their own sound
+WR.audioThru = function( def )
+{
+	if(def.thru)
+		return def.thru;
+	if(def.mixer)
+	{
+		var chans = [];
+		for(var k = 1; k <= def.channels; ++k) chans.push( "in" + k );
+		return { L: chans, R: [], outL: "main_l", outR: "main_r" };
+	}
+	var has = function(id){ return (def.rear_jacks || []).some(function(j){ return j && j[2] == id; }); };
+	if(has( "in_l" ) && has( "out_l" ))
+		return { L: ["in_l"], R: has( "in_r" ) ? ["in_r"] : [], outL: "out_l", outR: has( "out_r" ) ? "out_r" : null };
+	return null;
+}
+
+// before removing module `id` from settings `s`: what came into it goes on to where it went, so the
+// audio path stays whole. An unpatched IN R takes IN L (as the sockets do), and is left to the
+// receiving socket's own normalling when that is the R of the same pair
+WRContext.bridgeAudio = function( s, id )
+{
+	var m = s.modules.find(function(o){ return o.id == id; });
+	var thru = m && WR.types[ m.type ] ? WR.audioThru( WR.types[ m.type ] ) : null;
+	if(!thru)
+		return;
+	var prefix = id + ".";
+	var J = function(j){ return WR.jackId( id, j ); };
+	var sources = function(ins){ return s.patches.filter(function(p){ return ins.some(function(j){ return p[1] == J( j ); }) && p[0].indexOf( prefix ) != 0; }); };
+	var srcL = sources( thru.L ), srcR = sources( thru.R ), normalled = !srcR.length;
+	if(normalled) srcR = srcL;
+	var dests = function(out){ return out ? s.patches.filter(function(p){ return p[0] == J( out ) && p[1].indexOf( prefix ) != 0; }).map(function(p){ return p[1]; }) : []; };
+	var dL = dests( thru.outL ), dR = dests( thru.outR );
+	var add = [];
+	var connect = function(src, dst){
+		if(!s.patches.concat( add ).some(function(p){ return p[0] == src[0] && p[1] == dst; }))
+			add.push([ src[0], dst, src[2] ]);
+	};
+	dL.forEach(function(d){ srcL.forEach(function(src){ connect( src, d ); }); });
+	dR.forEach(function(d){
+		// R of the same pair as a left destination, nothing else in it: it will take its L by itself
+		var pairL = d.replace(/_r$/, "_l");
+		var others = s.patches.some(function(p){ return p[1] == d && p[0].indexOf( prefix ) != 0; });
+		if(normalled && pairL != d && dL.indexOf( pairL ) != -1 && !others)
+			return;
+		srcR.forEach(function(src){ connect( src, d ); });
+	});
+	s.patches = s.patches.concat( add );
+}
+
 WRContext.prototype.removeModule = function( id )
 {
 	var prefix = id + ".";
+	WRContext.bridgeAudio( this.settings, id );
 	this.settings.modules = this.settings.modules.filter(function(m){ return m.id != id; });
 	this.settings.patches = this.settings.patches.filter(function(p){ return p[0].indexOf( prefix ) != 0 && p[1].indexOf( prefix ) != 0; });
 	delete this.module_state[ id ];

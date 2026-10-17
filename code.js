@@ -1258,12 +1258,13 @@ function askRemoveModule( m )
 		ui.down = false;
 		ui.active = null;
 		var cables = rack.settings.patches.filter(function(p){ return p[0].indexOf( m.id + "." ) == 0 || p[1].indexOf( m.id + "." ) == 0; }).length;
-		if(!window.confirm( "Remove " + m.def.title + " (" + m.id + ") from the rack?" + (cables ? " Its " + cables + " cable" + (cables > 1 ? "s" : "") + " will be unplugged." : "") ))
+		var thru = WR.audioThru( m.def );
+		if(!window.confirm( "Remove " + m.def.title + " (" + m.id + ") from the rack?" + (cables ? " Its " + cables + " cable" + (cables > 1 ? "s" : "") + " will be unplugged" + (thru ? ", and the audio that went through it cabled around it." : ".") : "") ))
 			return;
 		rack.removeModule( m.id );
 		delete collapsed[ m.id ];
 		saveCollapsed();
-		setStatus( "Removed " + m.def.title + " from the rack" );
+		setStatus( "Removed " + m.def.title + " from the rack" + (thru && cables ? " (audio cabled around it)" : "") );
 	}, 0);
 }
 
