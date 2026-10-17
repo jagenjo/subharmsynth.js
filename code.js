@@ -636,12 +636,16 @@ function knob( id, cx, cy, r, value, min, max, o )
 		var travel = (o.step ? 260 : 220) * (ui.shift ? 5 : 1);
 		value = fromN( clamp( ui.startN + (ui.startY - ui.y) / travel, 0, 1 ) );
 	}
+	var wheeled = false;
 	if(hover && ui.wheel && ui.active === null && wheel_knobs)
 	{
 		var dn = -ui.wheel * (o.step ? o.step / (max - min) : (ui.shift ? 0.005 : 0.025));
 		value = fromN( clamp( toN(value) + dn, 0, 1 ) );
 		ui.wheel = 0;
+		wheeled = true;
 	}
+	if(WR.knobMoved && ((ui.active === id && ui.down) || wheeled)) // the song's CV tracks record it
+		WR.knobMoved( id, clamp( toN( value ), 0, 1 ) );
 	if(midictl.pending[ id ] !== undefined) // MIDI learn: a CC over the knob's range
 	{
 		value = fromN( clamp( midictl.pending[ id ], 0, 1 ) );
@@ -1248,11 +1252,15 @@ function fader( id, x, y, h, value, o )
 		}
 		value = clamp( ui.startN + (ui.startY - ui.y) / (h * (ui.shift ? 5 : 1)), 0, 1 );
 	}
+	var wheeled = false;
 	if(hover && ui.wheel && ui.active === null && wheel_knobs)
 	{
 		value = clamp( value - ui.wheel * (ui.shift ? 0.005 : 0.02), 0, 1 );
 		ui.wheel = 0;
+		wheeled = true;
 	}
+	if(WR.knobMoved && ((ui.active === id && ui.down) || wheeled)) // the song's CV tracks record it
+		WR.knobMoved( id, value );
 	if(midictl.pending[ id ] !== undefined) { value = clamp( midictl.pending[ id ], 0, 1 ); delete midictl.pending[ id ]; }
 	midiNote( id, x - capW * 0.5, y - capH * 0.5, capW, h + capH, "fader" );
 

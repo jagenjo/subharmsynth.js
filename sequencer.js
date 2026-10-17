@@ -51,6 +51,91 @@ function fitView()
 		view.top_note = Math.min( 127, hi + 2 );
 }
 
+// ---------------------------------------------------------------------------
+// CV TRACKS: a knob's (or fader's) movements over the song, [beat, 0..1] points. Turned while the song
+// plays with REC on, a knob gets its CV track (made then if it has none); playing, the tracks turn
+// their knobs (unless the hand is on one). "+ CV" makes a track for the next knob touched
+
+function isCv( t ) { return !!t && t.type == "cv"; }
+
+function cvValue( t, b )
+{
+	var p = t.points;
+	if(!p.length) return null;
+	if(b <= p[0][0]) return p[0][1];
+	for(var i = 1; i < p.length; ++i)
+		if(b < p[i][0])
+		{
+			var a = p[i - 1], c = p[i];
+			return c[0] > a[0] ? a[1] + (c[1] - a[1]) * (b - a[0]) / (c[0] - a[0]) : c[1];
+		}
+	return p[ p.length - 1 ][1];
+}
+
+function cvTrackFor( id, make )
+{
+	var s = song(), t = s.tracks.find(function(o){ return isCv( o ) && o.target == id; });
+	if(!t && make && s.tracks.length < 16)
+	{
+		t = { type: "cv", name: (typeof controlName == "function" ? controlName( id ) : id).substr( 0, 24 ), target: id, channel: 1, mute: false, solo: false, notes: [], points: [] };
+		s.tracks.push( t );
+	}
+	return t;
+}
+
+// writes v at beat b, the points since the last one written (from) replaced: a recorded or drawn stroke
+function cvWrite( t, from, b, v )
+{
+	var p = t.points;
+	if(from !== null && b >= from)
+	{
+		t.points = p = p.filter(function(q){ return !(q[0] > from && q[0] <= b); });
+		var last = p.find(function(q){ return q[0] == from; });
+		if(last && b - from < 1 / 48) { last[1] = v; return from; } // close together: the last one moves
+	}
+	var i = 0;
+	while(i < p.length && p[i][0] < b) ++i;
+	if(p[i] && p[i][0] == b) p[i][1] = v;
+	else p.splice( i, 0, [ b, v ] );
+	return b;
+}
+
+var cvrec = {};   // control id -> { beat, time } of its last point recorded
+var cvsent = {};  // control id -> the value last sent
+WR.knobMoved = function( id, n )
+{
+	if(view.cvlearn) // + CV: this knob
+	{
+		view.cvlearn = false;
+		var nt = cvTrackFor( id, true );
+		if(nt) { song().sel = song().tracks.indexOf( nt ); view.sel = []; }
+		return;
+	}
+	if(!play.on || !play.rec) return;
+	var t = cvTrackFor( id, true );
+	if(!t) return;
+	var b = position(), r = cvrec[id], now = performance.now();
+	var from = r && now - r.time < 150 && b >= r.beat ? r.beat : null; // a new touch, or the loop came round
+	cvrec[id] = { beat: cvWrite( t, from, b, Math.round( n * 10000 ) / 10000 ), time: now };
+};
+
+// the knobs follow their CV tracks while the song plays
+function applyCv()
+{
+	if(!play.on || typeof midictl == "undefined") return;
+	var b = position(), now = performance.now();
+	song().tracks.forEach(function(t){
+		if(!isCv( t ) || t.mute || !t.points.length) return;
+		var r = cvrec[ t.target ];
+		if(window.ui && window.ui.active === t.target) return;        // the hand on it
+		if(play.rec && r && now - r.time < 300) return;               // just recorded
+		var v = cvValue( t, b );
+		if(cvsent[ t.target ] !== undefined && Math.abs( v - cvsent[ t.target ] ) < 1e-4) return;
+		cvsent[ t.target ] = v;
+		midictl.pending[ t.target ] = v;
+	});
+}
+
 function save() { try { localStorage.setItem( "SUBHARM_seq", JSON.stringify({ open: view.open, h: view.h }) ); } catch(err) {} }
 
 // ---------------------------------------------------------------------------
@@ -321,7 +406,7 @@ function drawBar( w )
 	x += 128;
 	btn( x, 5, 54, 20, play.on ? "■ STOP" : "▶ PLAY", play.on, function(){ play.on ? stop() : start(); }, "Play / stop the song", "#2f6b3a" );
 	btn( x + 60, 5, 46, 20, "● REC", play.rec, function(){ play.rec = !play.rec; if(!play.rec) finishRecording(); },
-		"Record the keys and MIDI into the selected track while playing" );
+		"Record while playing: the keys and MIDI into the selected track, the knobs turned into their CV tracks" );
 	btn( x + 112, 5, 46, 20, "LOOP", s.loop, function(){ s.loop = !s.loop; reschedule(); }, "Loop the song" );
 	x += 170;
 	var p = position();
@@ -367,32 +452,53 @@ function drawTracks( y0, h )
 		}, tip: "Select (double-click: rename)" });
 		if(!(view.rename && view.rename.i == i))
 		{
-			text( t.name, 12, y + TRACK_H * 0.5 - 6, 13, sel ? "#fff" : "#c8c5bd", "left", sel );
-			text( t.notes.length + " notes", 12, y + TRACK_H * 0.5 + 10, 9, "#6d6b66" );
+			g.font = (sel ? "bold " : "") + "13px " + FONT;
+			var nm = t.name;
+			while(nm.length > 3 && g.measureText( nm ).width > 96) nm = nm.slice( 0, -1 );
+			text( nm == t.name ? nm : nm.slice( 0, -1 ) + "…", 12, y + TRACK_H * 0.5 - 6, 13, sel ? "#fff" : "#c8c5bd", "left", sel );
+			var gone = isCv( t ) && !rack.settings.modules.some(function(m){ return t.target.indexOf( m.id + "." ) == 0; });
+			text( isCv( t ) ? t.points.length + " points" + (gone ? " · DEVICE GONE" : "") : t.notes.length + " notes", 12, y + TRACK_H * 0.5 + 10, 9, gone ? "#c0574c" : "#6d6b66" );
 		}
-		btn( 112, by, 52, 20, "CH " + t.channel, false, function(){
-			t.channel = (t.channel - 1 + (view.shift ? 15 : 1)) % 16 + 1; reschedule();
-		}, "MIDI channel of the track (Shift: previous). Set the synths' CH on the back (Tab)" );
-		btn( 168, by, 22, 20, "M", t.mute, function(){ t.mute = !t.mute; reschedule(); }, "Mute", "#6b5a1c" );
-		btn( 194, by, 22, 20, "S", t.solo, function(){ t.solo = !t.solo; reschedule(); }, "Solo", "#2f5a6b" );
+		if(isCv( t ))
+		{
+			g.fillStyle = "#3a2f4a"; g.beginPath(); g.roundRect( 112, by, 78, 20, 4 ); g.fill();
+			text( "CV", 151, by + 10, 12, "#d9c4ff", "center", true );
+			ui.buttons.push({ x: 112, y: by, w: 78, h: 20, fn: function(){ s.sel = i; view.sel = []; }, tip: "Knob automation: " + t.target.toUpperCase() });
+		}
+		else
+		{
+			btn( 112, by, 52, 20, "CH " + t.channel, false, function(){
+				t.channel = (t.channel - 1 + (view.shift ? 15 : 1)) % 16 + 1; reschedule();
+			}, "MIDI channel of the track (Shift: previous). Set the synths' CH on the back (Tab)" );
+			btn( 168, by, 22, 20, "M", t.mute, function(){ t.mute = !t.mute; reschedule(); }, "Mute", "#6b5a1c" );
+		}
+		if(isCv( t ))
+			btn( 194, by, 22, 20, "M", t.mute, function(){ t.mute = !t.mute; }, "Mute: the knob is left alone", "#6b5a1c" );
+		else
+			btn( 194, by, 22, 20, "S", t.solo, function(){ t.solo = !t.solo; reschedule(); }, "Solo", "#2f5a6b" );
 		btn( 220, by, 22, 20, "⋮", !!(view.menu && view.menu.i == i), function(){
 			view.menu = view.menu && view.menu.i == i ? null : { i: i, x: 132, y: by + 22 };
 		}, "Track options: copy, paste, delete, move up / down", "#4a4a45" );
 		ui.buttons[ ui.buttons.length - 1 ].menu = true; // it toggles the menu itself
 	});
 	var by = y0 + h - 26;
-	btn( 8, by, 70, 20, "+ TRACK", false, function(){
+	btn( 8, by, 58, 20, "+ TRACK", false, function(){
 		if(s.tracks.length >= 16) return;
 		var used = s.tracks.map(function(t){ return t.channel; });
 		var ch = 1; while(used.indexOf( ch ) != -1 && ch < 16) ch++;
 		s.tracks.push({ name: "TRACK " + (s.tracks.length + 1), channel: ch, mute: false, solo: false, notes: [] });
 		s.sel = s.tracks.length - 1; view.sel = [];
 	}, "Add a track on the next free channel" );
-	btn( 82, by, 56, 20, "CLEAR", false, function(){
-		var t = track();
-		if(t.notes.length && window.confirm( "Clear the " + t.notes.length + " notes of " + t.name + "?" )) { t.notes = []; view.sel = []; reschedule(); }
-	}, "Remove the notes of the selected track" );
-	btn( 142, by, 100, 20, "LOAD MIDI FILE", false, function(){ midiFileInput().click(); },
+	btn( 70, by, 40, 20, "+ CV", !!view.cvlearn, function(){
+		if(s.tracks.length >= 16) return;
+		view.cvlearn = !view.cvlearn;
+		if(view.cvlearn && window.setStatus) setStatus( "+ CV: turn the knob (or fader) the new CV track moves", true );
+	}, view.cvlearn ? "Now turn a knob in the rack (click again: cancel)" : "A CV track for a knob: click, then turn the knob", "#5a3f86" );
+	btn( 114, by, 48, 20, "CLEAR", false, function(){
+		var t = track(), n = isCv( t ) ? t.points.length : t.notes.length;
+		if(n && window.confirm( "Clear the " + n + (isCv( t ) ? " points" : " notes") + " of " + t.name + "?" )) { t.notes = []; if(isCv( t )) t.points = []; view.sel = []; reschedule(); }
+	}, "Remove the notes (or CV points) of the selected track" );
+	btn( 166, by, 76, 20, "MIDI FILE", false, function(){ midiFileInput().click(); },
 		"Load a standard MIDI file (.mid): its tracks replace the song's" );
 }
 
@@ -579,8 +685,64 @@ function roll( x0, y0, w, h )
 function noteY( r, n ) { return r.y + (view.top_note - n) * ROW_H; }
 function beatX( r, b ) { return r.x + b * r.bw; }
 
+// a CV track: its curve over the loop, the points to drag
+function laneY( r, v ) { return r.y + 10 + (1 - v) * (r.h - 20); }
+function drawLane( x0, y0, w, h )
+{
+	var s = song(), r = roll( x0, y0, w, h ), t = track(), gb = gridBeats(), color = COLORS[ s.sel % COLORS.length ];
+	g.save();
+	g.beginPath(); g.rect( x0, y0, w, h ); g.clip();
+	rect( x0, r.y, w, r.h, "#181817" );
+	for(var b = 0; b <= r.L + 1e-9; b += gb)
+	{
+		var bar = Math.abs( b % 4 ) < 1e-9, beat = Math.abs( b % 1 ) < 1e-9;
+		rect( beatX( r, b ), r.y, 1, r.h, bar ? "#4a4945" : (beat ? "#2f2e2c" : "#222221") );
+	}
+	[0, 0.25, 0.5, 0.75, 1].forEach(function(v){
+		rect( r.x, Math.round( laneY( r, v ) ), r.w, 1, v == 0.5 ? "#3a3936" : "#2a2a28" );
+		text( Math.round( v * 100 ) + "%", x0 + KEYS_W - 4, laneY( r, v ), 9, "#8c8a84", "right" );
+	});
+	rect( r.x, y0, r.w, RULER_H, "#232322" );
+	for(var bar = 0; bar < s.bars; ++bar)
+		text( String( bar + 1 ), beatX( r, bar * 4 ) + 4, y0 + RULER_H * 0.5, 10, "#b8b5ad" );
+	text( "CV  " + t.target.toUpperCase(), r.x + 8, r.y + 12, 11, "#d9c4ff", "left", true );
+	var p = t.points;
+	if(p.length)
+	{
+		g.beginPath();
+		g.moveTo( r.x, laneY( r, p[0][1] ) );
+		p.forEach(function(q){ g.lineTo( beatX( r, q[0] ), laneY( r, q[1] ) ); });
+		g.lineTo( r.x + r.w, laneY( r, p[ p.length - 1 ][1] ) );
+		g.strokeStyle = t.mute ? "#5d5b56" : color; g.lineWidth = 2; g.stroke();
+		g.lineTo( r.x + r.w, r.y + r.h ); g.lineTo( r.x, r.y + r.h ); g.closePath();
+		g.globalAlpha = 0.12; g.fillStyle = color; g.fill(); g.globalAlpha = 1;
+		if(p.length < 400) // the points, where they can be told apart
+			p.forEach(function(q){
+				g.fillStyle = q === view.cvpt ? "#fff" : color;
+				g.beginPath(); g.arc( beatX( r, q[0] ), laneY( r, q[1] ), 3.5, 0, Math.PI * 2 ); g.fill();
+			});
+	}
+	else
+		text( "TURN THE KNOB WHILE PLAYING WITH REC ON, OR CLICK HERE TO ADD POINTS", r.x + r.w / 2, r.y + r.h / 2, 11, "#6d6b66", "center" );
+	if(play.on || play.last_beat > 0)
+		rect( beatX( r, position() ), y0, 2, h, play.on ? "#e8e4dc" : "#6d6b66" );
+	g.restore();
+	view.roll = r;
+}
+
+function cvPointAt( r, x, y )
+{
+	var p = track().points;
+	for(var i = p.length - 1; i >= 0; --i)
+		if(Math.abs( beatX( r, p[i][0] ) - x ) < 7 && Math.abs( laneY( r, p[i][1] ) - y ) < 7)
+			return p[i];
+	return null;
+}
+
 function drawRoll( x0, y0, w, h )
 {
+	if(isCv( track() ))
+		return drawLane( x0, y0, w, h );
 	var s = song(), r = roll( x0, y0, w, h ), t = track(), gb = gridBeats();
 	var rows = Math.ceil( r.h / ROW_H );
 	g.save();
@@ -665,6 +827,8 @@ function draw()
 	{
 		drawTracks( BAR_H, h - BAR_H );
 		drawRoll( TRACKS_W, BAR_H, w - TRACKS_W, h - BAR_H );
+		if(!view.hot_tip && view.roll && view.px > view.roll.x && view.py > view.roll.y && isCv( track() ))
+			view.hot_tip = "CLICK: ADD A POINT · DRAG: MOVE IT · SHIFT+DRAG: DRAW · RIGHT-CLICK: DELETE";
 		if(!view.hot_tip && view.roll && view.px > view.roll.x && view.py > view.roll.y)
 			view.hot_tip = "CLICK: ADD A NOTE · DRAG: SELECT · DRAG NOTES: MOVE · DRAG THE END: LENGTH · RIGHT-CLICK: DELETE · WHEEL: SCROLL";
 	}
@@ -675,12 +839,15 @@ function draw()
 	var cur = "default", r = view.roll, d = view.drag;
 	if(view.resize || (view.open && view.py < 4 && !view.menu)) cur = "ns-resize";
 	else if(d) cur = d.mode == "length" ? "ew-resize" : (d.mode == "move" ? "grabbing" : "crosshair");
+	else if(view.open && r && !view.menu && view.px > r.x && view.py > r.y && isCv( track() ))
+		cur = cvPointAt( r, view.px, view.py ) ? "move" : "crosshair";
 	else if(view.open && r && !view.menu && view.px > r.x && view.py > r.y)
 	{
 		var hit = noteAt( r, view.px, view.py );
 		cur = hit ? (hit.edge ? "ew-resize" : "grab") : "default";
 	}
 	cv.style.cursor = cur;
+	applyCv();
 }
 
 // ---------------------------------------------------------------------------
@@ -704,6 +871,23 @@ function noteAt( r, x, y )
 			return { note: n, edge: x > nx + nw - 6 };
 	}
 	return null;
+}
+
+// the CV lane: a point to drag, a new one, Shift: a stroke drawn; right-click deletes
+function cvDown( e, r )
+{
+	var t = track(), hit = cvPointAt( r, view.px, view.py );
+	var b = Math.max( 0, Math.min( r.L, (view.px - r.x) / r.bw ) ), v = Math.max( 0, Math.min( 1, 1 - (view.py - r.y - 10) / (r.h - 20) ) );
+	if(e.button == 2)
+	{
+		if(hit) t.points.splice( t.points.indexOf( hit ), 1 );
+		return;
+	}
+	cv.setPointerCapture( e.pointerId );
+	if(e.shiftKey) { view.drag = { mode: "cvdraw", from: cvWrite( t, null, b, v ) }; return; }
+	if(!hit) { hit = [ b, v ]; cvWrite( t, null, b, v ); hit = t.points.find(function(q){ return q[0] == b; }); }
+	view.cvpt = hit;
+	view.drag = { mode: "cvpt", pt: hit };
 }
 
 var last_click = 0;
@@ -737,6 +921,11 @@ cv.addEventListener("pointerdown", function(e){
 	var r = view.roll;
 	if(!view.open || !r)
 		return;
+	if(isCv( track() ))
+	{
+		if(view.px >= r.x && view.py >= r.y) cvDown( e, r );
+		return;
+	}
 	if(view.px < r.x && view.py > r.y) // keyboard strip: hear the note
 	{
 		var n = view.top_note - Math.floor( (view.py - r.y) / ROW_H );
@@ -795,6 +984,18 @@ cv.addEventListener("pointermove", function(e){
 	if(!d || !r)
 		return;
 	var gb = gridBeats(), sel = view.sel, beat = (view.px - r.x) / r.bw;
+	if(d.mode == "cvpt" || d.mode == "cvdraw")
+	{
+		var t = track(), cb = Math.max( 0, Math.min( r.L, beat ) ), v = Math.max( 0, Math.min( 1, 1 - (view.py - r.y - 10) / (r.h - 20) ) );
+		if(d.mode == "cvpt")
+		{
+			d.pt[0] = cb; d.pt[1] = v;
+			t.points.sort(function(a, b){ return a[0] - b[0]; });
+		}
+		else if(cb >= d.from) d.from = cvWrite( t, d.from, cb, v );
+		else d.from = cvWrite( t, null, cb, v ); // drawn backwards: point by point
+		return;
+	}
 	if(d.mode == "pending" && Math.abs( view.px - d.x0 ) + Math.abs( view.py - d.y0 ) > 4)
 		d.mode = "rect";
 	if(d.mode == "rect")
@@ -898,6 +1099,6 @@ setInterval(function(){
 draw();
 
 // for the tests
-window.SEQ = { view: view, play: play, exportWav: exportWav, wavTick: wavTick, wav: function(){ return wav; }, parseMidi: parseMidi, loadMidiFile: loadMidiFile, start: start, stop: stop, scheduleRange: scheduleRange, position: position, roll: function(){ return view.roll; } };
+window.SEQ = { view: view, play: play, applyCv: applyCv, cvValue: cvValue, exportWav: exportWav, wavTick: wavTick, wav: function(){ return wav; }, parseMidi: parseMidi, loadMidiFile: loadMidiFile, start: start, stop: stop, scheduleRange: scheduleRange, position: position, roll: function(){ return view.roll; } };
 
 })();

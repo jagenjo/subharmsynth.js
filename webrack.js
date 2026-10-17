@@ -13,7 +13,7 @@ var WR = {
 	order: []
 };
 
-WR.VERSION = "20261017x"; // bump together with the ?v= in index.html so browsers reload the scripts
+WR.VERSION = "20261017y"; // bump together with the ?v= in index.html so browsers reload the scripts
 
 // def: {
 //   title, description,           names for menus and the panel
@@ -139,6 +139,17 @@ WR.validateSong = function( data )
 		s.grid = 4;
 	var tracks = data && Array.isArray(data.tracks) ? data.tracks : def.tracks;
 	s.tracks = tracks.slice( 0, 16 ).filter(function(t){ return t && typeof t == "object"; }).map(function(t, i){
+		if(t.type == "cv") // a knob's movements: [beat, 0..1] points, sorted
+			return {
+				type: "cv",
+				name: typeof t.name == "string" && t.name.trim() ? t.name.trim().substr( 0, 24 ).toUpperCase() : "CV " + (i + 1),
+				target: typeof t.target == "string" ? t.target.substr( 0, 120 ) : "",
+				channel: 1, mute: !!t.mute, solo: false, notes: [],
+				points: (Array.isArray(t.points) ? t.points : []).filter(function(p){
+					return Array.isArray(p) && typeof p[0] == "number" && isFinite(p[0]) && typeof p[1] == "number" && isFinite(p[1]);
+				}).map(function(p){ return [ Math.max( 0, p[0] ), Math.min( 1, Math.max( 0, p[1] ) ) ]; })
+				.sort(function(a, b){ return a[0] - b[0]; }).slice( 0, 8000 )
+			};
 		return {
 			name: typeof t.name == "string" && t.name.trim() ? t.name.trim().substr( 0, 24 ).toUpperCase() : "TRACK " + (i + 1),
 			channel: Math.min( 16, Math.max( 1, Math.round( +t.channel || 1 ) ) ),
