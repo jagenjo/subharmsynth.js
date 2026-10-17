@@ -1,6 +1,6 @@
 # subharmsynth.js
 
-**SYNTHS** is a browser rack of semi-modular synthesizers built on the WebAudio API: replicas of the Moog Subharmonicon (polyrhythmic synthesizer), DFAM (percussion synthesizer, here called DRAM), Mother-32 (synthesizer with a 32 step sequencer, here called Brother-32) Labyrinth (parallel generative synthesizer, here called Maze) and ASM Hydrasynth (polyphonic wave morphing synthesizer, here called Mystic), plus the Hologram Microcosm (granular looper pedal, here called Universe), with a mixer, LFOs, compressors, reverbs and delays, all patchable with each other.
+**SYNTHS** is a browser rack of semi-modular synthesizers built on the WebAudio API: replicas of the Moog Subharmonicon (polyrhythmic synthesizer), DFAM (percussion synthesizer, here called DRAM), Mother-32 (synthesizer with a 32 step sequencer, here called Brother-32) Labyrinth (parallel generative synthesizer, here called Maze) ASM Hydrasynth (polyphonic wave morphing synthesizer, here called Mystic) and Behringer LM Drum (LinnDrum-style sampling drum machine, here called LLM Dram), plus the Hologram Microcosm (granular looper pedal, here called Universe), with a mixer, LFOs, compressors, reverbs and delays, all patchable with each other.
 
 All synthesis runs in real time in one `AudioWorkletProcessor` (`rack-worklet.js`), which hosts each synth's DSP and copies the patch cables between them every sample. Oscillators, filters, envelopes, clocks, sequencers and the cables are all computed per sample, so patching between synths is sample-accurate. The reverb and delay are native WebAudio nodes after it.
 
@@ -21,6 +21,7 @@ Needs a browser with AudioWorklet support, served over `https://` or `localhost`
 | `devices/b32.js`, `devices/b32-worklet.js` | the Brother-32 |
 | `devices/maze.js`, `devices/maze-worklet.js` | the Maze |
 | `devices/mystic.js`, `devices/mystic-worklet.js` | the Mystic (polyphonic) |
+| `devices/llmdram.js`, `devices/llmdram-worklet.js` | the LLM Dram drum machine |
 | `devices/mixer.js`, `devices/mixer-worklet.js` | the 6 channel mixer |
 | `devices/lfo.js`, `devices/lfo-worklet.js` | the dual LFO |
 | `devices/comp.js`, `devices/comp-worklet.js` | the stereo compressor and its scope |
@@ -45,14 +46,14 @@ A new rack has a Subharm, an LFO and a compressor, then a reverb and a delay, ca
 
 One patch bay spans all of them: any output can be cabled to any input of any device. The front carries CV, gates and audio at ±5 V; the back carries the line-level audio between devices (see *Rear view*).
 
-- **Add device** (toolbar) inserts a new device at the bottom of the rack. The menu is grouped into synths (Subharm, DRAM, Brother-32, Maze, Mystic), modulation (dual LFO), mixing (mixer, compressor) and effects (reverb, delay, Universe, Hyper).
+- **Add device** (toolbar) inserts a new device at the bottom of the rack. The menu is grouped into synths (Subharm, DRAM, Brother-32, Maze, Mystic, LLM Dram), modulation (dual LFO), mixing (mixer, compressor) and effects (reverb, delay, Universe, Hyper).
   - You can have several of the same kind (`dram`, `dram2`, …). Reverbs are limited to 8, one per send / return slot of the audio engine.
   - A new LFO, compressor, reverb or delay arrives unpatched: patch its audio on the back (Tab).
   - A new Universe or Hyper goes in just before the speakers (between the last device and MAIN IN), so you hear it right away.
   - A synth with a MIDI IN (Subharm, Brother-32, Maze) gets the keys' MIDI through **MASTER MIDI** instead of a long cable across the rack (see *MIDI on the back*).
   - A new synth's audio goes to the first free mixer channel; with no mixer, to wherever the other synths go (or the compressor).
   - A new mixer takes over the synths that weren't on a mixer: they move onto its channels, and its MAIN L / R go where they went.
-- Each synth has three buttons on its right wood cheek: **move up**, **move down** and **remove**. A full-width device moves past a whole row: a pair of half-width devices stays together. Removing asks first and unplugs that device's cables. When an effect (compressor, reverb, delay, Universe, Hyper) or a mixer is removed, what came into it is cabled on to where it went (IN L → OUT L, IN R → OUT R, mixer channels → MAIN), so the audio keeps reaching the speakers.
+- Each synth has three buttons on its right wood cheek: **move up**, **move down** and **remove**. A full-width device moves past a whole row: a pair of half-width devices stays together. The fourth button (◎) changes that device's **knob style**: aluminium cap, classic, black skirt, chrome, cream or soft touch (it cycles; "device default" goes back to its own). Each device keeps its own style, saved with the rack, so two devices can look different. Removing asks first and unplugs that device's cables. When an effect (compressor, reverb, delay, Universe, Hyper) or a mixer is removed, what came into it is cabled on to where it went (IN L → OUT L, IN R → OUT R, mixer channels → MAIN), so the audio keeps reaching the speakers.
 - The chevron on the top left folds a synth into a slim bar like the other devices. Its jacks stay on the bar, so cables stay connected.
 - **Scale:** the rack fills the window width; more devices make it taller and it scrolls vertically.
   - Zoom **−** / **+** (toolbar) change the scale; the percentage button goes back to 100%. The zoom is remembered in the browser.
@@ -168,6 +169,27 @@ A lo-fi distortion and bit crusher (half width, stereo IN / OUT on the back), fo
 - **CV:** DRIVE (±5 V = the whole range), BITS (1 V = 3 bits fewer), RATE (1 V/oct).
 
 These settings are my reading of that sound, not a recipe from the artist. His music gets much of it from the synths and samples themselves; Hyper adds the grit and the wobble.
+
+## LLM Dram
+
+A replica of the Behringer LM Drum (itself after the Linn LM-1 and LinnDrum), named LLM Dram here. Its panel follows the hardware's layout and look: charcoal with orange outlined sections, grey rectangular buttons, black skirted knobs, 16 pads and slider banks.
+
+- **Sounds:** 24 pad sounds on 16 mixer channels.
+  - **Bottom row:** SIDESTICK, SNARE 1–3, BASS 1–2, CRASH, and PERCUSSION, which switches the top row (as does BANK).
+  - **Top row:** HI HAT 1, 2 and OPEN, TOMS HI / MID / LO and RIDE 1–2; or, with PERCUSSION on, CABASA 1–2, TAMBOURINE 1–2, CONGAS HI / LO, COWBELL and CLAPS.
+  - **CLICK:** the 16th channel, a metronome while recording.
+  - **The samples:** not the original samples: they are synthesized in code at start, at 28 kHz, and stored as 8-bit companded and 12-bit samples played back without interpolation, for the grain of the early sampling drum machines. 32 samples in all; SAMP gives any pad sound any of them.
+- **Mixer:** PAN (top sliders) and LEVEL (bottom faders) per channel, and VOICE SELECT. Press a voice again to cycle its sounds (SNARE 1 / 2 / 3, …). MUTE and SOLO act on the selected voice.
+- **Display:** the selected voice's BIT (8 / 12), SAMP, DIST, PLAY (forward / reverse), TUNE, LEV, STRT, LEN and LOOP. Move with the arrows, change with the encoder, the wheel or NO- / YES+. MENU switches to the pattern's PATT, LEN, SWNG, BPM, QUAN, SYNC, FILL, SREP and PERC.
+- **TUNE:** SNARE, TOMS HI / MID / LO and CONGAS HI / LO (±12 semitones), and HI HAT DECAY. A closed hi hat cuts an open one.
+- **WAVE DESIGNER and ANALOG FILTER:** an FX bus for the voices with SEND on. ATTACK and SUSTAIN shape the transients; the filter is a 4-pole low pass (or HPF), with CUTOFF, RESONANCE and ON.
+- **VOLUME:** INPUT (the rear IN into the mix; REC lights with signal) and MASTER.
+- **Sequencer:** 16 patterns of up to 64 steps.
+  - **Modes:** PADS (play, and record while REC and playing, quantized with QUAN), STEP (the pads are the 16 steps of a page for the selected sound; ◀◀ ▶▶ change page), PATT (pick the pattern; it changes at the end of the bar) and SONG (plays the patterns that have hits, in turn).
+  - **Functions:** LENGTH (16 / 32 / 48 / 64), RAND, COPY (then a pad in PATT to paste), ERASE (the selected sound; twice: the whole pattern), SYNC, STEP REPEAT (loops the current beat), NOTE REPEAT (held pads repeat every 1/16), AUTO FILL (a snare / tom fill every 4 bars) and TRIGGER (the pads play the selected sound in 16 pitches).
+  - **Tempo:** RATE and TAP, or SYNC (MIDI clock, else the rack's tempo). Swing from 50 to 75%.
+- **On the back:** OUT L / R, IN, MIDI IN (notes play the pads on the General MIDI drum map, and are recorded) and 16 individual outputs. A cabled individual output takes its channel out of the mix.
+- **Not here:** MIDI, USB and DUMP only show a message; there is no sampling from the input.
 
 ## Maze
 

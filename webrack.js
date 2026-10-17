@@ -13,7 +13,7 @@ var WR = {
 	order: []
 };
 
-WR.VERSION = "20261017f"; // bump together with the ?v= in index.html so browsers reload the scripts
+WR.VERSION = "20261017h"; // bump together with the ?v= in index.html so browsers reload the scripts
 
 // def: {
 //   title, description,           names for menus and the panel
@@ -27,6 +27,8 @@ WR.VERSION = "20261017f"; // bump together with the ?v= in index.html so browser
 //   worklet,                      DSP file, registers globalThis.WR_DSP[type]
 //   jacks,                        patch bay rows of [label, "in"|"out"|"midiin", id]
 //   midi_in,                      id of its MIDI IN jack, if it has one
+//   onState( module, state ),     called with each state its DSP reports
+//   knob_skin,                    its knobs' style by default (code.js: KNOB_SKIN_NAMES)
 //   insert,                       an effect (in_l / in_r / out_l / out_r) put in before the speakers when added
 //   defaults(),                   settings of a new module
 //   validate(s, data),            fix-ups after a load (ranges, enums, old saves)
@@ -53,6 +55,8 @@ WR.registerSynth = function( type, def )
 
 // patch bay ids: the rack's own jacks are plain, a module's are prefixed with its id
 WR.jackId = function( module_id, id ) { return module_id + "." + id; }
+// knob styles a device can have (code.js draws them); "" = the device's own default
+WR.KNOB_SKINS = ["", "aluminium", "classic", "lm", "chrome", "cream", "soft"];
 
 // audio sockets on the back of the audio I/O row (line level, "ain" / "aout"): patched like the
 // front jacks, but only with each other. An audio input sums every cable plugged into it
@@ -267,7 +271,7 @@ WRContext.prototype.init = function()
 		});
 		node.port.onmessage = function(e) {
 			if(e.data.type == "state")
-				that.module_state = e.data.modules;
+				that.onState( e.data.modules );
 		};
 
 		that.buildMaster( ctx, node );
@@ -312,6 +316,18 @@ WRContext.prototype.sync = function()
 	this._sent = json;
 	this.post({ type: "settings", settings: this.settings, tempo: this.tempo() });
 	this.updateNative();
+}
+
+// a state report from the processor: kept for the panels, and given to the devices that act on it
+// (def.onState( module, state ), e.g. hits recorded by a drum machine's sequencer)
+WRContext.prototype.onState = function( states )
+{
+	this.module_state = states;
+	this.settings.modules.forEach(function(m){
+		var def = WR.types[ m.type ];
+		if(def && def.onState && states[ m.id ])
+			def.onState( m, states[ m.id ] );
+	});
 }
 
 // ---- modules ----
@@ -924,6 +940,8 @@ WRContext.prototype.setSettings = function( data )
 		var ms = WR.mergeValid( def.defaults(), raw );
 		if(def.validate)
 			def.validate( ms, raw );
+		if(raw.knob_skin && WR.KNOB_SKINS.indexOf( raw.knob_skin ) > 0) // the device's knob style, if not its default
+			ms.knob_skin = raw.knob_skin;
 		s.modules.push({ id: id, type: m.type, settings: ms });
 	});
 

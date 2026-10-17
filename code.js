@@ -51,6 +51,9 @@ try { wheel_knobs = localStorage.getItem("SUBHARM_wheel") != "scroll"; } catch(e
 var frame = { ox: 0, oy: 0, k: 1 };
 // widget and jack ids get the id of the module being drawn in front ("dram2." + "cutoff")
 var id_prefix = "";
+// knob style of the device being drawn (its settings.knob_skin, else its type's, else the layout's)
+var knob_skin = null;
+var KNOB_SKIN_NAMES = { "": "DEVICE DEFAULT", aluminium: "ALUMINIUM CAP", classic: "CLASSIC", lm: "BLACK SKIRT", chrome: "CHROME", cream: "CREAM", soft: "SOFT TOUCH" };
 
 function beginFrame( ox, oy, k )
 {
@@ -315,7 +318,16 @@ function knob( id, cx, cy, r, value, min, max, o )
 
 	var style = o.style || "ticks";
 	var steps = o.step ? Math.round( (max - min) / o.step ) + 1 : 0;
-	if(layout == "classic")
+	var skin = knob_skin || (layout == "classic" ? "classic" : "aluminium");
+	if(skin != "classic" && skin != "aluminium")
+	{
+		var tk = o.ticks || steps || (style == "ring" ? 11 : 31);
+		drawKnobScale( cx, cy, r, tk, o.bipolar, style == "small" ? "small" : style );
+		drawSkinKnob( skin, cx, cy, r, clamp( toN(value), 0, 1 ), hover || ui.active === id );
+		if(o.label)
+			drawLabel( o.label, cx, cy - (style == "small" ? r + 15 : (style == "ring" ? r * 1.2 + 16 : r * 1.12 + 18)), o.labelSize || 11 );
+	}
+	else if(skin == "classic")
 	{
 		classicDrawKnob( cx, cy, r, clamp( toN(value), 0, 1 ), hover || ui.active === id, steps || 11, o.bipolar );
 		if(o.label)
@@ -333,7 +345,7 @@ function knob( id, cx, cy, r, value, min, max, o )
 	return value;
 }
 
-function drawKnob( cx, cy, r, n, highlight, ticks, bipolar, style )
+function drawKnobScale( cx, cy, r, ticks, bipolar, style )
 {
 	var a;
 	// scale printed on the panel
@@ -369,6 +381,89 @@ function drawKnob( cx, cy, r, n, highlight, ticks, bipolar, style )
 		drawLabel( "(-)", cx + Math.cos(KNOB_A0) * (r * 1.5), cy + Math.sin(KNOB_A0) * (r * 1.5) + 4, 10 );
 		drawLabel( "(+)", cx + Math.cos(KNOB_A0 + KNOB_SWEEP) * (r * 1.5), cy + Math.sin(KNOB_A0 + KNOB_SWEEP) * (r * 1.5) + 4, 10 );
 	}
+}
+
+// the other knob styles: LM (black skirt, black cap), CHROME, CREAM (ivory cap), SOFT (rubber, coloured cap)
+function drawSkinKnob( skin, cx, cy, r, n, highlight )
+{
+	var a = KNOB_A0 + n * KNOB_SWEEP, g, i;
+	var pointer = function(color, r0, r1, wd) {
+		ctx.strokeStyle = color;
+		ctx.lineWidth = wd;
+		ctx.lineCap = "round";
+		ctx.beginPath();
+		ctx.moveTo( cx + Math.cos(a) * r * r0, cy + Math.sin(a) * r * r0 );
+		ctx.lineTo( cx + Math.cos(a) * r * r1, cy + Math.sin(a) * r * r1 );
+		ctx.stroke();
+		ctx.lineCap = "butt";
+	};
+	var ridges = function(color, r0, r1, count) {
+		ctx.strokeStyle = color;
+		ctx.lineWidth = 1;
+		ctx.beginPath();
+		for(i = 0; i < count; ++i)
+		{
+			var b = (i / count) * Math.PI * 2;
+			ctx.moveTo( cx + Math.cos(b) * r * r0, cy + Math.sin(b) * r * r0 );
+			ctx.lineTo( cx + Math.cos(b) * r * r1, cy + Math.sin(b) * r * r1 );
+		}
+		ctx.stroke();
+	};
+	var disc = function(rad, fill) { ctx.fillStyle = fill; ctx.beginPath(); ctx.arc( cx, cy, rad, 0, Math.PI * 2 ); ctx.fill(); };
+	ctx.fillStyle = "rgba(0,0,0,0.55)";
+	ctx.beginPath(); ctx.arc( cx + 2, cy + 4, r, 0, Math.PI * 2 ); ctx.fill();
+	if(skin == "lm")
+	{
+		// a knurled black skirt, a smooth black cap, a white line across both
+		g = ctx.createRadialGradient( cx - r * 0.3, cy - r * 0.35, r * 0.1, cx, cy, r );
+		g.addColorStop( 0, highlight ? "#3a3a3a" : "#2a2a2a" ); g.addColorStop( 1, "#060606" );
+		disc( r, g );
+		ridges( "rgba(150,150,150,0.35)", 0.74, 0.98, Math.max( 24, Math.round( r * 1.6 ) ) );
+		g = ctx.createRadialGradient( cx - r * 0.2, cy - r * 0.25, r * 0.05, cx, cy, r * 0.68 );
+		g.addColorStop( 0, highlight ? "#444" : "#333" ); g.addColorStop( 0.7, "#151515" ); g.addColorStop( 1, "#0a0a0a" );
+		disc( r * 0.68, g );
+		ctx.strokeStyle = "rgba(255,255,255,0.08)"; ctx.lineWidth = 1;
+		ctx.beginPath(); ctx.arc( cx, cy, r * 0.68, Math.PI * 1.05, Math.PI * 1.7 ); ctx.stroke();
+		pointer( "#f4f1ea", 0.1, 0.96, Math.max( 1.8, r * 0.09 ) );
+	}
+	else if(skin == "chrome")
+	{
+		g = ctx.createRadialGradient( cx - r * 0.35, cy - r * 0.4, r * 0.05, cx, cy, r );
+		g.addColorStop( 0, "#ffffff" ); g.addColorStop( 0.45, highlight ? "#d8dadc" : "#c4c7ca" ); g.addColorStop( 1, "#5d6064" );
+		disc( r, g );
+		ridges( "rgba(40,40,45,0.35)", 0.8, 0.99, Math.max( 20, Math.round( r * 1.4 ) ) );
+		g = ctx.createLinearGradient( cx - r, cy - r, cx + r, cy + r );
+		g.addColorStop( 0, "#f6f7f8" ); g.addColorStop( 0.5, "#a9adb2" ); g.addColorStop( 1, "#e8eaec" );
+		disc( r * 0.74, g );
+		pointer( "#151515", 0.2, 0.95, Math.max( 2, r * 0.1 ) );
+	}
+	else if(skin == "cream")
+	{
+		disc( r, highlight ? "#2a2622" : "#1a1714" );
+		g = ctx.createRadialGradient( cx - r * 0.3, cy - r * 0.35, r * 0.05, cx, cy, r * 0.86 );
+		g.addColorStop( 0, "#fffaf0" ); g.addColorStop( 0.6, highlight ? "#f1e6cc" : "#e6d9bb" ); g.addColorStop( 1, "#b7a780" );
+		disc( r * 0.86, g );
+		ctx.strokeStyle = "rgba(90,70,40,0.35)"; ctx.lineWidth = 1;
+		ctx.beginPath(); ctx.arc( cx, cy, r * 0.86, 0, Math.PI * 2 ); ctx.stroke();
+		pointer( "#1c1a17", 0.12, 0.84, Math.max( 2, r * 0.11 ) );
+	}
+	else // soft
+	{
+		g = ctx.createRadialGradient( cx - r * 0.3, cy - r * 0.35, r * 0.1, cx, cy, r );
+		g.addColorStop( 0, highlight ? "#56595e" : "#474a4f" ); g.addColorStop( 1, "#24262a" );
+		disc( r, g );
+		g = ctx.createRadialGradient( cx - r * 0.15, cy - r * 0.2, r * 0.02, cx, cy, r * 0.42 );
+		g.addColorStop( 0, "#ffb07a" ); g.addColorStop( 1, highlight ? "#ff7a35" : "#e8642a" );
+		disc( r * 0.42, g );
+		ctx.fillStyle = "#f4f1ea";
+		ctx.beginPath(); ctx.arc( cx + Math.cos(a) * r * 0.72, cy + Math.sin(a) * r * 0.72, Math.max( 1.6, r * 0.09 ), 0, Math.PI * 2 ); ctx.fill();
+	}
+}
+
+function drawKnob( cx, cy, r, n, highlight, ticks, bipolar, style )
+{
+	var a;
+	drawKnobScale( cx, cy, r, ticks, bipolar, style );
 
 	// shadow
 	ctx.fillStyle = "rgba(0,0,0,0.55)";
@@ -1231,6 +1326,7 @@ function rackButton( id, cx, cy, kind, text, enabled )
 	ctx.beginPath();
 	if(kind == "up") { ctx.moveTo( cx - 4, cy + 2 ); ctx.lineTo( cx, cy - 2.5 ); ctx.lineTo( cx + 4, cy + 2 ); }
 	else if(kind == "down") { ctx.moveTo( cx - 4, cy - 2 ); ctx.lineTo( cx, cy + 2.5 ); ctx.lineTo( cx + 4, cy - 2 ); }
+	else if(kind == "skin") { ctx.moveTo( cx + 3.5, cy ); ctx.arc( cx, cy, 3.5, 0, Math.PI * 2 ); ctx.moveTo( cx, cy ); ctx.lineTo( cx + 2.5, cy - 2.5 ); }
 	else { ctx.moveTo( cx - 3, cy - 3 ); ctx.lineTo( cx + 3, cy + 3 ); ctx.moveTo( cx + 3, cy - 3 ); ctx.lineTo( cx - 3, cy + 3 ); }
 	ctx.stroke();
 	ctx.restore();
@@ -1249,6 +1345,18 @@ function moduleButtons( m, index, count, pos )
 	p = pos(2);
 	if(rackButton( "mod_remove_" + m.id, p[0], p[1], "remove", "REMOVE FROM RACK", true ))
 		askRemoveModule( m );
+}
+
+// on the right cheek, under the move / remove buttons: the device's knob style, click for the next
+function skinButton( m, cx, cy )
+{
+	var ids = WR.KNOB_SKINS, cur = m.settings.knob_skin || "";
+	var name = KNOB_SKIN_NAMES[ cur ] + (cur ? "" : " (" + KNOB_SKIN_NAMES[ m.def.knob_skin || (layout == "classic" ? "classic" : "aluminium") ] + ")");
+	if(rackButton( "mod_skin_" + m.id, cx, cy, "skin", "KNOBS: " + name, true ))
+	{
+		m.settings.knob_skin = ids[ (ids.indexOf( cur ) + 1) % ids.length ];
+		setStatus( m.def.title + " knobs: " + KNOB_SKIN_NAMES[ m.settings.knob_skin ] );
+	}
 }
 
 function askRemoveModule( m )
@@ -1313,8 +1421,11 @@ function drawModules( y0 )
 			{
 				beginFrame( x, y, fit.k );
 				id_prefix = m.id + ".";
+				knob_skin = m.settings.knob_skin || m.def.knob_skin || null;
 				m.def.draw( m );
+				knob_skin = null;
 				id_prefix = "";
+				skinButton( m, fit.w - 11, 20 + 3 * 22 );
 				collapseButton( m.id, 36, 11 );
 				// on the right wood cheek
 				moduleButtons( m, i, mods.length, function(k){ return [ fit.w - 11, 20 + k * 22 ]; } );

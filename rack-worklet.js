@@ -201,7 +201,7 @@ class RackProcessor extends AudioWorkletProcessor {
 
 	setPatches(patches) {
 		const nodes = [this].concat(this.modules.map(m => m.dsp));
-		for (const n of nodes) { n.patched.fill(0); n.ins.fill(0); }
+		for (const n of nodes) { n.patched.fill(0); n.ins.fill(0); if (n.outPatched) n.outPatched.fill(0); }
 		const midi = {};
 		let c = 0, z = 0;
 		this.srcArr.length = 0;
@@ -222,6 +222,7 @@ class RackProcessor extends AudioWorkletProcessor {
 				this.zeroArr[z] = dst.node.ins; this.zeroIdx[z] = dst.index; z++;
 			}
 			dst.node.patched[dst.index] = 1;
+			if (src.node.outPatched) src.node.outPatched[src.index] = 1; // for modules that take a cabled output out of a mix
 			c++;
 		}
 		this.numCables = c;
