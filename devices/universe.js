@@ -431,6 +431,8 @@ WR.registerSynth( "universe", {
 	title: "UNIVERSE",
 	description: "UNIVERSE: granular micro loops, glitches, delays and a phrase looper",
 	about: "After the Hologram Microcosm: 11 granular, looping, glitch and delay effects x 4 variations, a reverb and a phrase looper. Half width.",
+	// keys: 3 played / triggered, 2 often, 1 sometimes, 0 no key (code.js: keyAssign)
+	key_prio: [["^foot_[lmr]$", 3], ["^(var\\d|fx\\d+|looper)$", 2], ["^(user|reverse_btn)$", 0], ["", 1]],
 	category: "Effects",
 	half: true,
 	insert: true,

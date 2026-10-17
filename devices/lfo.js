@@ -69,6 +69,8 @@ WR.registerSynth( "lfo", {
 	title: "DUAL LFO",
 	description: "Two low frequency oscillators, CV outputs",
 	about: "Two LFOs (sine, triangle, saw, ramp, square, S&H) with rate and level, and sync inputs. Half width.",
+	// keys: 3 played / triggered, 2 often, 1 sometimes, 0 no key (code.js: keyAssign)
+	key_prio: [["", 1]],
 	category: "Modulation",
 	half: true,
 	worklet: "devices/lfo-worklet.js",

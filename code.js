@@ -85,22 +85,87 @@ function rackY( y ) { return frame.oy + y * frame.k; }
 
 // ---------------------------------------------------------------------------
 // KEYBOARD CONTROL: the device in the middle of the screen gets its buttons (not its knobs) on the
-// computer keyboard, in the order it draws them: 1..0, Q..P, A..', Z../, [ ] - = \ (more than 47
-// buttons: banks, ` switches). Holding SHIFT shows the keys on the buttons. Every button widget calls
+// computer keyboard. Each button has a priority (the device's key_prio table: 3 played / triggered,
+// 2 often, 1 sometimes, 0 never: no key); the most used pick first, each taking the free key nearest
+// to where the button is on the device, so the keyboard is a map of the panel. What does not fit goes
+// to the next bank (` switches). Holding SHIFT shows the keys on the buttons. Every button widget calls
 // keyButton(): it registers the button and gets the key's press (a click) and hold (held down)
 
-var KEY_CODES = ["Digit1","Digit2","Digit3","Digit4","Digit5","Digit6","Digit7","Digit8","Digit9","Digit0",
-	"KeyQ","KeyW","KeyE","KeyR","KeyT","KeyY","KeyU","KeyI","KeyO","KeyP",
-	"KeyA","KeyS","KeyD","KeyF","KeyG","KeyH","KeyJ","KeyK","KeyL","Semicolon","Quote",
-	"KeyZ","KeyX","KeyC","KeyV","KeyB","KeyN","KeyM","Comma","Period","Slash",
-	"BracketLeft","BracketRight","Minus","Equal","Backslash"];
+// the keys by row, with their offsets on a staggered keyboard (in key widths)
+var KEY_ROWS = [
+	[0, ["Digit1","Digit2","Digit3","Digit4","Digit5","Digit6","Digit7","Digit8","Digit9","Digit0","Minus","Equal"]],
+	[0.5, ["KeyQ","KeyW","KeyE","KeyR","KeyT","KeyY","KeyU","KeyI","KeyO","KeyP","BracketLeft","BracketRight"]],
+	[0.75, ["KeyA","KeyS","KeyD","KeyF","KeyG","KeyH","KeyJ","KeyK","KeyL","Semicolon","Quote","Backslash"]],
+	[1.25, ["KeyZ","KeyX","KeyC","KeyV","KeyB","KeyN","KeyM","Comma","Period","Slash"]]
+];
+var KEY_CODES = [], KEY_POS = {};
+KEY_ROWS.forEach(function(row, r){ row[1].forEach(function(code, c){ KEY_CODES.push( code ); KEY_POS[ code ] = [ row[0] + c, r ]; }); });
+// a button's priority: the device's key_prio [[regex, priority], ...] (first match), else 1
+var KEY_PRIO_DEVICES = { keys: [["^kb_qwerty$", 2], ["^kb_oct", 2]], io: [["", 0]] };
+function keyPriority( device, id )
+{
+	var m = rack.settings.modules.find(function(m){ return m.id == device; });
+	var def = m ? WR.types[ m.type ] : null;
+	var table = (def && def.key_prio) || KEY_PRIO_DEVICES[ device ] || [];
+	var local = id.indexOf( device + "." ) == 0 ? id.substr( device.length + 1 ) : id;
+	for(var i = 0; i < table.length; ++i)
+		if(new RegExp( table[i][0] ).test( local ))
+			return table[i][1];
+	return 1;
+}
+// the keys for the buttons drawn: { map: [bank] -> code -> id, keyOf: id -> { bank, code } }
+function keyAssign( device, buttons )
+{
+	var list = buttons.map(function(b){ return { id: b.id, cx: b.x + b.w / 2, cy: b.y + b.h / 2, prio: keyPriority( device, b.id ) }; })
+		.filter(function(b){ return b.prio > 0; });
+	var map = [], keyOf = {};
+	if(!list.length)
+		return { map: map, keyOf: keyOf };
+	// the buttons' positions over the keyboard (12 keys by 4 rows), from their bounding box on the panel
+	var xs = list.map(function(b){ return b.cx; }), ys = list.map(function(b){ return b.cy; });
+	var x0 = Math.min.apply( null, xs ), x1 = Math.max.apply( null, xs ), y0 = Math.min.apply( null, ys ), y1 = Math.max.apply( null, ys );
+	list.forEach(function(b){
+		b.kx = x1 > x0 ? (b.cx - x0) / (x1 - x0) * 11.5 : 5.5;
+		b.ky = y1 > y0 ? (b.cy - y0) / (y1 - y0) * 3 : 1.5;
+	});
+	var left = list.slice(), bank = 0;
+	while(left.length && bank < 8)
+	{
+		var free = {};
+		KEY_CODES.forEach(function(c){ free[c] = true; });
+		map[bank] = {};
+		// the most used first; within a priority, the closest button / key pairs first
+		[3, 2, 1].forEach(function(prio){
+			var group = left.filter(function(b){ return b.prio == prio; }), pairs = [];
+			group.forEach(function(b){
+				KEY_CODES.forEach(function(c){
+					var dx = KEY_POS[c][0] - b.kx, dy = (KEY_POS[c][1] - b.ky) * 1.8;
+					pairs.push([ dx * dx + dy * dy, b, c ]);
+				});
+			});
+			pairs.sort(function(a, b){ return a[0] - b[0]; });
+			pairs.forEach(function(p){
+				if(!free[ p[2] ] || keyOf[ p[1].id ]) return;
+				free[ p[2] ] = false;
+				keyOf[ p[1].id ] = { bank: bank, code: p[2] };
+				map[bank][ p[2] ] = p[1].id;
+			});
+		});
+		left = left.filter(function(b){ return !keyOf[ b.id ]; });
+		bank++;
+	}
+	return { map: map, keyOf: keyOf };
+}
 var KEY_LABELS = { Semicolon: ";", Quote: "'", Comma: ",", Period: ".", Slash: "/", BracketLeft: "[", BracketRight: "]", Minus: "-", Equal: "=", Backslash: "\\" };
 function keyLabel( code ) { return KEY_LABELS[ code ] || code.replace( /^(Key|Digit)/, "" ); }
 var keyctl = {
 	target: null,      // the device the keys go to (a module id, "io" or "keys")
 	device: null,      // the device being drawn now
 	list: [],          // the target's buttons drawn this frame: { id, x, y, w, h } (rack coordinates)
-	ids: [],           // ... the last complete frame's ids, in order (key index -> button)
+	ids: [],           // ... the last complete frame's ids
+	map: [],           // [bank] -> key code -> button id
+	keyOf: {},         // button id -> { bank, code }
+	sig: "",           // the buttons the keys were assigned for
 	pressed: {},       // button id -> pressed (a click this frame)
 	held: {},          // button id -> its key is down
 	down: {},          // key code -> the button id it pressed
@@ -127,6 +192,13 @@ function keyFrameEnd( cx, cy )
 {
 	keyctl.ids = keyctl.list.map(function(b){ return b.id; });
 	keyctl.drawn = keyctl.list;
+	// the keys again only when the target or its buttons change: they stay where they are
+	var sig = keyctl.target + ":" + keyctl.ids.join( "," );
+	if(sig != keyctl.sig)
+	{
+		var a = keyAssign( keyctl.target, keyctl.list );
+		keyctl.map = a.map; keyctl.keyOf = a.keyOf; keyctl.sig = sig;
+	}
 	keyctl.list = [];
 	keyctl.pressed = {};
 	var best = null, bd = Infinity;
@@ -146,16 +218,15 @@ function keyReleaseAll() { keyctl.held = {}; keyctl.down = {}; }
 // a key: press the button it is mapped to; true when it was taken
 function keyDown( code )
 {
-	var n = KEY_CODES.length, banks = Math.max( 1, Math.ceil( keyctl.ids.length / n ) );
+	var banks = Math.max( 1, keyctl.map.length );
 	if(code == "Backquote")
 	{
 		if(banks > 1) { keyctl.bank = (keyctl.bank + 1) % banks; setStatus( "Keys: bank " + (keyctl.bank + 1) + " of " + banks + " (hold SHIFT to see them)" ); }
 		return banks > 1;
 	}
-	var i = KEY_CODES.indexOf( code );
-	if(i < 0)
+	if(KEY_CODES.indexOf( code ) < 0)
 		return false;
-	var id = keyctl.ids[ keyctl.bank * n + i ];
+	var id = (keyctl.map[ keyctl.bank ] || {})[ code ];
 	if(!id)
 		return true; // no button on that key: still ours, not the browser's
 	keyctl.pressed[ id ] = true;
@@ -176,7 +247,7 @@ function keyUp( code )
 // SHIFT: the keys over the buttons, the target outlined (rack coordinates, the rack's transform)
 function drawKeyOverlay()
 {
-	var now = performance.now(), n = KEY_CODES.length, r = keyctl.targetRect;
+	var now = performance.now(), r = keyctl.targetRect;
 	(keyctl.drawn || []).forEach(function(b, i){
 		var f = keyctl.flash[ b.id ];
 		if(f && now - f < 180)
@@ -191,13 +262,16 @@ function drawKeyOverlay()
 	ctx.setLineDash && ctx.setLineDash([ 10, 6 ]);
 	ctx.strokeRect( r.x + 2, r.y + 2, r.w - 4, r.h - 4 );
 	ctx.setLineDash && ctx.setLineDash([]);
-	var banks = Math.max( 1, Math.ceil( (keyctl.drawn || []).length / n ) );
+	var banks = Math.max( 1, keyctl.map.length ), mapped = 0;
 	ctx.font = "bold 13px " + FONT;
 	ctx.textBaseline = "middle"; ctx.textAlign = "center";
-	(keyctl.drawn || []).forEach(function(b, i){
-		if(Math.floor( i / n ) != keyctl.bank)
+	(keyctl.drawn || []).forEach(function(b){
+		var k = keyctl.keyOf[ b.id ];
+		if(!k) return;
+		mapped++;
+		if(k.bank != keyctl.bank)
 			return;
-		var label = keyLabel( KEY_CODES[ i % n ] ), cx = b.x + b.w / 2, cy = b.y + b.h / 2, w = Math.max( 18, ctx.measureText( label ).width + 8 );
+		var label = keyLabel( k.code ), cx = b.x + b.w / 2, cy = b.y + b.h / 2, w = Math.max( 18, ctx.measureText( label ).width + 8 );
 		ctx.fillStyle = keyctl.held[ b.id ] ? "#ffd65a" : "rgba(10,10,10,0.88)";
 		ctx.beginPath(); ctx.roundRect( cx - w / 2, cy - 10, w, 20, 4 ); ctx.fill();
 		ctx.strokeStyle = "#ffd65a"; ctx.lineWidth = 1.5; ctx.stroke();
@@ -205,7 +279,7 @@ function drawKeyOverlay()
 		ctx.fillText( label, cx, cy + 1 );
 	});
 	var name = r.id == "io" ? "AUDIO I/O" : (r.id == "keys" ? "KEYS" : ((rack.modules().find(function(m){ return m.id == r.id; }) || {}).def || { title: r.id }).title);
-	var tag = "KEYS \u2192 " + name + " (" + (keyctl.drawn || []).length + " BUTTONS" + (banks > 1 ? ", BANK " + (keyctl.bank + 1) + "/" + banks + ": ` NEXT" : "") + ")";
+	var tag = "KEYS \u2192 " + name + " (" + mapped + " OF " + (keyctl.drawn || []).length + " BUTTONS" + (banks > 1 ? ", BANK " + (keyctl.bank + 1) + "/" + banks + ": ` NEXT" : "") + ")";
 	ctx.font = "bold 14px " + FONT;
 	var tw = ctx.measureText( tag ).width + 20;
 	ctx.fillStyle = "#ffd65a";

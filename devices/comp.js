@@ -157,6 +157,8 @@ WR.registerSynth( "comp", {
 	title: "COMPRESSOR",
 	description: "Stereo compressor with sidechain and oscilloscope",
 	about: "A stereo compressor with sidechain input, gain reduction meter and an oscilloscope of the output. Half width.",
+	// keys: 3 played / triggered, 2 often, 1 sometimes, 0 no key (code.js: keyAssign)
+	key_prio: [["^on$", 2], ["^scope_screen$", 0]],
 	category: "Mixing",
 	half: true,
 	worklet: "devices/comp-worklet.js",

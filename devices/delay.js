@@ -59,6 +59,8 @@ WR.registerSynth( "delay", {
 	title: "DELAY",
 	description: "Stereo / ping-pong delay, tempo synced",
 	about: "Stereo / ping-pong delay, free or synced to the tempo, with feedback tone. Half width.",
+	// keys: 3 played / triggered, 2 often, 1 sometimes, 0 no key (code.js: keyAssign)
+	key_prio: [["^on$", 2], ["", 1]],
 	category: "Effects",
 	half: true,
 	worklet: "devices/delay-worklet.js",

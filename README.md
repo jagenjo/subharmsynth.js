@@ -79,7 +79,7 @@ One patch bay spans all of them: any output can be cabled to any input of any de
   - The front's CV cables are hidden while the rear is shown, and the rear cables while the front is.
 - **Space** starts every synth when none is running, otherwise stops them all.
 - **Keyboard control:** the device in the middle of the screen gets its buttons (not its knobs) on the computer keyboard. Scroll to choose the device.
-  - **Keys:** 1–0, Q–P, A–', Z–/, [ ] - = \, assigned in the order the device draws its buttons.
+  - **Keys:** 1–0, Q–P, A–', Z–/, [ ] - = \. The buttons used most (play, trigger, pads, steps, footswitches) get keys first, then mode and performance switches; configuration buttons (MIDI, DUMP, SAVE, the reset buttons under encoders) get none. Each button takes the free key nearest to where it is on the panel, so the keyboard is a map of the device. The priorities are each device's `key_prio` table.
   - **Held keys:** they hold the button down, so momentary buttons work (drone voices, pads, plates, footswitches). A lever switch moves to its next position.
   - **Seeing the keys:** hold **Shift** to show each button's key on it, with the device outlined. A device with more buttons than keys has banks; **`** switches between them.
   - **QWERTY piano:** when it is on (keys device), the letters play notes instead.

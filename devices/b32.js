@@ -368,6 +368,8 @@ WR.registerSynth( "brother32", {
 	title: "BROTHER-32",
 	description: "Brother-32: semi-modular synthesizer with a 32 step sequencer",
 	about: "After the Moog Mother-32: a mono semi-modular synth with a 32-step sequencer, ladder filter, envelope and a compact keyboard.",
+	// keys: 3 played / triggered, 2 often, 1 sometimes, 0 no key (code.js: keyAssign)
+	key_prio: [["^(run|reset|next|rec)$", 3], ["^step\\d+$", 3], ["^(rest|accent|glide_step|oct_down|oct_up)$", 2], ["^(assign|sustain)$", 0], ["", 1]],
 	category: "Synths",
 	worklet: "devices/b32-worklet.js",
 	jacks: JACKS,

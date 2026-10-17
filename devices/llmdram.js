@@ -680,6 +680,8 @@ WR.registerSynth( "llmdram", {
 	title: "LLM DRAM",
 	description: "LLM DRAM: 8/12-bit sampling drum machine (LinnDrum style), 16 pads, mixer and sequencer",
 	about: "After the Behringer LM Drum / LinnDrum: 24 gritty 8/12-bit sounds on 16 pads, a mixer, tuning, wave designer, filter and a 64-step sequencer.",
+	// keys: 3 played / triggered, 2 often, 1 sometimes, 0 no key (code.js: keyAssign)
+	key_prio: [["^pad\\d+$", 3], ["^(play|stop|rec|tap)$", 3], ["^(mute|solo|step_repeat|note_repeat|auto_fill|trigger)$", 2], ["^mode_", 2], ["^voice\\d+$", 2], ["^(prev|next)$", 2], ["^(midi|usb|dump|save|samp|bank|length|quan|copy)$", 0], ["", 1]],
 	category: "Synths",
 	worklet: "devices/llmdram-worklet.js",
 	jacks: [],

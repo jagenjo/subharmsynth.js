@@ -674,6 +674,8 @@ WR.registerSynth( "lunar", {
 	title: "LUNAR 21",
 	description: "LUNAR 21: ambient drone machine (Solar 42 style): 8 voices, dual effector, filters, sequencer",
 	about: "After the Elta Music Solar 42: six drone voices, two VCOs on touch plates, Polivoks filters and a dual effector with cartridges. Ambient machine.",
+	// keys: 3 played / triggered, 2 often, 1 sometimes, 0 no key (code.js: keyAssign)
+	key_prio: [["^dv\\d$", 3], ["^plate\\d+$", 3], ["^pad\\d$", 0], ["^(hold\\d|nhold\\d|kbhold|oct_dn|oct_up)$", 2], ["^(stages|link|kbmode|fx_edit)$", 0], ["", 1]],
 	category: "Synths",
 	worklet: "devices/lunar-worklet.js",
 	jacks: JACKS,

@@ -203,6 +203,8 @@ WR.registerSynth( "mixer", {
 	title: "MIXER",
 	description: "6 channel mixer with aux send and return",
 	about: "Six mono channels with level, pan, mute / solo and an aux send / return, into the main stereo out.",
+	// keys: 3 played / triggered, 2 often, 1 sometimes, 0 no key (code.js: keyAssign)
+	key_prio: [["^(mute|solo)\\d$", 2]],
 	worklet: "devices/mixer-worklet.js",
 	jacks: JACKS,
 	rear_jacks: REAR_JACKS,

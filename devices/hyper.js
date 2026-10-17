@@ -69,6 +69,8 @@ WR.registerSynth( "hyper", {
 	title: "HYPER",
 	description: "HYPER: lo-fi distortion and bit crusher",
 	about: "Lo-fi distortion and bit crusher: tape wobble, 4 saturations, sample rate and bit reduction. Half width.",
+	// keys: 3 played / triggered, 2 often, 1 sometimes, 0 no key (code.js: keyAssign)
+	key_prio: [["^on$", 2], ["", 1]],
 	category: "Effects",
 	half: true,
 	insert: true,
