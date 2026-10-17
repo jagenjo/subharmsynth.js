@@ -213,8 +213,8 @@ The bar at the bottom of the page: **▲ SEQUENCER** raises it into a multitrack
 MIDI sockets are on the back of the devices (Tab): the keys' **MIDI OUT**, and a **MIDI IN** on the Subharm, Brother-32 and Maze.
 
 - **Cable or MASTER MIDI:** a MIDI cable from MIDI OUT to a MIDI IN carries the notes. Or switch on **MASTER MIDI** under the MIDI IN to get them without a cable; new synths start that way. Switching it on unplugs a MIDI IN cable, and patching a cable switches it off.
-- **Channels:** the **CH** switch under each MIDI IN picks the channel the synth listens to: OMNI (every channel, the default) or 1–16. Click for the next, Shift + click for the previous.
-- **Keys:** **KB CH** under the MIDI OUT sets the channel of the on-screen and QWERTY keys. Notes from a MIDI device keep their own channel.
+- **Channels:** the channel selector under each MIDI IN, a red 7-segment display with ▲ / ▼ buttons (or the mouse wheel over the display), picks the channel the synth listens to: `--` for OMNI (every channel, the default) or 01–16.
+- **Keys:** the same selector under the keys' MIDI OUT sets the channel of the on-screen and QWERTY keys. Notes from a MIDI device keep their own channel.
 - **Engine:** every channel has its own note stack with last-note priority, so two synths on different channels play their own lines. Clock and start / stop go to every synth the MIDI reaches.
 
 ## Keys device and MIDI

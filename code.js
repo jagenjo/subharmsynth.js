@@ -1585,10 +1585,11 @@ function midiInSwitches( module_id, jack, x, y )
 		rack.setMidiMaster( module_id, !s.midi_master );
 		setStatus( s.midi_master ? "MASTER MIDI on: the keys' MIDI reaches it without a cable" : "MASTER MIDI off: cable the keys' MIDI OUT into MIDI IN" );
 	}
-	if(tinyButton( module_id + ".midi_channel", x - 28, y + 35, 56, 13, channelName( s.midi_channel ), s.midi_channel > 0,
-		"LISTENS TO " + (s.midi_channel ? "CHANNEL " + s.midi_channel : "EVERY CHANNEL") + "  (CLICK: NEXT, SHIFT: PREVIOUS)" ))
+	var ch = channelSelector( module_id + ".midi_channel", x - 28, y + 35, s.midi_channel, true,
+		"LISTENS TO " + (s.midi_channel ? "CHANNEL " + s.midi_channel : "EVERY CHANNEL (OMNI)") );
+	if(ch != s.midi_channel)
 	{
-		s.midi_channel = (s.midi_channel + (ui.shift ? 16 : 1)) % 17;
+		s.midi_channel = ch;
 		rack.allNotesOff();
 	}
 }
@@ -1597,12 +1598,111 @@ function midiInSwitches( module_id, jack, x, y )
 function keysChannelSwitch( x, y )
 {
 	var kb = rack.settings.kb;
-	if(tinyButton( "kb_channel", x - 28, y + 19, 56, 13, "KB CH " + kb.channel, false,
-		"THE ON-SCREEN AND QWERTY KEYS PLAY ON CHANNEL " + kb.channel + "  (CLICK: NEXT, SHIFT: PREVIOUS)" ))
+	var ch = channelSelector( "kb_channel", x - 28, y + 19, kb.channel, false,
+		"THE ON-SCREEN AND QWERTY KEYS PLAY ON CHANNEL " + kb.channel );
+	if(ch != kb.channel)
 	{
 		rack.allNotesOff();
-		kb.channel = (kb.channel - 1 + (ui.shift ? 15 : 1)) % 16 + 1;
+		kb.channel = ch;
 	}
+}
+
+// 7 segment digits: segments a b c d e f g (top, top right, bottom right, bottom, bottom left, top left, middle)
+var SEVEN_SEG = { "0": "abcdef", "1": "bc", "2": "abged", "3": "abgcd", "4": "fgbc", "5": "afgcd", "6": "afgedc",
+	"7": "abc", "8": "abcdefg", "9": "abcdfg", "-": "g", " ": "" };
+
+// a red LED 7 segment display: unlit segments faintly visible, slanted like the real ones
+function drawSevenSeg( x, y, text, h, color )
+{
+	var w = h * 0.52, t = Math.max( 1.6, h * 0.13 ), gap = h * 0.22;
+	var lit = color || "#ff3b2f", off = "rgba(255,60,40,0.09)";
+	ctx.save();
+	ctx.translate( x, y );
+	ctx.transform( 1, 0, -0.12, 1, 0, 0 ); // slant
+	for(var i = 0; i < text.length; ++i)
+	{
+		var on = SEVEN_SEG[ text[i] ] || "";
+		var ox = i * (w + gap), m = h * 0.5;
+		// [segment, x, y, horizontal]
+		[["a", 0, 0, 1], ["g", 0, m, 1], ["d", 0, h, 1], ["f", 0, 0, 0], ["b", w, 0, 0], ["e", 0, m, 0], ["c", w, m, 0]].forEach(function(sg){
+			ctx.fillStyle = on.indexOf( sg[0] ) != -1 ? lit : off;
+			var sx = ox + sg[1], sy = sg[2];
+			ctx.beginPath();
+			if(sg[3]) // horizontal: a long hexagon
+			{
+				ctx.moveTo( sx + t * 0.6, sy ); ctx.lineTo( sx + t * 1.1, sy - t * 0.5 ); ctx.lineTo( sx + w - t * 1.1, sy - t * 0.5 );
+				ctx.lineTo( sx + w - t * 0.6, sy ); ctx.lineTo( sx + w - t * 1.1, sy + t * 0.5 ); ctx.lineTo( sx + t * 1.1, sy + t * 0.5 );
+			}
+			else
+			{
+				ctx.moveTo( sx, sy + t * 0.6 ); ctx.lineTo( sx + t * 0.5, sy + t * 1.1 ); ctx.lineTo( sx + t * 0.5, sy + m - t * 1.1 );
+				ctx.lineTo( sx, sy + m - t * 0.6 ); ctx.lineTo( sx - t * 0.5, sy + m - t * 1.1 ); ctx.lineTo( sx - t * 0.5, sy + t * 1.1 );
+			}
+			ctx.closePath();
+			ctx.fill();
+		});
+	}
+	ctx.restore();
+}
+
+// MIDI channel selector on the back: a 2 digit LED display (-- = OMNI when allowed) with up / down
+// buttons; the mouse wheel over the display also changes it. Returns the (new) channel
+function channelSelector( id, x, y, value, omni, tooltip )
+{
+	var min = omni ? 0 : 1, n = 17 - min;
+	var step = function(d) { value = min + ((value - min + d) % n + n) % n; };
+	// display: dark red glass in a black bezel
+	var dw = 34, dh = 17;
+	ctx.fillStyle = "#050505";
+	ctx.beginPath(); ctx.roundRect( x - 2, y - 2, dw + 4, dh + 4, 3 ); ctx.fill();
+	var g = ctx.createLinearGradient( 0, y, 0, y + dh );
+	g.addColorStop( 0, "#1c0606" );
+	g.addColorStop( 1, "#0d0303" );
+	ctx.fillStyle = g;
+	ctx.fillRect( x, y, dw, dh );
+	drawSevenSeg( x + 11, y + 3.5, value ? (value < 10 ? "0" : "") + value : "--", 10 );
+	ctx.fillStyle = "rgba(255,255,255,0.06)"; // glass sheen
+	ctx.fillRect( x, y, dw, dh * 0.45 );
+	var hover = !cable_drag && ui.active === null && hitRect( x, y, dw, dh );
+	if(hover)
+	{
+		ui.hot = id;
+		tip( tooltip + "  (WHEEL OR \u25b2\u25bc)", x + 28, y + dh + 10 );
+		if(ui.wheel)
+		{
+			step( -ui.wheel );
+			ui.wheel = 0;
+		}
+	}
+	// up / down rubber buttons on the right
+	[[-1, "up", y - 1], [1, "down", y + 9]].forEach(function(b){
+		var bx = x + dw + 5, by = b[2], bw = 16, bh = 9;
+		var bid = id + "_" + b[1];
+		var hb = !cable_drag && ui.active === null && hitRect( bx, by, bw, bh );
+		if(hb)
+			ui.hot = bid;
+		if(hb && ui.pressed)
+		{
+			ui.active = bid;
+			step( -b[0] );
+		}
+		var held = ui.active === bid && ui.down;
+		var gg = ctx.createLinearGradient( 0, by, 0, by + bh );
+		gg.addColorStop( 0, hb ? "#5a5a56" : "#4a4a46" );
+		gg.addColorStop( 1, "#2a2a28" );
+		ctx.fillStyle = "rgba(0,0,0,0.6)";
+		ctx.beginPath(); ctx.roundRect( bx, by + 1.5, bw, bh, 2 ); ctx.fill();
+		ctx.fillStyle = gg;
+		ctx.beginPath(); ctx.roundRect( bx, by + (held ? 1 : 0), bw, bh, 2 ); ctx.fill();
+		ctx.fillStyle = "#d8d5ce";
+		ctx.beginPath();
+		var cx = bx + bw * 0.5, cy = by + bh * 0.5 + (held ? 1 : 0);
+		if(b[0] < 0) { ctx.moveTo( cx - 3, cy + 1.5 ); ctx.lineTo( cx + 3, cy + 1.5 ); ctx.lineTo( cx, cy - 2 ); }
+		else { ctx.moveTo( cx - 3, cy - 1.5 ); ctx.lineTo( cx + 3, cy - 1.5 ); ctx.lineTo( cx, cy + 2 ); }
+		ctx.closePath();
+		ctx.fill();
+	});
+	return value;
 }
 
 // label of a jack id that may not be on screen (rear sockets)
