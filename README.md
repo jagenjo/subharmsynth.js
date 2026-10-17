@@ -31,6 +31,7 @@ Needs a browser with AudioWorklet support, served over `https://` or `localhost`
 | `devices/universe.js`, `devices/universe-worklet.js` | Universe, the granular / looper effect |
 | `devices/hyper.js`, `devices/hyper-worklet.js` | Hyper, the distortion / bit crusher |
 | `devices/cosmos.js`, `devices/cosmos-worklet.js` | Cosmos, the 12 algorithm reverb |
+| `devices/pollyd.js`, `devices/pollyd-worklet.js` | Polly D, the four-voice Minimoog |
 | `devices/reroute.js`, `devices/reroute-worklet.js` | Reroute, front to back and back again |
 | `devices/reverb.js`, `devices/reverb-worklet.js` | the convolution reverb: native nodes, bridged through a send / return slot |
 | `data/patches.json` | factory patches |
@@ -110,6 +111,30 @@ A 6 channel line mixer in the same panel style as the synths. Insert it from *Ad
 - **Front:** LEVEL CV 1–6 inputs act as a VCA on each channel (5 V = the fader's level), and a MIX output carries the mono mix at ±5 V, e.g. for the scope.
 - **Back:** IN 1–6, AUX SEND, AUX RET L / R, MAIN L / R.
 - **Reverb on an aux:** patch AUX SEND → REVERB IN L, REVERB OUT L / R → AUX RET L / R, and turn the reverb's **DRY** button off so it returns only the effect. The delay has the same DRY button. The *Mixer & Aux Reverb* factory patch is set up this way.
+
+## Polly D
+
+A replica of the Behringer Poly D: a Minimoog with four oscillators, played as one voice or as four. Its panel is laid out as the original's: black with white print, Moog knobs with numbered scales, blue, orange and white rocker switches, and wooden sides. Below the panel, on the keyboard deck, are the wheels, the sequencer and the sockets of the back panel.
+
+- **Controllers:**
+  - TUNE, GLIDE (with its ON switch on the deck), MODULATION MIX.
+  - The two modulation sources: OSC 4 or FILTER EG, and NOISE (or the MOD SOURCE socket) or LFO. The mod wheel sets how much reaches the oscillators (OSCILLATOR MODULATION) and the cutoff (FILTER MODULATION).
+  - MODE: **MONO** (the four oscillators on the last note, legato), **UNISON** (the four, detuned and spread in stereo), **POLY** (an oscillator a note, four voices).
+  - **AUTO DAMP** (POLY): a key let go stops its note at once. Off, it rings on until the contour ends.
+- **Oscillator bank:** four oscillators, each with RANGE (LO, 32', 16', 8', 4', 2'), FREQUENCY (OSC 2–4, ±7 semitones) and WAVEFORM (triangle, tri / saw, saw, square, wide and narrow pulse; OSC 4 has a reverse saw instead of the tri / saw). **OSC 4 CONTROL** off takes OSC 4 off the keyboard: a drone or a modulation oscillator, and POLY has three voices.
+- **Mixer:** the four oscillators, EXT IN (the EXT SIGNAL IN socket on the back, with its OVERLOAD light) and NOISE (white or pink), each with its volume and switch.
+- **Modifiers:** the 24 dB ladder filter (CUTOFF, EMPHASIS, AMOUNT OF CONTOUR, low or high pass) and its contour (attack, decay, sustain). KEYBOARD CONTROL 1 and 2 track the keys by 1/3, 2/3 or (both) fully. Then the loudness contour. **DECAY** on: both contours release with their decay time; off, at once.
+  - In POLY, the four voices share the filter and the contours (paraphonic, as the original). The contours start again when a key is pressed with none held.
+- **Output:** VOLUME, the stereo BBD **CHORUS** (I, II, or both: fast and shallow) and a **DISTORTION** (DS-1 style: DISTORTION, TONE, LEVEL).
+- **Deck:** the PITCH wheel (±2 semitones, springs back), the MOD wheel, the LFO (0.05–200 Hz, triangle or square) and TRANSPOSE (±1 octave).
+- **Sequencer:** 8 patterns of up to 32 steps. Each step holds a note or a chord (up to 4), an accent, a glide (tied into the next step) and a ratchet (1–4 repeats).
+  - **TEMPO**, GATE, SWING, and SYNC (follow the rack's tempo: its first device with a clock). It also follows MIDI clock (the song with SYNC on) or the SYNC IN socket (a step per pulse).
+  - **PLAY / STOP**, **HOLD** (stay on the step), **RESET** (back to step 1), **PAGE** (steps 1–8, 9–16, 17–24, 25–32, shown by the LOCATION lights).
+  - **PATTERN**, then a step button, picks a pattern. **SHIFT + ARP (SET END)**, then a step button, sets its length. **SHIFT + a step** clears it. A step button alone moves the record position there and plays the step.
+  - **REC**, stopped: each chord (or note) played is a step, and HOLD / REST adds a rest. RESET / ACCENT accents the last step recorded, and RATCHET sets its repeats. REC while playing: the notes go onto the nearest step.
+  - **ARP:** the keys held, in a 16th each. The step buttons choose its mode (UP, DOWN, INC, EXC, RANDOM, ORDER, UP 2 OCT, DOWN 2 OCT); HOLD keeps it playing after the keys are let go.
+- **Sockets:** PITCH, V-TRIG, VELOCITY (with its level knob) and SYNC OUT; SYNC IN, EXT V-TRIG (starts the contours), LOUDNESS, FILTER, OSCILLATOR (1 V/oct) and MOD SOURCE. On the back: OUT L, OUT R and EXT SIGNAL IN.
+- **Not here:** the 37 keys (play it from the keys device or MIDI), the after pressure output, and the sequencer's banks (one bank of 8 patterns).
 
 ## Mystic
 
@@ -436,7 +461,7 @@ As on the hardware, MIDI reaches the synth only through its MIDI IN jack, so the
   - The panel lists the sessions, newest first, with their devices and song, to **Load**, rename (✎) or delete (×). **New session** starts a fresh rack and keeps the current one.
   - The 30 most recent are kept; when the browser's storage is full, the oldest go first.
 - **Patches**: a patch is the whole rack, meaning its synths, all their settings, the shared devices and the cables.
-  - The toolbar menu has 35 factory patches (in `data/patches.json`), grouped as SUBHARM, DRAM, BROTHER-32, MAZE, MYSTIC, LLM DRAM, LUNAR 21 (at least three for every synth) and RACK (several devices together), plus your own.
+  - The toolbar menu has 38 factory patches (in `data/patches.json`), grouped as SUBHARM, DRAM, BROTHER-32, MAZE, MYSTIC, LLM DRAM, LUNAR 21, POLLY D (at least three for every synth) and RACK (several devices together), plus your own.
   - *Save as…* stores the rack under a name in the browser.
   - *Export* / *Import* write and read `.json` files, so patches can be shared or added to the repo.
   - Patches saved before the rack existed load as a rack with one Subharm.
@@ -466,6 +491,7 @@ As on the hardware, MIDI reaches the synth only through its MIDI IN jack, so the
 
 Some details are educated guesses, not measurements of the hardware:
 
+- Polly D: the curves and ranges of the knobs, the modulation depths, how UNISON spreads the oscillators, the chorus and distortion circuits, the arpeggiator modes, and the layout of the sequencer's buttons on the deck
 - Maze: how much CORRUPT changes per pass, the ranges of the amounts, the wavefolder and filter curves, the scales after the ones the manual lists, how notes are handled over MIDI, and the panel layout (an arrangement of the manual's controls, not a copy of the panel)
 - Brother-32: the placement of the patch bay jacks within the 4 × 8 grid, the ranges of the knobs, the ASSIGN choices, and the step editing (a step grid instead of the button modes)
 - DRAM: the order of the patch bay jacks within their rows, the envelope curves and ranges, the FM depth and the HP filter (a 4-pole high pass from the same ladder)
