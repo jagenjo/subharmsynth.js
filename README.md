@@ -386,11 +386,16 @@ The bar at the bottom of the page: **▲ SEQUENCER** raises it into a multitrack
 
 - **Transport:** ▶ PLAY / ■ STOP, **● REC**, **LOOP**, the position (bar.beat), **BPM** (− / +, Shift for steps of 1), **BARS** (the loop length, 1–64), **GRID** (1/4 to 1/32) and **SYNC**.
   - SYNC sends MIDI clock and start / stop with the song, so the synths' own sequencers follow it.
-- **Tracks** (up to 16), on the left: each plays on its own MIDI **CH**annel (click to change, Shift for the previous), with **M**ute, **S**olo and **×** to delete. Double-click a name to rename it.
+- **Tracks** (up to 16), on the left: each plays on its own MIDI **CH**annel (click to change, Shift for the previous), with **M**ute and **S**olo. Double-click a name to rename it in place (Enter keeps it, Escape cancels).
+  - **⋮ (options):** COPY the track, PASTE the copy below it, DELETE it, MOVE UP or MOVE DOWN.
   - **+ TRACK** adds one on the next free channel; **CLEAR** empties the selected track.
+  - **LOAD MIDI FILE** replaces the song with a standard MIDI file (.mid). Every channel of every track becomes a track (up to 16), on its channel; the first tempo sets the BPM, and the loop gets as many bars as the notes need (up to 64).
   - Set the synths' **CH** switches on the back (Tab) to choose which synth plays which track. A synth on OMNI plays them all.
 - **Piano roll** of the selected track, with the other tracks' notes faint behind it.
-  - Click to add a note on the grid (drag to set its length). Drag a note to move it, drag its end to change its length, right-click (or Delete) to remove it.
+  - Click empty space to add a note, as long as the grid. Drag a note's end to change its length (the cursor changes over the end).
+  - **Selecting:** drag on empty space to select the notes in a rectangle; Shift+click adds or removes a note, Shift+drag adds a rectangle. Ctrl+A selects them all, Escape none.
+  - Dragging a selected note moves the whole selection, and dragging the end of one changes the length of all of them.
+  - Right-click or Delete removes the note, or the selection it is in.
   - The keys on the left play the note. The mouse wheel scrolls the notes.
 - **Recording:** with REC on while playing, notes from the on-screen keys, the QWERTY keys and a MIDI device go into the selected track, snapped to the grid.
 - **Timing:** notes are scheduled ahead into the audio engine with their sample position, so they don't depend on the page's frame rate.

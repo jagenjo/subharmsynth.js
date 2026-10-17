@@ -12,14 +12,18 @@ var cv = document.getElementById("seq");
 var g = cv.getContext("2d");
 var BAR_H = 30;
 var LOOKAHEAD = 0.15, TICK = 25; // seconds scheduled ahead, ms between scheduler runs
-var ROW_H = 12, KEYS_W = 44, RULER_H = 20, TRACKS_W = 250, TRACK_H = 30;
+var ROW_H = 12, KEYS_W = 44, RULER_H = 20, TRACKS_W = 250, TRACK_H = 44;
 var NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
 var COLORS = ["#e2574c","#f0a43a","#e8c547","#6cc070","#4fa3e0","#c77dd8","#ececec","#f08c3a"];
 var FONT = "Antonio, Oswald, 'Arial Narrow', sans-serif";
 
 var view = {
 	open: false, h: 320, top_note: 76, // highest note shown in the piano roll
-	px: -1, py: -1, down: false, drag: null, hot: null, sel_note: null, resize: null
+	px: -1, py: -1, down: false, drag: null, hot: null, resize: null,
+	sel: [],       // the selected notes of the track
+	menu: null,    // the track options menu: { i, x, y }
+	clip: null,    // a copied track
+	rename: null   // the track name being edited
 };
 try {
 	var saved = JSON.parse( localStorage.getItem("SUBHARM_seq") || "{}" ) || {};
@@ -287,44 +291,218 @@ function drawTracks( y0, h )
 	var s = song();
 	rect( 0, y0, TRACKS_W, h, "#141413" );
 	s.tracks.forEach(function(t, i){
-		var y = y0 + i * TRACK_H;
+		var y = y0 + i * TRACK_H, by = y + (TRACK_H - 20) * 0.5;
 		if(y + TRACK_H > y0 + h - 30)
 			return;
 		var sel = i == s.sel;
 		rect( 0, y, TRACKS_W, TRACK_H - 1, sel ? "#2a2a28" : "#1b1b1a" );
 		rect( 0, y, 4, TRACK_H - 1, COLORS[ i % COLORS.length ] );
-		ui.buttons.push({ x: 0, y: y, w: 110, h: TRACK_H, fn: function(){ s.sel = i; view.sel_note = null; fitView(); }, dbl: function(){
-			var name = window.prompt( "Track name:", t.name );
-			if(name && name.trim()) t.name = name.trim().substr( 0, 24 ).toUpperCase();
+		ui.buttons.push({ x: 0, y: y, w: 110, h: TRACK_H, fn: function(){ if(s.sel != i) { s.sel = i; view.sel = []; fitView(); } }, dbl: function(){
+			renameTrack( i, 8, y + TRACK_H * 0.5 - 17 );
 		}, tip: "Select (double-click: rename)" });
-		text( t.name, 12, y + TRACK_H * 0.5, 12, sel ? "#fff" : "#c8c5bd", "left", sel );
-		text( t.notes.length + " notes", 12, y + TRACK_H * 0.5 + 9, 8, "#6d6b66" );
-		btn( 112, y + 5, 52, 20, "CH " + t.channel, false, function(){
+		if(!(view.rename && view.rename.i == i))
+		{
+			text( t.name, 12, y + TRACK_H * 0.5 - 6, 13, sel ? "#fff" : "#c8c5bd", "left", sel );
+			text( t.notes.length + " notes", 12, y + TRACK_H * 0.5 + 10, 9, "#6d6b66" );
+		}
+		btn( 112, by, 52, 20, "CH " + t.channel, false, function(){
 			t.channel = (t.channel - 1 + (view.shift ? 15 : 1)) % 16 + 1; reschedule();
 		}, "MIDI channel of the track (Shift: previous). Set the synths' CH on the back (Tab)" );
-		btn( 168, y + 5, 22, 20, "M", t.mute, function(){ t.mute = !t.mute; reschedule(); }, "Mute", "#6b5a1c" );
-		btn( 194, y + 5, 22, 20, "S", t.solo, function(){ t.solo = !t.solo; reschedule(); }, "Solo", "#2f5a6b" );
-		btn( 220, y + 5, 22, 20, "×", false, function(){
-			if(t.notes.length && !window.confirm( "Delete " + t.name + " and its " + t.notes.length + " notes?" ))
-				return;
-			s.tracks.splice( i, 1 );
-			if(!s.tracks.length) s.tracks.push({ name: "TRACK 1", channel: 1, mute: false, solo: false, notes: [] });
-			s.sel = Math.min( s.sel, s.tracks.length - 1 );
-			reschedule();
-		}, "Delete the track" );
+		btn( 168, by, 22, 20, "M", t.mute, function(){ t.mute = !t.mute; reschedule(); }, "Mute", "#6b5a1c" );
+		btn( 194, by, 22, 20, "S", t.solo, function(){ t.solo = !t.solo; reschedule(); }, "Solo", "#2f5a6b" );
+		btn( 220, by, 22, 20, "⋮", !!(view.menu && view.menu.i == i), function(){
+			view.menu = view.menu && view.menu.i == i ? null : { i: i, x: 132, y: by + 22 };
+		}, "Track options: copy, paste, delete, move up / down", "#4a4a45" );
+		ui.buttons[ ui.buttons.length - 1 ].menu = true; // it toggles the menu itself
 	});
 	var by = y0 + h - 26;
-	btn( 8, by, 74, 20, "+ TRACK", false, function(){
+	btn( 8, by, 70, 20, "+ TRACK", false, function(){
 		if(s.tracks.length >= 16) return;
 		var used = s.tracks.map(function(t){ return t.channel; });
 		var ch = 1; while(used.indexOf( ch ) != -1 && ch < 16) ch++;
 		s.tracks.push({ name: "TRACK " + (s.tracks.length + 1), channel: ch, mute: false, solo: false, notes: [] });
-		s.sel = s.tracks.length - 1;
+		s.sel = s.tracks.length - 1; view.sel = [];
 	}, "Add a track on the next free channel" );
-	btn( 88, by, 64, 20, "CLEAR", false, function(){
+	btn( 82, by, 56, 20, "CLEAR", false, function(){
 		var t = track();
-		if(t.notes.length && window.confirm( "Clear the " + t.notes.length + " notes of " + t.name + "?" )) { t.notes = []; reschedule(); }
+		if(t.notes.length && window.confirm( "Clear the " + t.notes.length + " notes of " + t.name + "?" )) { t.notes = []; view.sel = []; reschedule(); }
 	}, "Remove the notes of the selected track" );
+	btn( 142, by, 100, 20, "LOAD MIDI FILE", false, function(){ midiFileInput().click(); },
+		"Load a standard MIDI file (.mid): its tracks replace the song's" );
+}
+
+// the track options menu, drawn over everything (a click elsewhere closes it)
+function drawMenu( H )
+{
+	var m = view.menu, s = song();
+	if(!m) return;
+	if(m.i >= s.tracks.length) { view.menu = null; return; }
+	var items = [
+		[ "COPY", true, function(){ view.clip = JSON.parse( JSON.stringify( s.tracks[ m.i ] ) ); } ],
+		[ "PASTE", !!view.clip && s.tracks.length < 16, function(){
+			var t = JSON.parse( JSON.stringify( view.clip ) );
+			t.name = (t.name.substr( 0, 19 ) + " COPY").trim();
+			t.solo = false;
+			s.tracks.splice( m.i + 1, 0, t ); s.sel = m.i + 1; view.sel = []; reschedule();
+		} ],
+		[ "DELETE", true, function(){
+			var t = s.tracks[ m.i ];
+			if(t.notes.length && !window.confirm( "Delete " + t.name + " and its " + t.notes.length + " notes?" ))
+				return;
+			s.tracks.splice( m.i, 1 );
+			if(!s.tracks.length) s.tracks.push({ name: "TRACK 1", channel: 1, mute: false, solo: false, notes: [] });
+			s.sel = Math.min( s.sel > m.i ? s.sel - 1 : s.sel, s.tracks.length - 1 ); view.sel = [];
+			reschedule();
+		} ],
+		[ "MOVE UP", m.i > 0, function(){ moveTrack( m.i, -1 ); } ],
+		[ "MOVE DOWN", m.i < s.tracks.length - 1, function(){ moveTrack( m.i, 1 ); } ]
+	];
+	var w = 110, ih = 24, mh = items.length * ih + 6, x = m.x, y = m.y + mh > H ? Math.max( BAR_H, m.y - 24 - mh ) : m.y;
+	g.fillStyle = "#262624"; g.strokeStyle = "#55554f"; g.lineWidth = 1;
+	g.beginPath(); g.roundRect( x, y, w, mh, 5 ); g.fill(); g.stroke();
+	ui.buttons.push({ x: x, y: y, w: w, h: mh, menu: true, fn: function(){} }); // its gaps: no click through
+	items.forEach(function(it, k){
+		var iy = y + 3 + k * ih, hover = it[1] && view.px >= x && view.px <= x + w && view.py >= iy && view.py < iy + ih;
+		if(hover) rect( x + 3, iy, w - 6, ih, "#3d3d39" );
+		text( it[0], x + 12, iy + ih * 0.5, 12, it[1] ? (it[0] == "DELETE" ? "#f08070" : "#e8e4dc") : "#5d5b56" );
+		ui.buttons.push({ x: x, y: iy, w: w, h: ih, menu: true, fn: function(){ if(!it[1]) return; view.menu = null; it[2](); } });
+	});
+}
+
+function moveTrack( i, d )
+{
+	var s = song(), j = i + d;
+	if(j < 0 || j >= s.tracks.length) return;
+	var t = s.tracks[i]; s.tracks[i] = s.tracks[j]; s.tracks[j] = t;
+	if(s.sel == i) s.sel = j; else if(s.sel == j) s.sel = i;
+}
+
+// double-click a track's name: edit it in place (Enter or a click elsewhere keeps it, Escape does not)
+function renameTrack( i, x, y )
+{
+	var t = song().tracks[i], r = cv.getBoundingClientRect(), inp = document.createElement( "input" );
+	inp.value = t.name; inp.maxLength = 24; inp.spellcheck = false;
+	inp.style.cssText = "position:fixed;z-index:50;left:" + (r.left + x) + "px;top:" + (r.top + y) + "px;width:100px;height:22px;box-sizing:border-box;" +
+		"font:bold 13px " + FONT + ";text-transform:uppercase;background:#0e0e0d;color:#fff;border:1px solid #b6f06a;border-radius:3px;padding:0 4px;outline:none";
+	var done = false;
+	function finish( ok )
+	{
+		if(done) return;
+		done = true;
+		if(ok && inp.value.trim()) t.name = inp.value.trim().substr( 0, 24 ).toUpperCase();
+		view.rename = null;
+		if(inp.parentNode) inp.parentNode.removeChild( inp );
+	}
+	view.rename = { i: i, input: inp, finish: finish };
+	inp.addEventListener("keydown", function(e){
+		e.stopPropagation();
+		if(e.key == "Enter") finish( true );
+		else if(e.key == "Escape") finish( false );
+	});
+	inp.addEventListener("blur", function(){ finish( true ); });
+	document.body.appendChild( inp );
+	inp.focus(); inp.select();
+}
+
+// ---------------------------------------------------------------------------
+// MIDI files: every channel of every track with notes becomes a track (up to 16), the first tempo
+// sets the BPM, and the song gets as many bars as the notes need (up to 64)
+
+function parseMidi( buf )
+{
+	var d = new Uint8Array( buf ), p = 0;
+	function u32() { var v = (d[p] << 24 | d[p+1] << 16 | d[p+2] << 8 | d[p+3]) >>> 0; p += 4; return v; }
+	function u16() { var v = d[p] << 8 | d[p+1]; p += 2; return v; }
+	function str4() { var v = String.fromCharCode( d[p], d[p+1], d[p+2], d[p+3] ); p += 4; return v; }
+	function vlq() { var v = 0, b; do { b = d[p++]; v = v * 128 + (b & 0x7F); } while(b & 0x80 && p < d.length); return v; }
+	if(d.length < 14 || str4() != "MThd")
+		throw new Error( "not a MIDI file" );
+	var hlen = u32(), hstart = p; u16(); var ntrks = u16(), div = u16();
+	p = hstart + hlen;
+	var ppq = div & 0x8000 ? 96 : (div || 96), tempo = 0, out = [];
+	for(var k = 0; k < ntrks && p + 8 <= d.length; ++k)
+	{
+		var id = str4(), len = u32(), end = Math.min( d.length, p + len );
+		if(id != "MTrk") { p = end; continue; }
+		var tick = 0, run = 0, name = "", open = {}, byCh = {};
+		while(p < end)
+		{
+			tick += vlq();
+			var st = d[p];
+			if(st & 0x80) p++; else st = run;
+			if(st == 0xFF)
+			{
+				var type = d[p++], l = vlq();
+				if(type == 0x51 && l == 3 && !tempo) tempo = 60000000 / (d[p] << 16 | d[p+1] << 8 | d[p+2]);
+				if(type == 0x03 && !name) for(var c = 0; c < l; ++c) name += String.fromCharCode( d[p + c] );
+				p += l;
+				if(type == 0x2F) break;
+				continue;
+			}
+			if(st == 0xF0 || st == 0xF7) { p += vlq(); continue; }
+			if(!(st & 0x80)) break; // corrupt: data without a status
+			run = st;
+			var cmd = st & 0xF0, ch = st & 0x0F, a = d[p++], b = cmd == 0xC0 || cmd == 0xD0 ? 0 : d[p++];
+			if(cmd == 0x90 && b > 0)
+			{
+				var key = ch * 128 + a;
+				(open[key] = open[key] || []).push([ tick, b ]);
+			}
+			else if(cmd == 0x80 || cmd == 0x90)
+			{
+				var o = open[ ch * 128 + a ];
+				if(o && o.length)
+				{
+					var on = o.shift();
+					(byCh[ch] = byCh[ch] || []).push([ on[0] / ppq, Math.max( 1 / 64, (tick - on[0]) / ppq ), a, on[1] / 127 ]);
+				}
+			}
+		}
+		p = end;
+		Object.keys( byCh ).forEach(function(ch){
+			var notes = byCh[ch].sort(function(x, y){ return x[0] - y[0]; });
+			out.push({ name: name.replace( /[^\x20-\x7E]/g, "" ).trim() || "MIDI " + (out.length + 1), channel: +ch + 1, mute: false, solo: false, notes: notes });
+		});
+	}
+	return { bpm: tempo || 120, tracks: out };
+}
+
+function loadMidiFile( buf )
+{
+	var m = parseMidi( buf ), s = song();
+	if(!m.tracks.length)
+		throw new Error( "no notes in the MIDI file" );
+	var tracks = m.tracks.slice( 0, 16 ), last = 0;
+	tracks.forEach(function(t){
+		t.notes = t.notes.filter(function(n){ return n[0] < 64 * 4; });
+		t.notes.forEach(function(n){ last = Math.max( last, n[0] + n[1] ); });
+	});
+	rack.settings.song = WR.validateSong({ bpm: Math.round( m.bpm ), bars: Math.max( 1, Math.min( 64, Math.ceil( last / 4 - 1e-9 ) ) ),
+		loop: s.loop, grid: s.grid, clock: s.clock, sel: 0, tracks: tracks });
+	return rack.settings.song;
+}
+
+var midi_input = null;
+function midiFileInput()
+{
+	if(midi_input)
+		return midi_input;
+	midi_input = document.createElement( "input" );
+	midi_input.type = "file"; midi_input.accept = ".mid,.midi,audio/midi"; midi_input.style.display = "none";
+	midi_input.addEventListener("change", function(){
+		var f = midi_input.files && midi_input.files[0];
+		midi_input.value = "";
+		if(!f) return;
+		var notes = song().tracks.reduce(function(a, t){ return a + t.notes.length; }, 0);
+		if(notes && !window.confirm( "Replace the song (" + notes + " notes) with " + f.name + "?" ))
+			return;
+		f.arrayBuffer().then(function(buf){
+			var sg = loadMidiFile( buf );
+			if(window.setStatus) setStatus( f.name + ": " + sg.tracks.length + " tracks, " + sg.bars + " bars at " + Math.round( sg.bpm ) + " BPM" );
+		}).catch(function(err){ window.alert( "Could not load " + f.name + ": " + err.message ); });
+	});
+	document.body.appendChild( midi_input );
+	return midi_input;
 }
 
 // piano roll geometry
@@ -377,12 +555,21 @@ function drawRoll( x0, y0, w, h )
 		g.globalAlpha = 0.45 + 0.55 * n[3];
 		rect( x, y + 1, nw, ROW_H - 2, n[0] >= r.L ? "#555" : color );
 		g.globalAlpha = 1;
-		if(n === view.sel_note)
+		if(view.sel.indexOf( n ) != -1)
 		{
 			g.strokeStyle = "#fff"; g.lineWidth = 1.5;
 			g.strokeRect( x + 0.5, y + 1.5, nw - 1, ROW_H - 3 );
 		}
 	});
+	// the selection rectangle
+	var d = view.drag;
+	if(d && d.mode == "rect")
+	{
+		g.fillStyle = "rgba(182,240,106,0.08)"; g.fillRect( Math.min( d.x0, d.x1 ), Math.min( d.y0, d.y1 ), Math.abs( d.x1 - d.x0 ), Math.abs( d.y1 - d.y0 ) );
+		g.strokeStyle = "#b6f06a"; g.lineWidth = 1; g.setLineDash([ 4, 3 ]);
+		g.strokeRect( Math.min( d.x0, d.x1 ) + 0.5, Math.min( d.y0, d.y1 ) + 0.5, Math.abs( d.x1 - d.x0 ), Math.abs( d.y1 - d.y0 ) );
+		g.setLineDash([]);
+	}
 	// play head
 	if(play.on || play.last_beat > 0)
 	{
@@ -414,11 +601,21 @@ function draw()
 		drawTracks( BAR_H, h - BAR_H );
 		drawRoll( TRACKS_W, BAR_H, w - TRACKS_W, h - BAR_H );
 		if(!view.hot_tip && view.roll && view.px > view.roll.x && view.py > view.roll.y)
-			view.hot_tip = "CLICK: ADD A NOTE · DRAG: MOVE · DRAG THE END: LENGTH · RIGHT-CLICK: DELETE · WHEEL: SCROLL NOTES";
+			view.hot_tip = "CLICK: ADD A NOTE · DRAG: SELECT · DRAG NOTES: MOVE · DRAG THE END: LENGTH · RIGHT-CLICK: DELETE · WHEEL: SCROLL";
 	}
 	drawBar( w );
-	// the resize grip on the top edge
-	cv.style.cursor = view.resize ? "ns-resize" : (view.open && view.py < 4 ? "ns-resize" : (view.drag ? "grabbing" : "default"));
+	if(view.open)
+		drawMenu( h );
+	// the cursor: resize grip on the top edge, a note's end, a note, dragging
+	var cur = "default", r = view.roll, d = view.drag;
+	if(view.resize || (view.open && view.py < 4 && !view.menu)) cur = "ns-resize";
+	else if(d) cur = d.mode == "length" ? "ew-resize" : (d.mode == "move" ? "grabbing" : "crosshair");
+	else if(view.open && r && !view.menu && view.px > r.x && view.py > r.y)
+	{
+		var hit = noteAt( r, view.px, view.py );
+		cur = hit ? (hit.edge ? "ew-resize" : "grab") : "default";
+	}
+	cv.style.cursor = cur;
 }
 
 // ---------------------------------------------------------------------------
@@ -450,12 +647,15 @@ cv.addEventListener("pointerdown", function(e){
 	ensureAudio();
 	var now = performance.now(), dbl = now - last_click < 350;
 	last_click = now;
-	if(view.open && view.py < 4)
+	if(view.rename)
+		view.rename.finish( true );
+	if(view.open && view.py < 4 && !view.menu)
 	{
 		view.resize = { y: e.clientY, h: view.h };
 		cv.setPointerCapture( e.pointerId );
 		return;
 	}
+	var menu = view.menu;
 	for(var i = ui.buttons.length - 1; i >= 0; --i)
 	{
 		var b = ui.buttons[i];
@@ -463,9 +663,12 @@ cv.addEventListener("pointerdown", function(e){
 		{
 			if(e.button == 0)
 				(dbl && b.dbl ? b.dbl : b.fn)();
+			if(menu && view.menu === menu && !b.menu)
+				view.menu = null; // another button: the menu closes
 			return;
 		}
 	}
+	if(menu) { view.menu = null; return; } // a click outside the menu only closes it
 	var r = view.roll;
 	if(!view.open || !r)
 		return;
@@ -480,30 +683,40 @@ cv.addEventListener("pointerdown", function(e){
 	if(view.px < r.x || view.py < r.y)
 		return;
 	var hit = noteAt( r, view.px, view.py );
-	var t = track(), gb = gridBeats();
-	if(e.button == 2)
+	var t = track();
+	if(e.button == 2) // right-click: the note (or the selection it is in) goes
 	{
-		if(hit) { t.notes.splice( t.notes.indexOf( hit.note ), 1 ); view.sel_note = null; reschedule(); }
+		if(hit)
+		{
+			var del = view.sel.indexOf( hit.note ) != -1 ? view.sel : [ hit.note ];
+			t.notes = t.notes.filter(function(n){ return del.indexOf( n ) == -1; });
+			view.sel = [];
+			reschedule();
+		}
 		return;
 	}
 	cv.setPointerCapture( e.pointerId );
+	var beat = (view.px - r.x) / r.bw, pitch = view.top_note - Math.floor( (view.py - r.y) / ROW_H );
 	if(hit)
 	{
-		view.sel_note = hit.note;
-		view.drag = hit.edge ? { mode: "length", note: hit.note } :
-			{ mode: "move", note: hit.note, db: (view.px - beatX( r, hit.note[0] )) / r.bw, n0: hit.note[2] };
+		if(e.shiftKey) // Shift: add to / take out of the selection
+		{
+			var k = view.sel.indexOf( hit.note );
+			if(k == -1) view.sel.push( hit.note ); else view.sel.splice( k, 1 );
+			return;
+		}
+		if(view.sel.indexOf( hit.note ) == -1)
+			view.sel = [ hit.note ];
+		// the whole selection moves, or gets longer, with the note dragged
+		view.drag = hit.edge ? { mode: "length", b0: beat, len: view.sel.map(function(n){ return n[1]; }) } :
+			{ mode: "move", b0: beat, p0: pitch, pos: view.sel.map(function(n){ return [ n[0], n[2] ]; }) };
 		return;
 	}
-	// a new note on the grid, as long as the grid; dragging sets its length
-	var b = Math.floor( (view.px - r.x) / r.bw / gb ) * gb;
-	var note = view.top_note - Math.floor( (view.py - r.y) / ROW_H );
-	var nn = [ b, gb, note, 0.8 ];
-	t.notes.push( nn );
-	view.sel_note = nn;
-	view.drag = { mode: "length", note: nn };
-	var ch = t.channel;
-	act(function(){ rack.post({ type: "note", channel: ch, note: note, on: true, vel: 0.8 }); });
-	view.preview = { channel: ch, note: note };
+	// empty space: a click adds a note, a drag selects the notes in its rectangle (Shift: adds them)
+	view.drag = { mode: "pending", x0: view.px, y0: view.py, x1: view.px, y1: view.py, beat: beat, pitch: pitch,
+		base: e.shiftKey ? view.sel.slice() : [] };
+	if(!e.shiftKey)
+		view.sel = [];
 });
 
 cv.addEventListener("pointermove", function(e){
@@ -516,13 +729,29 @@ cv.addEventListener("pointermove", function(e){
 	var d = view.drag, r = view.roll;
 	if(!d || !r)
 		return;
-	var gb = gridBeats(), n = d.note;
-	if(d.mode == "length")
-		n[1] = Math.max( gb, Math.round( ((view.px - r.x) / r.bw - n[0]) / gb ) * gb );
-	else
+	var gb = gridBeats(), sel = view.sel, beat = (view.px - r.x) / r.bw;
+	if(d.mode == "pending" && Math.abs( view.px - d.x0 ) + Math.abs( view.py - d.y0 ) > 4)
+		d.mode = "rect";
+	if(d.mode == "rect")
 	{
-		n[0] = Math.max( 0, Math.min( r.L - gb, Math.round( ((view.px - r.x) / r.bw - d.db) / gb ) * gb ) );
-		n[2] = Math.max( 0, Math.min( 127, view.top_note - Math.floor( (view.py - r.y) / ROW_H ) ) );
+		d.x1 = view.px; d.y1 = view.py;
+		var b0 = (Math.min( d.x0, d.x1 ) - r.x) / r.bw, b1 = (Math.max( d.x0, d.x1 ) - r.x) / r.bw;
+		var p1 = view.top_note - (Math.min( d.y0, d.y1 ) - r.y) / ROW_H + 1, p0 = view.top_note - (Math.max( d.y0, d.y1 ) - r.y) / ROW_H + 1;
+		view.sel = d.base.concat( track().notes.filter(function(n){
+			return d.base.indexOf( n ) == -1 && n[0] < b1 && n[0] + n[1] > b0 && n[2] + 1 > p0 && n[2] < p1;
+		}) );
+	}
+	else if(d.mode == "length")
+	{
+		var db = Math.round( (beat - d.b0) / gb ) * gb;
+		sel.forEach(function(n, k){ n[1] = Math.max( gb, d.len[k] + db ); });
+	}
+	else if(d.mode == "move")
+	{
+		var dt = Math.round( (beat - d.b0) / gb ) * gb, dp = view.top_note - Math.floor( (view.py - r.y) / ROW_H ) - d.p0;
+		// all of them kept inside the loop and the MIDI notes
+		d.pos.forEach(function(p){ dt = Math.min( Math.max( dt, -p[0] ), r.L - gb - p[0] ); dp = Math.min( Math.max( dp, -p[1] ), 127 - p[1] ); });
+		sel.forEach(function(n, k){ n[0] = d.pos[k][0] + dt; n[2] = d.pos[k][1] + dp; });
 	}
 });
 
@@ -534,10 +763,20 @@ function release()
 		rack.post({ type: "note", channel: p.channel, note: p.note, on: false });
 		view.preview = null;
 	}
-	if(view.drag)
+	var d = view.drag;
+	if(d && d.mode == "pending" && view.roll) // a click on empty space: a new note, as long as the grid
+	{
+		var gb = gridBeats(), t = track(), nn = [ Math.floor( d.beat / gb ) * gb, gb, Math.max( 0, Math.min( 127, d.pitch ) ), 0.8 ];
+		t.notes.push( nn );
+		view.sel = [ nn ];
+		var ch = t.channel, note = nn[2];
+		act(function(){ rack.post({ type: "note", channel: ch, note: note, on: true, vel: 0.8 }); });
+		setTimeout(function(){ rack.post({ type: "note", channel: ch, note: note, on: false }); }, 200);
+	}
+	if(d)
 	{
 		view.drag = null;
-		reschedule();
+		if(d.mode != "rect") reschedule();
 	}
 	if(view.resize)
 	{
@@ -556,16 +795,26 @@ cv.addEventListener("wheel", function(e){
 	e.preventDefault();
 }, { passive: false });
 
-// Delete / Backspace removes the selected note
+// Delete / Backspace removes the selected notes; Ctrl+A selects all of them; Escape: none
 window.addEventListener("keydown", function(e){
-	if(!view.open || !view.sel_note || isTextField( e.target ))
+	if(!view.open || isTextField( e.target ))
 		return;
-	if(e.code == "Delete" || e.code == "Backspace")
+	if((e.code == "Delete" || e.code == "Backspace") && view.sel.length)
 	{
-		var t = track(), i = t.notes.indexOf( view.sel_note );
-		if(i != -1) { t.notes.splice( i, 1 ); reschedule(); }
-		view.sel_note = null;
+		var t = track(), sel = view.sel;
+		t.notes = t.notes.filter(function(n){ return sel.indexOf( n ) == -1; });
+		view.sel = [];
+		reschedule();
 		e.preventDefault();
+	}
+	else if(e.code == "KeyA" && (e.ctrlKey || e.metaKey) && view.roll && view.px > view.roll.x && view.py > view.roll.y)
+	{
+		view.sel = track().notes.slice();
+		e.preventDefault();
+	}
+	else if(e.code == "Escape" && (view.sel.length || view.menu))
+	{
+		view.sel = []; view.menu = null;
 	}
 });
 
@@ -576,7 +825,7 @@ setInterval(function(){
 	{
 		if(last_song && play.on) { stop(); }
 		last_song = song();
-		view.sel_note = null;
+		view.sel = []; view.menu = null;
 		fitView();
 	}
 }, 100);
@@ -584,6 +833,6 @@ setInterval(function(){
 draw();
 
 // for the tests
-window.SEQ = { view: view, play: play, start: start, stop: stop, scheduleRange: scheduleRange, position: position, roll: function(){ return view.roll; } };
+window.SEQ = { view: view, play: play, parseMidi: parseMidi, loadMidiFile: loadMidiFile, start: start, stop: stop, scheduleRange: scheduleRange, position: position, roll: function(){ return view.roll; } };
 
 })();
