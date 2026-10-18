@@ -19,8 +19,8 @@ for (let i = 1; i <= SLOTS; i++) { IN_IDS.push("in" + i); OUT_IDS.push("out" + i
 OUT_IDS.push("audio_l", "audio_r");
 for (let i = 1; i <= ASLOTS; i++) { IN_IDS.push("ain" + i); OUT_IDS.push("aout" + i); }
 
-// an input: [key, label, min, max, default, unit]
-// units: oct (pitch, octaves from C4), hz / s / bpm (exponential), lvl (0..1), bi (-1..1), audio, gate, int, x
+// an input: [key, label, min, max, default, unit, names (an int input's choices)]
+// units: oct (pitch, octaves from C4), hz / s / bpm (exponential), lvl (0..1), bi (-1..1), audio, gate, int, bits, x
 const MODULES = {
 	midi:   { title: "MIDI IN", cat: "Inputs", ins: [], outs: ["pitch", "gate", "vel"], about: "The notes of the keys or a MIDI device: PITCH (octaves from C4), GATE, VELOCITY" },
 	osc:    { title: "OSCILLATOR", cat: "Sources", ins: [["pitch", "PITCH", -4, 4, 0, "oct"], ["fm", "FM", -2, 2, 0, "oct"], ["pw", "PULSE WIDTH", 0.05, 0.95, 0.5, "lvl"]],
@@ -36,14 +36,56 @@ const MODULES = {
 	sh:     { title: "SAMPLE & HOLD", cat: "Modulation", ins: [["in", "IN", -1, 1, 0, "bi"], ["trig", "TRIGGER", 0, 1, 0, "gate"]], outs: ["out"], about: "Holds IN on each trigger" },
 	slew:   { title: "SLEW", cat: "Modulation", ins: [["in", "IN", -4, 4, 0, "x"], ["time", "TIME", 0.001, 2, 0.05, "s"]], outs: ["out"], about: "Glides to IN (portamento)" },
 	quant:  { title: "QUANTIZER", cat: "Modulation", ins: [["in", "IN", -4, 4, 0, "oct"]], outs: ["out"], about: "Rounds a pitch to semitones" },
+	decay:  { title: "AD ENVELOPE", cat: "Modulation", ins: [["trig", "TRIGGER", 0, 1, 0, "gate"], ["a", "ATTACK", 0.001, 4, 0.002, "s"], ["d", "DECAY", 0.005, 8, 0.25, "s"]],
+		outs: ["env"], about: "Rises and falls on each trigger, 0..1: drums, plucks" },
+	follow: { title: "ENV FOLLOWER", cat: "Modulation", ins: [["in", "IN", -1, 1, 0, "audio"], ["time", "RELEASE", 0.005, 2, 0.1, "s"]], outs: ["env"],
+		about: "How loud IN is, 0..1: let a sound move something else" },
+	random: { title: "RANDOM", cat: "Modulation", ins: [["rate", "RATE", 0.05, 50, 2, "hz"], ["smooth", "SMOOTH", 0, 1, 0, "lvl"]], outs: ["out"],
+		about: "A new random value -1..1 RATE times a second, stepped or smooth" },
+	// triggers and time
+	metro:  { title: "TRIGGER EVERY", cat: "Triggers & time", ins: [["time", "EVERY", 0.01, 30, 1, "s"], ["width", "WIDTH", 0.01, 0.99, 0.5, "lvl"], ["reset", "RESET", 0, 1, 0, "gate"]],
+		outs: ["gate", "ramp"], about: "A gate every so many seconds (and a 0..1 ramp between them)" },
+	div:    { title: "CLOCK DIVIDER", cat: "Triggers & time", ins: [["clock", "CLOCK", 0, 1, 0, "gate"], ["div", "DIVIDE BY", 1, 32, 2, "int"], ["reset", "RESET", 0, 1, 0, "gate"]],
+		outs: ["out"], about: "Lets one gate in every N through" },
+	euclid: { title: "EUCLID", cat: "Triggers & time", ins: [["clock", "CLOCK", 0, 1, 0, "gate"], ["steps", "STEPS", 1, 32, 8, "int"], ["hits", "HITS", 0, 32, 3, "int"],
+		["rot", "ROTATE", 0, 31, 0, "int"], ["reset", "RESET", 0, 1, 0, "gate"]], outs: ["gate"], about: "HITS spread as evenly as can be over STEPS: world rhythms" },
+	gdelay: { title: "GATE DELAY", cat: "Triggers & time", ins: [["in", "IN", 0, 1, 0, "gate"], ["time", "TIME", 0.001, 8, 0.25, "s"]], outs: ["out"],
+		about: "The same gates, TIME later" },
+	pulse:  { title: "PULSE", cat: "Triggers & time", ins: [["trig", "TRIGGER", 0, 1, 0, "gate"], ["len", "LENGTH", 0.001, 8, 0.1, "s"]], outs: ["gate"],
+		about: "A gate of LENGTH on each trigger" },
+	chance: { title: "CHANCE", cat: "Triggers & time", ins: [["in", "IN", 0, 1, 0, "gate"], ["prob", "CHANCE", 0, 1, 0.5, "lvl"]], outs: ["a", "b"],
+		about: "Each gate goes to A (with that chance) or to B" },
+	cmp:    { title: "COMPARATOR", cat: "Triggers & time", ins: [["in", "IN", -1, 1, 0, "bi"], ["thr", "THRESHOLD", -1, 1, 0, "bi"]], outs: ["gate"],
+		about: "A gate while IN is over THRESHOLD: turns a wave into gates" },
+	// mixing
+	xfade:  { title: "CROSSFADE", cat: "Mixing", ins: [["a", "A", -1, 1, 0, "audio"], ["b", "B", -1, 1, 0, "audio"], ["fade", "FADE", 0, 1, 0.5, "lvl"]], outs: ["out"],
+		about: "From A (0) to B (1)" },
+	pan:    { title: "PANNER", cat: "Mixing", ins: [["in", "IN", -1, 1, 0, "audio"], ["pan", "PAN", -1, 1, 0, "bi"]], outs: ["l", "r"], about: "Places IN between LEFT and RIGHT" },
+	switch: { title: "SWITCH", cat: "Mixing", ins: [["sel", "SELECT", 0, 1, 0, "gate"], ["a", "A", -4, 4, 0, "x"], ["b", "B", -4, 4, 0, "x"]], outs: ["out"],
+		about: "A, or B while SELECT is on" },
 	filter: { title: "FILTER", cat: "Processors", ins: [["in", "IN", -1, 1, 0, "audio"], ["cutoff", "CUTOFF", -4, 6, 2, "oct"], ["res", "RESONANCE", 0, 1, 0.2, "lvl"]],
 		outs: ["lp", "bp", "hp"], about: "State variable filter; CUTOFF in octaves from C4 (2 = about 1 kHz)" },
 	vca:    { title: "VCA", cat: "Processors", ins: [["in", "IN", -1, 1, 0, "audio"], ["gain", "GAIN", 0, 1, 1, "lvl"]], outs: ["out"], about: "IN times GAIN" },
-	mix:    { title: "MIXER", cat: "Processors", ins: [["a", "IN 1", -1, 1, 0, "audio"], ["b", "IN 2", -1, 1, 0, "audio"], ["c", "IN 3", -1, 1, 0, "audio"], ["d", "IN 4", -1, 1, 0, "audio"],
+	mix:    { title: "MIXER", cat: "Mixing", ins: [["a", "IN 1", -1, 1, 0, "audio"], ["b", "IN 2", -1, 1, 0, "audio"], ["c", "IN 3", -1, 1, 0, "audio"], ["d", "IN 4", -1, 1, 0, "audio"],
 		["la", "LEVEL 1", 0, 1, 1, "lvl"], ["lb", "LEVEL 2", 0, 1, 1, "lvl"], ["lc", "LEVEL 3", 0, 1, 1, "lvl"], ["ld", "LEVEL 4", 0, 1, 1, "lvl"]], outs: ["out"], about: "Four inputs and their levels" },
-	drive:  { title: "DRIVE", cat: "Processors", ins: [["in", "IN", -1, 1, 0, "audio"], ["amount", "AMOUNT", 0, 1, 0.5, "lvl"]], outs: ["out"], about: "Saturation" },
-	delay:  { title: "DELAY", cat: "Processors", ins: [["in", "IN", -1, 1, 0, "audio"], ["time", "TIME", 0.005, 2, 0.3, "s"], ["fb", "FEEDBACK", 0, 0.95, 0.4, "lvl"], ["mix", "MIX", 0, 1, 0.3, "lvl"]],
+	drive:  { title: "DRIVE", cat: "Distortion", ins: [["in", "IN", -1, 1, 0, "audio"], ["amount", "AMOUNT", 0, 1, 0.5, "lvl"]], outs: ["out"], about: "Saturation" },
+	dist:   { title: "DISTORTION", cat: "Distortion", ins: [["in", "IN", -1, 1, 0, "audio"], ["drive", "DRIVE", 0, 1, 0.5, "lvl"], ["type", "TYPE", 0, 4, 0, "int", ["SOFT", "HARD", "FUZZ", "FOLD", "RECTIFY"]],
+		["tone", "TONE", 200, 20000, 8000, "hz"]], outs: ["out"], about: "SOFT, HARD, FUZZ, FOLD or RECTIFY, with a TONE after" },
+	crush:  { title: "BIT CRUSHER", cat: "Distortion", ins: [["in", "IN", -1, 1, 0, "audio"], ["bits", "BITS", 1, 16, 8, "bits"], ["rate", "RATE", 100, 48000, 12000, "hz"]], outs: ["out"],
+		about: "Fewer bits, a lower sample rate: lo-fi, 8-bit" },
+	fold:   { title: "WAVEFOLDER", cat: "Distortion", ins: [["in", "IN", -1, 1, 0, "audio"], ["amount", "AMOUNT", 0, 1, 0.3, "lvl"], ["bias", "SYMMETRY", -1, 1, 0, "bi"]], outs: ["out"],
+		about: "Folds the wave back on itself: bright, metallic harmonics" },
+	ring:   { title: "RING MOD", cat: "Distortion", ins: [["a", "A", -1, 1, 0, "audio"], ["b", "B", -1, 1, 0, "audio"]], outs: ["out"], about: "A times B: bells, robots" },
+	// effects
+	delay:  { title: "DELAY", cat: "Effects", ins: [["in", "IN", -1, 1, 0, "audio"], ["time", "TIME", 0.005, 2, 0.3, "s"], ["fb", "FEEDBACK", 0, 0.95, 0.4, "lvl"], ["mix", "MIX", 0, 1, 0.3, "lvl"]],
 		outs: ["out"], about: "Echo" },
+	reverb: { title: "REVERB", cat: "Effects", ins: [["in", "IN", -1, 1, 0, "audio"], ["size", "SIZE", 0, 1, 0.6, "lvl"], ["damp", "DAMPING", 0, 1, 0.4, "lvl"], ["mix", "MIX", 0, 1, 0.3, "lvl"]],
+		outs: ["l", "r"], about: "A room to a hall, in stereo" },
+	chorus: { title: "CHORUS", cat: "Effects", ins: [["in", "IN", -1, 1, 0, "audio"], ["rate", "RATE", 0.05, 8, 0.6, "hz"], ["depth", "DEPTH", 0, 1, 0.5, "lvl"], ["mix", "MIX", 0, 1, 0.5, "lvl"]],
+		outs: ["l", "r"], about: "Wide and shimmering, in stereo" },
+	rec:    { title: "RECORDER", cat: "Effects", ins: [["in", "IN", -1, 1, 0, "audio"], ["rec", "RECORD", 0, 1, 0, "gate"], ["play", "PLAY", 0, 1, 0, "gate"],
+		["speed", "SPEED", -2, 2, 1, "x"], ["loop", "LOOP", 0, 1, 1, "gate"]], outs: ["out", "playing"],
+		about: "Records IN (up to 8 s) while RECORD is on; PLAY starts it (SPEED below 0: backwards), LOOP repeats it" },
 	math:   { title: "MATH", cat: "Utilities", ins: [["a", "A", -1, 1, 0, "bi"], ["b", "x B", -4, 4, 1, "x"], ["c", "+ C", -4, 4, 0, "x"]], outs: ["out"], about: "A x B + C: scale, offset, invert, multiply" },
 	out:    { title: "AUDIO OUT", cat: "Outputs", ins: [["l", "LEFT", -1, 1, 0, "audio"], ["r", "RIGHT", -1, 1, 0, "audio"], ["vol", "VOLUME", 0, 1, 0.8, "lvl"]], outs: [], fixed: true,
 		about: "To the rack's speakers (RIGHT follows LEFT when it has no wire)" }
@@ -83,6 +125,7 @@ function polyblep(t, dt) {
 }
 
 // ---- ranges: a knob or slider takes the range of the input it is wired to (or its own) ----
+function rangeOf(inp) { return { min: inp[2], max: inp[3], def: inp[4], unit: inp[5], names: inp[6] }; }
 function isExp(unit) { return unit === "hz" || unit === "s" || unit === "bpm"; }
 function controlRange(design, item) {
 	if (item.range && item.range.min !== undefined) return item.range;
@@ -91,7 +134,7 @@ function controlRange(design, item) {
 		const to = findItem(design, w.to[0]);
 		const spec = to && specOf(to.kind);
 		const inp = spec && spec.ins.find(function(i){ return i[0] === w.to[1]; });
-		if (inp && inp[5] !== "gate") return { min: inp[2], max: inp[3], def: inp[4], unit: inp[5] };
+		if (inp && inp[5] !== "gate") return rangeOf(inp);
 	}
 	return { min: 0, max: 1, def: 0.5, unit: "lvl" };
 }
@@ -100,6 +143,7 @@ function fromN(r, n) { n = clamp(n, 0, 1); const v = isExp(r.unit) ? r.min * Mat
 function toN(r, v) { return clamp(isExp(r.unit) ? Math.log(v / r.min) / Math.log(r.max / r.min) : (v - r.min) / (r.max - r.min), 0, 1); }
 const NOTE_N = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 function fmt(r, v) {
+	if (r.names) return r.names[clamp(Math.round(v - r.min), 0, r.names.length - 1)];
 	switch (r.unit) {
 		case "oct": { const st = v * 12; return (st >= 0 ? "+" : "") + st.toFixed(Math.abs(st) < 10 ? 1 : 0) + " st (" + NOTE_N[((Math.round(60 + st) % 12) + 12) % 12] + (Math.floor(Math.round(60 + st) / 12) - 1) + ")"; }
 		case "hz": return v < 10 ? v.toFixed(2) + " Hz" : Math.round(v) + " Hz";
@@ -107,6 +151,7 @@ function fmt(r, v) {
 		case "bpm": return Math.round(v) + " BPM";
 		case "lvl": return Math.round(v * 100) + "%";
 		case "int": return String(Math.round(v));
+		case "bits": return v.toFixed(1) + " bits";
 		case "bi": case "audio": return (v >= 0 ? "+" : "") + v.toFixed(2);
 		default: return v.toFixed(2);
 	}
@@ -201,6 +246,141 @@ RUN.delay = function(n, v, e) {
 	v[n.o] = x * (1 - mix) + y * mix;
 };
 RUN.math = function(n, v) { v[n.o] = I(n, v, 0) * I(n, v, 1) + I(n, v, 2); };
+// edges: true once when a gate goes up (the state kept in n[key])
+function rise(n, key, x) { const g = x > 0.5, r = g && !n[key]; n[key] = g; return r; }
+RUN.decay = function(n, v, e) {
+	if (rise(n, "th", I(n, v, 0))) n.stage = 1;
+	let x = n.val;
+	if (n.stage === 1) { x += 1 / (Math.max(0.0005, I(n, v, 1)) * e.sr); if (x >= 1) { x = 1; n.stage = 2; } }
+	else if (n.stage === 2) { x *= Math.exp(-6.9 / (Math.max(0.002, I(n, v, 2)) * e.sr)); if (x < 1e-5) { x = 0; n.stage = 0; } }
+	n.val = x; v[n.o] = x;
+};
+RUN.follow = function(n, v, e) {
+	const x = Math.abs(I(n, v, 0));
+	n.val += (x - n.val) * (x > n.val ? 1 - Math.exp(-1 / (0.002 * e.sr)) : 1 - Math.exp(-2.3 / (Math.max(0.002, I(n, v, 1)) * e.sr)));
+	v[n.o] = Math.min(1, n.val * 1.4);
+};
+RUN.random = function(n, v, e) {
+	n.ph += clamp(I(n, v, 0), 0.001, 1000) / e.sr;
+	if (n.ph >= 1) { n.ph -= Math.floor(n.ph); n.hold = Math.random() * 2 - 1; }
+	const sm = clamp(I(n, v, 1), 0, 1);
+	if (sm < 0.001) n.val = n.hold;
+	else n.val += (n.hold - n.val) * (1 - Math.exp(-4.6 * clamp(I(n, v, 0), 0.001, 1000) / (sm * 2 * e.sr)));
+	v[n.o] = n.val;
+};
+RUN.metro = function(n, v, e) {
+	if (rise(n, "rh", I(n, v, 2))) n.ph = 0;
+	const t = n.ph; n.ph += 1 / (Math.max(0.001, I(n, v, 0)) * e.sr); if (n.ph >= 1) n.ph -= Math.floor(n.ph);
+	v[n.o] = t < clamp(I(n, v, 1), 0.01, 0.99) ? 1 : 0; v[n.o + 1] = t;
+};
+RUN.div = function(n, v) {
+	if (rise(n, "rh", I(n, v, 2))) n.step = -1;
+	const c = I(n, v, 0) > 0.5;
+	if (rise(n, "ch", I(n, v, 0))) n.step++;
+	v[n.o] = c && n.step >= 0 && n.step % Math.max(1, Math.round(I(n, v, 1))) === 0 ? 1 : 0;
+};
+RUN.euclid = function(n, v) {
+	if (rise(n, "rh", I(n, v, 4))) n.step = -1;
+	const steps = clamp(Math.round(I(n, v, 1)), 1, 32), hits = clamp(Math.round(I(n, v, 2)), 0, steps);
+	if (rise(n, "ch", I(n, v, 0))) n.step = (n.step + 1) % steps;
+	const i = ((Math.max(0, n.step) + Math.round(I(n, v, 3))) % steps + steps) % steps;
+	v[n.o] = n.ch && hits > 0 && (i * hits) % steps < hits ? 1 : 0;
+};
+RUN.gdelay = function(n, v, e) {
+	const g = I(n, v, 0) > 0.5;
+	n.t++;
+	if (g !== n.th) { n.th = g; if (n.q.length < 256) n.q.push([n.t + Math.round(Math.max(0.001, I(n, v, 1)) * e.sr), g ? 1 : 0]); }
+	while (n.q.length && n.q[0][0] <= n.t) n.val = n.q.shift()[1];
+	v[n.o] = n.val;
+};
+RUN.pulse = function(n, v, e) {
+	if (rise(n, "th", I(n, v, 0))) n.count = Math.round(Math.max(0.001, I(n, v, 1)) * e.sr);
+	v[n.o] = n.count > 0 ? 1 : 0; if (n.count > 0) n.count--;
+};
+RUN.chance = function(n, v) {
+	const g = I(n, v, 0) > 0.5;
+	if (rise(n, "th", I(n, v, 0))) n.hold = Math.random() < clamp(I(n, v, 1), 0, 1) ? 1 : 0;
+	v[n.o] = g && n.hold ? 1 : 0; v[n.o + 1] = g && !n.hold ? 1 : 0;
+};
+RUN.cmp = function(n, v) {
+	const x = I(n, v, 0), t = I(n, v, 1);
+	if (x > t + 0.001) n.val = 1; else if (x < t - 0.001) n.val = 0; // a little hysteresis
+	v[n.o] = n.val;
+};
+RUN.xfade = function(n, v) { const f = clamp(I(n, v, 2), 0, 1); v[n.o] = I(n, v, 0) * (1 - f) + I(n, v, 1) * f; };
+RUN.pan = function(n, v) { const x = I(n, v, 0), a = (clamp(I(n, v, 1), -1, 1) + 1) * Math.PI / 4; v[n.o] = x * Math.cos(a) * 1.4142; v[n.o + 1] = x * Math.sin(a) * 1.4142; };
+RUN.switch = function(n, v) { v[n.o] = I(n, v, 0) > 0.5 ? I(n, v, 2) : I(n, v, 1); };
+function fold(x) { let y = x * 0.25 + 0.25; y -= Math.floor(y); return y < 0.5 ? 4 * y - 1 : 3 - 4 * y; }
+RUN.dist = function(n, v, e) {
+	const a = clamp(I(n, v, 1), 0, 1), x = I(n, v, 0) * (1 + a * a * 40);
+	let y;
+	switch (Math.round(I(n, v, 2))) {
+		case 1: y = clamp(x, -1, 1); break;                              // HARD
+		case 2: y = clamp(x + 0.3, -0.7, 1) - 0.15; break;               // FUZZ: asymmetric
+		case 3: y = fold(x); break;                                      // FOLD
+		case 4: y = fastTanh(Math.abs(x) * 2 - 0.5); break;               // RECTIFY: an octave up
+		default: y = fastTanh(x);                                        // SOFT
+	}
+	n.val += (y - n.val) * (1 - Math.exp(-2 * Math.PI * clamp(I(n, v, 3), 20, e.sr * 0.45) / e.sr));
+	v[n.o] = n.val / (1 + a * 0.6);
+};
+RUN.crush = function(n, v, e) {
+	n.ph += clamp(I(n, v, 2), 20, e.sr) / e.sr;
+	if (n.ph >= 1) { n.ph -= Math.floor(n.ph); const q = Math.pow(2, clamp(I(n, v, 1), 1, 16) - 1); n.hold = Math.round(I(n, v, 0) * q) / q; }
+	v[n.o] = n.hold;
+};
+RUN.fold = function(n, v) { const a = clamp(I(n, v, 1), 0, 1); v[n.o] = fold(I(n, v, 0) * (1 + a * 7) + I(n, v, 2) * 0.5 - 1); };
+RUN.ring = function(n, v) { v[n.o] = I(n, v, 0) * I(n, v, 1); };
+// REVERB: four combs and two all-passes a side (a classic design), lengths scaled to the sample rate
+const COMBS = [1116, 1277, 1422, 1557], APS = [556, 441];
+RUN.reverb = function(n, v) {
+	const x = I(n, v, 0) * 0.2, fb = 0.7 + clamp(I(n, v, 1), 0, 1) * 0.28, d = clamp(I(n, v, 2), 0, 1) * 0.6, out = [0, 0];
+	for (let c = 0; c < 2; c++) {
+		const R = n.rv[c];
+		let y = 0;
+		for (let k = 0; k < 4; k++) {
+			const b = R.comb[k], i = R.cp[k], o = b[i];
+			R.lp[k] = o * (1 - d) + R.lp[k] * d;
+			b[i] = x + R.lp[k] * fb; R.cp[k] = (i + 1) % b.length; y += o;
+		}
+		for (let k = 0; k < 2; k++) {
+			const b = R.ap[k], i = R.apos[k], o = b[i];
+			b[i] = y + o * 0.5; R.apos[k] = (i + 1) % b.length; y = o - y;
+		}
+		out[c] = y;
+	}
+	const mix = clamp(I(n, v, 3), 0, 1), dry = I(n, v, 0) * (1 - mix);
+	v[n.o] = dry + out[0] * mix; v[n.o + 1] = dry + out[1] * mix;
+};
+RUN.chorus = function(n, v, e) {
+	const b = n.buf, len = b.length, x = I(n, v, 0);
+	b[n.pos] = x;
+	n.ph += clamp(I(n, v, 1), 0.01, 20) / e.sr; if (n.ph >= 1) n.ph -= 1;
+	const dep = clamp(I(n, v, 2), 0, 1) * 0.006 * e.sr, base = 0.008 * e.sr, mix = clamp(I(n, v, 3), 0, 1);
+	for (let c = 0; c < 2; c++) {
+		let p = n.pos - (base + dep * (1 + Math.sin(2 * Math.PI * (n.ph + c * 0.25))) * 0.5); if (p < 0) p += len;
+		const i = p | 0, f = p - i, y = b[i] * (1 - f) + b[(i + 1) % len] * f;
+		v[n.o + c] = x * (1 - mix * 0.5) + y * mix;
+	}
+	n.pos = (n.pos + 1) % len;
+};
+RUN.rec = function(n, v) {
+	const b = n.buf, x = I(n, v, 0), rec = I(n, v, 1) > 0.5, speed = I(n, v, 3), loop = I(n, v, 4) > 0.5;
+	if (rise(n, "rh", I(n, v, 1))) { n.len = 0; n.playing = false; }
+	if (rec) { if (n.len < b.length) b[n.len++] = x; v[n.o] = x; v[n.o + 1] = 0; return; } // monitors IN while recording
+	if (rise(n, "ph2", I(n, v, 2)) && n.len > 1) { n.playing = true; n.pos = speed < 0 ? n.len - 1 : 0; }
+	let y = 0;
+	if (n.playing && n.len > 1) {
+		const i = n.pos | 0, f = n.pos - i;
+		y = b[i] * (1 - f) + b[Math.min(n.len - 1, i + 1)] * f;
+		n.pos += speed;
+		if (n.pos >= n.len - 1 || n.pos < 0) {
+			if (loop) n.pos = speed < 0 ? n.pos + n.len - 1 : n.pos - (n.len - 1);
+			else n.playing = false;
+		}
+	}
+	v[n.o] = y; v[n.o + 1] = n.playing ? 1 : 0;
+};
 RUN.out = function(n, v, e) {
 	const vol = clamp(I(n, v, 2), 0, 1), l = I(n, v, 0), r = n.inIdx[1] >= 0 ? I(n, v, 1) : l;
 	e.outs[SLOTS] = fastTanh(l * vol); e.outs[SLOTS + 1] = fastTanh(r * vol);
@@ -253,6 +433,15 @@ class CustomDSP {
 			n.ph = 0; n.val = 0; n.stage = 0; n.gate = false; n.s = new Float64Array(2); n.b = new Float64Array(3); n.step = -1; n.ch = n.rh = n.th = false; n.hold = 0; n.peak = 0;
 			n.cur = n.target = 0;
 			if (kind === "delay") { n.buf = new Float32Array(Math.round(this.sr * 2.05)); n.pos = 0; }
+			if (kind === "chorus") { n.buf = new Float32Array(Math.round(this.sr * 0.03)); n.pos = 0; }
+			if (kind === "rec") { n.buf = new Float32Array(Math.round(this.sr * 8)); n.len = 0; n.pos = 0; n.playing = false; }
+			if (kind === "gdelay") { n.q = []; n.t = 0; }
+			if (kind === "reverb") {
+				const k = this.sr / 44100;
+				n.rv = [0, 23].map((sp) => ({ comb: COMBS.map((l) => new Float32Array(Math.round((l + sp) * k))), cp: [0, 0, 0, 0], lp: [0, 0, 0, 0],
+					ap: APS.map((l) => new Float32Array(Math.round((l + sp) * k))), apos: [0, 0] }));
+			}
+			n.count = 0;
 			if (kind === "jackin" || kind === "jackout") { n.slot = clamp((item.slot | 0) - 1, 0, SLOTS - 1); n.mode = item.mode || "cv"; }
 			if (kind === "ain" || kind === "aout") n.slot = clamp((item.slot | 0) - 1, 0, ASLOTS - 1);
 			nodes.push(n); byId[n.id] = n;
@@ -319,7 +508,7 @@ class CustomDSP {
 CustomDSP.IN_IDS = IN_IDS;
 CustomDSP.OUT_IDS = OUT_IDS;
 CustomDSP.MIDI_IN = "midi_in";
-CustomDSP.CATALOG = { MODULES, CONTROLS, SLOTS, ASLOTS, specOf, controlRange, fromN, toN, fmt, isExp, findItem };
+CustomDSP.CATALOG = { MODULES, CONTROLS, SLOTS, ASLOTS, specOf, controlRange, rangeOf, fromN, toN, fmt, isExp, findItem };
 
 globalThis.WR_DSP = globalThis.WR_DSP || {};
 globalThis.WR_DSP.custom = CustomDSP;

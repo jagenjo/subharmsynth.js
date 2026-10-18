@@ -599,10 +599,10 @@ function renderInside()
 		sp.ins.forEach(function(inp){
 			var w = wiredInto( x.id, inp[0] ), row = $e( "div", "se-row" ), dot = $e( "span", "se-port in" + (w ? " on" : "") );
 			dot.setAttribute( "data-node", x.id ); dot.setAttribute( "data-port", inp[0] ); dot.setAttribute( "data-dir", "in" );
-			dot.title = inp[1] + (w ? "" : ": " + CAT.fmt( { min: inp[2], max: inp[3], unit: inp[5] }, constOf( x, inp ) ));
+			dot.title = inp[1] + (w ? "" : ": " + CAT.fmt( CAT.rangeOf( inp ), constOf( x, inp ) ));
 			row.appendChild( dot );
 			row.appendChild( document.createTextNode( inp[1] ) );
-			if(!w && inp[5] != "audio" && inp[5] != "gate") row.appendChild( $e( "i", "", esc( CAT.fmt( { min: inp[2], max: inp[3], unit: inp[5] }, constOf( x, inp ) ) ) ) );
+			if(!w && inp[5] != "audio" && inp[5] != "gate") row.appendChild( $e( "i", "", esc( CAT.fmt( CAT.rangeOf( inp ), constOf( x, inp ) ) ) ) );
 			ci.appendChild( row );
 			ed.ports[ x.id + "|in|" + inp[0] ] = dot;
 		});
@@ -909,7 +909,7 @@ function renderProps()
 			if(w) box.textContent = inp[1] + "  ←  " + nameOf( byId( w.from[0] ) ) + " " + w.from[1].toUpperCase();
 			else
 			{
-				var r = { min: inp[2], max: inp[3], unit: inp[5] }, val = constOf( x, inp );
+				var r = CAT.rangeOf( inp ), val = constOf( x, inp );
 				var head = $e( "div", "se-cv", esc( inp[1] ) + ' <b>' + esc( CAT.fmt( r, val ) ) + '</b>' );
 				var sl = $e( "input" ); sl.type = "range"; sl.min = 0; sl.max = 1000; sl.value = Math.round( CAT.toN( r, val ) * 1000 );
 				sl.addEventListener("input", function(){
