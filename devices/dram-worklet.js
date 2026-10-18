@@ -1,5 +1,5 @@
 // devices/dram-worklet.js
-// DRAM DSP (a replica of the Moog DFAM, "Drummer From Another Mother"), hosted by the rack processor (rack-worklet.js).
+// DRAM DSP (an analog percussion synthesizer), hosted by the rack processor (rack-worklet.js).
 // Two VCOs (triangle / square) with a shared decay-only pitch envelope, 1->2 FM and hard sync,
 // white noise (or the EXT AUDIO input), a ladder filter with LP / HP modes and noise modulation,
 // a VCA with FAST / SLOW attack, and the 8-step sequencer with a pitch and a velocity per step.

@@ -1,6 +1,6 @@
 // devices/hyper.js
 // HYPER module (half rack width): lo-fi distortion and bit crusher for the warm, crunchy, broken
-// console sounds of Disasterpeace's soundtracks. WOBBLE (tape wow and flutter), DRIVE and TYPE
+// console sounds of indie game soundtracks. WOBBLE (tape wow and flutter), DRIVE and TYPE
 // (TAPE, TUBE, FUZZ, FOLD), TONE, RATE (sample rate reduction), BITS, MIX, OUTPUT, ON, and CV for
 // DRIVE, BITS and RATE. Audio on the back. DSP in hyper-worklet.js.
 
@@ -10,8 +10,8 @@ var H = 170;
 var TYPES = [["tape", "TAPE"], ["tube", "TUBE"], ["fuzz", "FUZZ"], ["fold", "FOLD"]];
 // starting points: [name, settings, tooltip]
 var PRESETS = [
-	["DRIFTER", { drive: 0.3, type: "tube", tone: 6500, bits: 10, rate: 22050, wobble: 0.35, mix: 1 }, "WARM, WOBBLY, SLIGHTLY CRUSHED (HYPER LIGHT DRIFTER)"],
-	["8-BIT", { drive: 0.2, type: "tape", tone: 12000, bits: 6, rate: 11025, wobble: 0.05, mix: 1 }, "CHIPTUNE GRIT (FEZ)"],
+	["DRIFTER", { drive: 0.3, type: "tube", tone: 6500, bits: 10, rate: 22050, wobble: 0.35, mix: 1 }, "WARM, WOBBLY, SLIGHTLY CRUSHED (DRIFTER)"],
+	["8-BIT", { drive: 0.2, type: "tape", tone: 12000, bits: 6, rate: 11025, wobble: 0.05, mix: 1 }, "CHIPTUNE GRIT"],
 	["BROKEN", { drive: 0.7, type: "fuzz", tone: 4500, bits: 4, rate: 4000, wobble: 0.5, mix: 0.8 }, "A DYING CONSOLE"],
 	["FOLDED", { drive: 0.55, type: "fold", tone: 9000, bits: 12, rate: 32000, wobble: 0.1, mix: 1 }, "WAVE FOLDING, METALLIC"]
 ];

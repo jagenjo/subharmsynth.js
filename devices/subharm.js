@@ -1,7 +1,7 @@
 // devices/subharm.js
-// Subharmonicon module for the rack: its settings, patch bay and panel, in two layouts
-// ("hardware" mirrors the real front panel, "classic" is the original compact layout of this
-// replica). The panel is drawn with the widgets of code.js; the DSP is in subharm-worklet.js.
+// SUBHARM module for the rack (a polyrhythmic subharmonic synthesizer): its settings, patch bay and panel, in two layouts
+// ("hardware" is the full front panel, "classic" is the first compact layout of this
+// version). The panel is drawn with the widgets of code.js; the DSP is in subharm-worklet.js.
 
 (function(){
 
@@ -9,7 +9,7 @@ var VCO_MIN_FREQ = 261.63; // VCO FREQ knob range is C4..C8
 var VCO_MAX_FREQ = 4186.0;
 var TEMPO_MIN = 20;        // 0.333Hz..50Hz at 1 ppq
 var TEMPO_MAX = 3000;
-// panel size per layout: 60HP Eurorack panel (~2.37:1) plus wood cheeks
+// panel size per layout: a 60HP panel (~2.37:1) plus wood cheeks
 var SIZES = { hardware: [1568, 596], classic: [1460, 640] };
 var QUANTIZE_MODES = ["OFF","12-ET","8-ET","12-JI","8-JI","SCL"];
 
@@ -158,7 +158,7 @@ function send( msg )
 }
 
 // ---------------------------------------------------------------------------
-// panel, laid out like the hardware (60HP Eurorack panel between wood cheeks):
+// panel, laid out like the hardware (a 60HP panel between wood cheeks):
 // sequencers / polyrhythm / transport | VCO 1 | SEQ OCT + QUANTIZE | VCO 2 | VCF + EGs | patch bay
 
 var SEQ_COLS = [100, 180, 260, 340];
@@ -432,7 +432,7 @@ function drawPatchBay()
 }
 
 // ---------------------------------------------------------------------------
-// classic layout: the original compact arrangement of this replica (toolbar "Layout" button)
+// classic layout: the first compact arrangement (toolbar "Layout" button)
 
 
 
@@ -677,8 +677,8 @@ function drawHardwarePanel()
 
 WR.registerSynth( "subharm", {
 	title: "SUBHARM",
-	description: "Subharmonicon: polyrhythmic subharmonic synthesizer",
-	about: "After the Moog Subharmonicon: 2 VCOs with 4 subharmonics, 2 four-step sequencers and 4 polyrhythmic clock dividers. Polyrhythms that lock together.",
+	description: "SUBHARM: polyrhythmic subharmonic synthesizer",
+	about: "A polyrhythmic synthesizer: 2 VCOs with 4 subharmonics, 2 four-step sequencers and 4 polyrhythmic clock dividers. Polyrhythms that lock together.",
 	// keys: 3 played / triggered, 2 often, 1 sometimes, 0 no key (code.js: keyAssign)
 	key_prio: [["^(play|trigger|reset|next)$", 3], ["^r\\ds\\d$", 2], ["^assign", 2], ["^(quantize|seq_oct|eg)$", 1]],
 	// a knob's sockets, lit when the mouse is over it (code.js: controlJacks)

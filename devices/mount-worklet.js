@@ -1,5 +1,5 @@
 // devices/mount-worklet.js
-// MOUNT DSP, after the Novation Peak: 8 voices of 3 oscillators (sine, triangle, saw, pulse or one of
+// MOUNT DSP: 8 voices of 3 oscillators (sine, triangle, saw, pulse or one of
 // 8 wavetables, each shaped by SHAPE: manual, MOD ENV 1, LFO 1), pitch modulated by MOD ENV 2 and
 // LFO 2; the mixer (OSC 1-3, RING 1*2, NOISE, VCA GAIN), a per-voice state variable filter (LP / BP /
 // HP, 12 or 24 dB, resonance, overdrive, MOD ENV 1 and / or AMP ENV, LFO 1, OSC 3 FM, key tracking),

@@ -1,5 +1,5 @@
 // devices/subharm-worklet.js
-// Subharmonicon DSP, hosted by the rack processor (rack-worklet.js) in the AudioWorklet.
+// SUBHARM DSP, hosted by the rack processor (rack-worklet.js) in the AudioWorklet.
 // Oscillators, subharmonic dividers, ladder filter, envelopes, master clock,
 // polyrhythm dividers and sequencers are computed sample by sample, so rhythms and
 // CV patching are sample accurate. The rack copies the patch cables into `ins`

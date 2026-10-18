@@ -1,5 +1,5 @@
 // devices/b32.js
-// Brother-32 module, a replica of the Moog Mother-32: settings, the 32 point patch bay and the panel, laid out like the
+// Brother-32 module, a semi-modular synthesizer with a sequencer: settings, the 32 point patch bay and the panel, laid out like the
 // hardware's front: oscillator and filter controls on the left, LFO, VCA, envelope and tempo on the
 // right, the 32 step sequencer with its 13 key keyboard below, the patch bay on the right side.
 // The real unit edits steps through button modes; here every step is a cell of the step grid
@@ -367,7 +367,7 @@ function drawPatchBay()
 WR.registerSynth( "brother32", {
 	title: "BROTHER-32",
 	description: "Brother-32: semi-modular synthesizer with a 32 step sequencer",
-	about: "After the Moog Mother-32: a mono semi-modular synth with a 32-step sequencer, ladder filter, envelope and a compact keyboard.",
+	about: "A mono semi-modular synth with a 32-step sequencer, ladder filter, envelope and a compact keyboard.",
 	// keys: 3 played / triggered, 2 often, 1 sometimes, 0 no key (code.js: keyAssign)
 	key_prio: [["^(run|reset|next|rec)$", 3], ["^step\\d+$", 3], ["^(rest|accent|glide_step|oct_down|oct_up)$", 2], ["^(assign|sustain)$", 0], ["", 1]],
 	// a knob's sockets, lit when the mouse is over it (code.js: controlJacks)

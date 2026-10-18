@@ -1,5 +1,5 @@
 // devices/universe.js
-// UNIVERSE module, a replica of the Hologram Microcosm (granular / looper / delay pedal), half rack
+// UNIVERSE module, a granular / looper / delay effect, half rack
 // width, laid out as the pedal: ACTIVITY, SHAPE, FILTER, MIX / TIME, REPEATS, SPACE, LOOP LEVEL (SHIFT:
 // their secondary controls), SELECT (SUBDIV / TEMPO), the preset knob among the 11 effects (x A-D
 // = 44 presets), the PHRASE LOOPER, the A-D lights and the footswitches (TAP / REC-PLAY-DUB, bypass,
@@ -430,7 +430,7 @@ function draw( mod )
 WR.registerSynth( "universe", {
 	title: "UNIVERSE",
 	description: "UNIVERSE: granular micro loops, glitches, delays and a phrase looper",
-	about: "After the Hologram Microcosm: 11 granular, looping, glitch and delay effects x 4 variations, a reverb and a phrase looper. Half width.",
+	about: "11 granular, looping, glitch and delay effects x 4 variations, a reverb and a phrase looper. Half width.",
 	// keys: 3 played / triggered, 2 often, 1 sometimes, 0 no key (code.js: keyAssign)
 	key_prio: [["^foot_[lmr]$", 3], ["^(var\\d|fx\\d+|looper)$", 2], ["^(user|reverse_btn)$", 0], ["", 1]],
 	category: "Effects",

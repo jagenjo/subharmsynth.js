@@ -1,5 +1,5 @@
 // devices/lunar-worklet.js
-// LUNAR 21 DSP (a replica of the Elta Music SOLAR 42 ambient drone machine), hosted by the rack
+// LUNAR 21 DSP (an ambient drone machine), hosted by the rack
 // processor:
 //   VOICE 1, 2, 6, 7: drone voices of 5 oscillators each (reed-like pulses), each with MUTE, TUNE and
 //     MOD (a slow drift of its own), VOLT (the voice's pitch), ATT / RLS, played by its button or pad
@@ -8,7 +8,7 @@
 //     FM and / or AM, NOISE, ATT / RLS; MOD OUT and an S&H (IN, CLOCK, OUT)
 //   VOICE 4, 5: VCO 1 / 2: OCTAVE (LO, 64' to 1'), TUNE, FINE, SHAPE (sine > triangle > saw > square,
 //     PW), FM; played from the touch plates (or MIDI) through EG VCA 1 / 2 (ADSR, HOLD, LOOP)
-//   a 10 channel mixer (PAN, VOL: the voices, EXT AUDIO, PREAMP), FILTER L / R (12 dB, Polivoks-like,
+//   a 10 channel mixer (PAN, VOL: the voices, EXT AUDIO, PREAMP), FILTER L / R (12 dB, aggressive and
 //   LINK), the DUAL EFFECTOR (a cartridge per side, 3 programs, X / Y / Z, BLEND), MASTER VOLUME
 //   LFO A / B, JOYSTICK, 5 STEP SEQUENCER (PULSER), PREAMP and ENVELOPE FOLLOWER as CV sources
 
@@ -543,7 +543,7 @@ class LunarDSP {
 		this.envfGate = this.envf > (this.envfGate ? 0.04 : 0.07);
 		outs[O.envf_gate] = this.envfGate ? 8 : 0;
 
-		// ---- FILTER L / R: 12 dB, Polivoks-like (driven integrators), LINK: R follows L ----
+		// ---- FILTER L / R: 12 dB, aggressive (driven integrators), LINK: R follows L ----
 		const fcv = P[I.filt_cv] ? ins[I.filt_cv] * s.filt.cv * 2 : 0; // CV FREQ: 1 V/oct at half
 		const fl = s.filt.l, fr2 = s.filt.link ? s.filt.l : s.filt.r;
 		const run = this.runFilter || (this.runFilter = (k, x, st, fcv) => {

@@ -13,7 +13,7 @@ var WR = {
 	order: []
 };
 
-WR.VERSION = "20261018f"; // bump together with the ?v= in index.html so browsers reload the scripts
+WR.VERSION = "20261018g"; // bump together with the ?v= in index.html so browsers reload the scripts
 
 // def: {
 //   title, description,           names for menus and the panel
@@ -891,7 +891,7 @@ WR.mergeValid = function( def, data )
 	return typeof data == typeof def ? data : def;
 }
 
-// saves from before the rack (version 2 and older) are a single Subharmonicon with the shared
+// saves from before the rack (version 2 and older) are a single SUBHARM with the shared
 // devices in the same object: they become a rack with one "subharm" module
 WR.migrateV2 = function( data )
 {
@@ -947,7 +947,7 @@ WR.migrateV4 = function( data )
 		add_audio: !(data.version >= 4) }; // from before the rear sockets: cable the old fixed audio path
 }
 
-// devices that were renamed: older saves have the old type, module ids ("dfam", "dfam2") and jacks
+// devices that were renamed: older saves have the old type, module ids and jacks (legacy ids, kept to load them)
 WR.RENAMED_TYPES = { dfam: "dram", mother32: "brother32", labyrinth: "maze", hydra: "mystic" };
 
 WR.migrateRenamed = function( data )

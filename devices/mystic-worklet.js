@@ -1,8 +1,8 @@
 // devices/mystic-worklet.js
-// MYSTIC DSP (a replica of the ASM Hydrasynth, simplified), hosted by the rack processor. Polyphonic:
+// MYSTIC DSP (a wave-scanning polyphonic synthesizer), hosted by the rack processor. Polyphonic:
 // it gets the raw MIDI notes of its channel (POLY) and plays them on 8 voices (or one, in MONO).
 // Per voice: OSC 1 and OSC 2 scan through 8 single cycle waves (WAVSCAN) and go through two mutators
-// each (FM-LIN, WAVSTACK, SYNC, PW-ASM, HARMONIC, PHAZDIST: transformations of the oscillator's phase
+// each (FM-LIN, WAVSTACK, SYNC, PW-ASYM, HARMONIC, PHAZDIST: transformations of the oscillator's phase
 // or its wave), OSC 3 plays one wave; a mixer with ring modulation and noise; FILTER 1 (LP24 ladder,
 // LP12, BP, HP, VOWEL, COMB) and FILTER 2 (state variable morphing LP -> BP -> HP), in series or
 // parallel; an amp envelope, a filter envelope and a mod envelope (to the mutators and WAVSCAN).
@@ -266,7 +266,7 @@ class MysticDSP {
 			case 1: w = this.mut(v, o, j + 1, frac(p + d * 1.5 * lookup(WAVES[0], v.mph[mi]))); break;   // FM-LIN
 			case 2: w = (this.mut(v, o, j + 1, p) + this.mut(v, o, j + 1, v.sph[mi * 2]) + this.mut(v, o, j + 1, v.sph[mi * 2 + 1])) / 3; break; // WAVSTACK
 			case 3: w = this.mut(v, o, j + 1, frac(p * (1 + d * this.mRatio[mi] * 2))); break;            // OSC SYNC
-			case 4: {                                                                                       // PW-ASM
+			case 4: {                                                                                       // PW-ASYM
 				const pw = 0.5 - d * 0.47;
 				w = this.mut(v, o, j + 1, p < pw ? p * 0.5 / pw : 0.5 + (p - pw) * 0.5 / (1 - pw));
 				break;

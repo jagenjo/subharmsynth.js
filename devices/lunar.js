@@ -1,5 +1,5 @@
 // devices/lunar.js
-// LUNAR 21 module, a replica of the Elta Music SOLAR 42 ambient drone machine, its panel laid out as
+// LUNAR 21 module, an ambient drone machine, its panel laid out as
 // the original's (cream, black print, red and blue knobs): drone voices 1, 2, 6, 7 (5 oscillators
 // each), voices 3, 8 (oscillator, modulator, divider, noise, S&H), voices 4, 5 (VCO 1 / 2 with EG
 // VCA 1 / 2), the DUAL EFFECTOR with its cartridges, FILTER L / R, the mixer, LFO A / B, the JOYSTICK,
@@ -673,8 +673,8 @@ function draw( mod )
 
 WR.registerSynth( "lunar", {
 	title: "LUNAR 21",
-	description: "LUNAR 21: ambient drone machine (Solar 42 style): 8 voices, dual effector, filters, sequencer",
-	about: "After the Elta Music Solar 42: six drone voices, two VCOs on touch plates, Polivoks filters and a dual effector with cartridges. Ambient machine.",
+	description: "LUNAR 21: ambient drone machine: 8 voices, dual effector, filters, sequencer",
+	about: "An ambient drone machine: six drone voices, two VCOs on touch plates, aggressive resonant filters and a dual effector with cartridges. Ambient machine.",
 	// keys: 3 played / triggered, 2 often, 1 sometimes, 0 no key (code.js: keyAssign)
 	key_prio: [["^dv\\d$", 3], ["^plate\\d+$", 3], ["^pad\\d$", 0], ["^(hold\\d|nhold\\d|kbhold|oct_dn|oct_up)$", 2], ["^(stages|link|kbmode|fx_edit)$", 0], ["", 1]],
 	// a knob's sockets, lit when the mouse is over it (code.js: controlJacks)

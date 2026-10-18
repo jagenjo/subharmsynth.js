@@ -1,6 +1,6 @@
 // devices/llmdram.js
-// LLM DRAM module, a replica of the Behringer LM Drum (after the Linn LM-1 / LinnDrum): its panel laid
-// out as on the hardware (charcoal with orange sections, black skirted knobs), 16 pads with the
+// LLM DRAM module, a sampling drum machine in the style of the early 80s: its panel laid
+// out as a classic drum machine's (charcoal with orange sections, black skirted knobs), 16 pads with the
 // PERCUSSION bank, the TUNE knobs, WAVE DESIGNER, ANALOG FILTER, VOLUME, the 16 channel mixer (PAN,
 // VOICE SELECT, LEVEL), the display with the selected voice's parameters, and the sequencer (PADS,
 // STEP, PATT and SONG modes, REC, swing, auto fill, step / note repeat). Its own widgets draw the
@@ -384,7 +384,7 @@ function draw( mod )
 		else { txt( t[0], X(TOPX[i]), Y(145), 10 ); txt( t[1], X(TOPX[i]), Y(157), 10 ); }
 	});
 	if(lmButton( "midi", 94, 184, 52, 30, "", false, "MIDI: ON THE BACK (TAB)" ).clicked) setStatus( "MIDI IN is on the back of the LLM DRAM (Tab): notes play the pads (GM drum map), clock syncs it" );
-	if(lmButton( "usb", 173, 184, 52, 30, "", false, "USB: NOT IN THIS REPLICA" ).clicked) setStatus( "USB: not in this replica" );
+	if(lmButton( "usb", 173, 184, 52, 30, "", false, "USB: NOT HERE" ).clicked) setStatus( "USB: not here" );
 	if(lmButton( "sync", 253, 184, 52, 30, "", S.sync, "SYNC: FOLLOW MIDI CLOCK / THE RACK'S TEMPO" ).clicked) S.sync = !S.sync;
 	if(lmButton( "rand", 332, 184, 52, 30, "", false, "RAND: A NEW PATTERN" ).clicked) { randomize( S ); setStatus( "LLM DRAM: pattern " + (S.pattern + 1) + " randomized" ); }
 	if(lmButton( "step_repeat", 412, 184, 52, 30, function(cx, cy){ ctx.fillStyle = "#ddd"; ctx.fillRect( cx - 13, cy - 0.75, 26, 1.5 ); }, S.step_repeat, "STEP REPEAT: LOOP THE CURRENT BEAT" ).clicked) S.step_repeat = !S.step_repeat;
@@ -409,7 +409,7 @@ function draw( mod )
 		else { p.hits = p.hits.filter(function(h){ return h[1] != S.sel; }); setStatus( SLOT_NAMES[ S.sel ] + " erased from pattern " + (S.pattern + 1) + " (ERASE again: the whole pattern)" ); }
 		lastErase[ M.id ] = now;
 	}
-	if(lmButton( "dump", 332, 278, 52, 28, "DUMP", false, "DUMP: NOT IN THIS REPLICA" ).clicked) setStatus( "DUMP: not in this replica" );
+	if(lmButton( "dump", 332, 278, 52, 28, "DUMP", false, "DUMP: NOT HERE" ).clicked) setStatus( "DUMP: not here" );
 	[["song", 412, "SONG"], ["patt", 492, "PATT"], ["step", 572, "STEP"], ["pads", 651, "PADS"]].forEach(function(b){
 		if(lmButton( "mode_" + b[0], b[1], 278, 52, 28, b[2], S.mode == b[0] ).clicked) S.mode = b[0];
 	});
@@ -679,8 +679,8 @@ function onState( m, state )
 
 WR.registerSynth( "llmdram", {
 	title: "LLM DRAM",
-	description: "LLM DRAM: 8/12-bit sampling drum machine (LinnDrum style), 16 pads, mixer and sequencer",
-	about: "After the Behringer LM Drum / LinnDrum: 24 gritty 8/12-bit sounds on 16 pads, a mixer, tuning, wave designer, filter and a 64-step sequencer.",
+	description: "LLM DRAM: 8/12-bit sampling drum machine (early 80s style), 16 pads, mixer and sequencer",
+	about: "An early 80s style drum machine: 24 gritty 8/12-bit sounds on 16 pads, a mixer, tuning, wave designer, filter and a 64-step sequencer.",
 	// keys: 3 played / triggered, 2 often, 1 sometimes, 0 no key (code.js: keyAssign)
 	key_prio: [["^pad\\d+$", 3], ["^(play|stop|rec|tap)$", 3], ["^(mute|solo|step_repeat|note_repeat|auto_fill|trigger)$", 2], ["^mode_", 2], ["^voice\\d+$", 2], ["^(prev|next)$", 2], ["^(midi|usb|dump|save|samp|bank|length|quan|copy)$", 0], ["", 1]],
 	category: "Synths",

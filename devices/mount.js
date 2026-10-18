@@ -1,6 +1,5 @@
 // devices/mount.js
-// MOUNT module, a replica of the Novation Peak (8 voice polyphonic, 3 oscillators a voice). Its panel
-// follows the Peak's: PATCH, LFO 1 / 2, GLIDE, ARP, the MENU with its 4 x 20 OLED, ANIMATE and MASTER
+// MOUNT module, an 8 voice polyphonic synthesizer (3 oscillators a voice). Its panel: PATCH, LFO 1 / 2, GLIDE, ARP, the MENU with its 4 x 20 OLED, ANIMATE and MASTER
 // on top; the three OSCILLATOR rows, MIXER, FILTER, AMP / MOD ENVELOPE sliders and EFFECTS below.
 // Dark grey panel, white print, rubber buttons lit red, LED columns for the stepped choices.
 // The OLED shows the patch, or the control being turned; its nine menu buttons (PATCH, OSC, ENV, LFO,
@@ -60,7 +59,7 @@ function defaults()
 // the factory patches: [name, category, changes from the init patch]
 var PATCHES = [
 	["INIT PATCH", "INIT", {}],
-	["SUMMIT PAD", "PAD", { osc: [ { wave: "saw", coarse: 0, fine: -8 }, { wave: "saw", fine: 8 }, { wave: "more", table: 1, range: 0, shape: { manual: 0.3, env1: 0, lfo1: 0.4 } } ], mix: { osc1: 0.7, osc2: 0.7, osc3: 0.5 },
+	["HIGH PAD", "PAD", { osc: [ { wave: "saw", coarse: 0, fine: -8 }, { wave: "saw", fine: 8 }, { wave: "more", table: 1, range: 0, shape: { manual: 0.3, env1: 0, lfo1: 0.4 } } ], mix: { osc1: 0.7, osc2: 0.7, osc3: 0.5 },
 		filter: { freq: 0.55, res: 0.2, env: 0.25 }, amp: { a: 0.9, d: 1, s: 0.9, r: 2.2 }, env1: { a: 1.2, d: 2.5, s: 0.4, r: 2 }, lfo: [ { rate: 0.2 }, { rate: 0.3 } ],
 		fx: { chorus: { level: 0.6, type: 1, rate: 0.25 }, reverb: { level: 0.5, time: 0.75, type: 2 } } }],
 	["BRASS STAB", "BRASS", { osc: [ { wave: "saw" }, { wave: "saw", fine: 12 }, { wave: "pulse", range: 0, shape: { manual: 0.3 } } ], mix: { osc1: 0.8, osc2: 0.7, osc3: 0.4 },
@@ -72,7 +71,7 @@ var PATCHES = [
 		filter: { freq: 0.8, res: 0.1 }, env1: { a: 0.3, d: 1.2, s: 0.3 }, amp: { a: 0.05, r: 0.5 }, lfo: [ { rate: 0.3 }, { rate: 0.5 } ], fx: { reverb: { level: 0.35 }, chorus: { level: 0.3 } } }],
 	["SNOW PLUCK", "ARP", { arp: { on: true, pattern: 2, octaves: 2, tempo: 112, gate: 0.4 }, osc: [ { wave: "pulse", shape: { manual: 0.3 } }, { wave: "tri", range: 2 }, {} ], mix: { osc1: 0.7, osc2: 0.5 },
 		filter: { freq: 0.35, res: 0.3, env: 0.6 }, env1: { a: 0.001, d: 0.22, s: 0 }, amp: { a: 0.001, d: 0.4, s: 0, r: 0.3 }, fx: { delay: { level: 0.35, sync: true, time: 0.6, fb: 0.45 }, reverb: { level: 0.3 } } }],
-	["PEAK UNISON", "LEAD", { voice: { mode: "mono", unison: 2, detune: 0.25 }, glide: { on: true, time: 0.08 }, osc: [ { wave: "saw" }, { wave: "saw", coarse: 7 }, {} ], mix: { osc1: 0.8, osc2: 0.5 },
+	["WIDE UNISON", "LEAD", { voice: { mode: "mono", unison: 2, detune: 0.25 }, glide: { on: true, time: 0.08 }, osc: [ { wave: "saw" }, { wave: "saw", coarse: 7 }, {} ], mix: { osc1: 0.8, osc2: 0.5 },
 		filter: { freq: 0.6, res: 0.25, env: 0.3, drive: 0.3 }, env1: { d: 0.8, s: 0.3 }, fx: { dist: 0.15, delay: { level: 0.2, time: 0.35, fb: 0.3 } } }],
 	["BELL KEYS", "KEYS", { osc: [ { wave: "sine", range: 2 }, { wave: "sine", range: 1, coarse: 7, fine: 3 }, {} ], mix: { osc1: 0.7, osc2: 0.6, ring: 0.6 },
 		filter: { freq: 0.9 }, amp: { a: 0.001, d: 2.2, s: 0, r: 1.8 }, fx: { reverb: { level: 0.45, time: 0.7 }, chorus: { level: 0.3 } } }],
@@ -571,8 +570,8 @@ function draw( mod )
 
 WR.registerSynth( "mount", {
 	title: "MOUNT",
-	description: "MOUNT: 8 voice polyphonic synthesizer with wavetables, a mod matrix and effects (Novation Peak style)",
-	about: "After the Novation Peak: 8 voices of 3 oscillators (with wavetables), a multimode filter, three envelopes, two LFOs, a mod matrix with ANIMATE buttons, an arpeggiator, and distortion, chorus, delay and reverb.",
+	description: "MOUNT: 8 voice polyphonic synthesizer with wavetables, a mod matrix and effects",
+	about: "8 voices of 3 oscillators (with wavetables), a multimode filter, three envelopes, two LFOs, a mod matrix with ANIMATE buttons, an arpeggiator, and distortion, chorus, delay and reverb.",
 	key_prio: [["^anim\\d$", 3], ["^(audition|arp_on|arp_latch|glide_on)$", 2], ["^(patch_dn|patch_up|fx_bypass|anim_hold)$", 2], ["^(menu_|row|page_|val_)", 1], ["", 0]],
 	knob_jacks: [["^(flt_freq|volume)$", ["cv_in"]]],
 	category: "Synths",

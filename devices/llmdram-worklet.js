@@ -1,5 +1,5 @@
 // devices/llmdram-worklet.js
-// LLM DRAM DSP (a replica of the Behringer LM Drum, itself after the Linn LM-1 / LinnDrum), hosted by
+// LLM DRAM DSP (an early 80s style sampling drum machine), hosted by
 // the rack processor. The drum sounds are synthesized here at start (not the original samples), at
 // 28 kHz, and kept as 8-bit companded and 12-bit "samples" played back without interpolation, which
 // gives them the grain of the early sampling drum machines.

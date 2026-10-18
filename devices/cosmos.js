@@ -1,6 +1,5 @@
 // devices/cosmos.js
-// COSMOS module, a replica of the Eventide Space reverb pedal (half rack width), laid out as the pedal
-// (the Space user guide's overview): MIX with the PEAK / SIGNAL LEDs, DECAY, SIZE, DELAY, LOW, HIGH;
+// COSMOS module, a multi-algorithm stereo reverb (half rack width), laid out as a pedal: MIX with the PEAK / SIGNAL LEDs, DECAY, SIZE, DELAY, LOW, HIGH;
 // the PRESET encoder (click: ALGORITHM mode) with TEMPO, XNOB, YNOB, FXMIX, CONTOUR and the EDITED
 // LED; the 12 character display; the ACTIVE, HOTSWITCH (here: FREEZE) and TAP footswitches.
 // 12 algorithms, each knob's meaning per algorithm as in the guide; presets from the factory list.
@@ -8,7 +7,7 @@
 
 (function(){
 
-var NAMES = ["HALL", "ROOM", "PLATE", "SPRING", "DUALVERB", "REVERSE", "MODECHOVERB", "BLACKHOLE", "MANGLEDVERB", "TREMOLOVERB", "DYNAVERB", "SHIMMER"];
+var NAMES = ["HALL", "ROOM", "PLATE", "SPRING", "DUALVERB", "REVERSE", "MODECHOVERB", "VOID", "WARPVERB", "TREMOLOVERB", "DYNAVERB", "SHIMMER"];
 // the knobs: MIX, DECAY, SIZE, DELAY, LOW, HIGH, XNOB, YNOB, FXMIX, CONTOUR
 var KNOBS = ["MIX", "DECAY", "SIZE", "DELAY", "LOW", "HIGH", "XNOB", "YNOB", "FXMIX", "CONTOUR"];
 var NOTES = [["1/64", 1 / 16], ["1/32", 1 / 8], ["1/16T", 1 / 6], ["1/16", 1 / 4], ["1/8T", 1 / 3], ["1/16D", 3 / 8], ["1/8", 1 / 2], ["1/4T", 2 / 3], ["1/8D", 3 / 4], ["1/4", 1], ["1/2T", 4 / 3], ["1/4D", 3 / 2], ["1/2", 2], ["1/2D", 3], ["WHOLE", 4]];
@@ -67,7 +66,7 @@ var A = [
 function fmt( a, k, v ) { var p = A[a][k]; return p[0] + " " + T[ p[1] ][0]( v ); }
 function inv( a, k, x ) { return Math.min( 1, Math.max( 0, T[ A[a][k][1] ][1]( x ) ) ); }
 
-// factory presets (from Eventide's list, the ones without tempo), in display units: MIX, DECAY,
+// factory presets (the ones without tempo), in display units: MIX, DECAY,
 // SIZE, DELAY, LOW, HIGH, XNOB, YNOB, FXMIX, CONTOUR
 var PRESETS = [
 	["HALL", 0, [39, 1.42, 52, 99, -100, -100, 2.1, 2.0, 17, 18]],
@@ -77,8 +76,8 @@ var PRESETS = [
 	["DUALVERB", 4, [45, 3.2, 70, 40, 32, 83, 2.75, 120, 0.5, 30]],
 	["REVERSE", 5, [100, 819, 61, 6, 1, -100, 100, 83, 13, 100]],
 	["MODECHOVERB", 6, [100, 10.0, 90, 0, -8, 75, 0, 50, 0.87, -29]],
-	["BLACKHOLE", 7, [31, 0.93, 92, 0, 1, 0, 0, 36, 18, 0]],
-	["MANGLEDVERB", 8, [39, 49, 74, 250, 70, -42, 0.35, -16.5, 34, 73]],
+	["VOID", 7, [31, 0.93, 92, 0, 1, 0, 0, 36, 18, 0]],
+	["WARPVERB", 8, [39, 49, 74, 250, 70, -42, 0.35, -16.5, 34, 73]],
 	["TREMOLOVERB", 9, [51, 10.0, 54, 0, 10, 19, "SINE", 4.1, 0.31, 1690]],
 	["DYNAVERB", 10, [60, 20.1, 100, 0.08, -13, -9, 0.2, 0.34, -57.7, 0]],
 	["SHIMMER", 11, [39, 97, 30, 20, 100, 80, 1204, 1193, 37, 100]],
@@ -351,8 +350,8 @@ function encoder( x, y )
 
 WR.registerSynth( "cosmos", {
 	title: "COSMOS",
-	description: "COSMOS: 12 stereo reverbs, from halls and springs to shimmer and black holes",
-	about: "After the Eventide Space: Hall, Room, Plate, Spring, DualVerb, Reverse, ModEchoVerb, BlackHole, MangledVerb, TremoloVerb, DynaVerb, Shimmer; 10 knobs per algorithm, presets, freeze. Half width.",
+	description: "COSMOS: 12 stereo reverbs, from halls and springs to shimmer and endless voids",
+	about: "Hall, Room, Plate, Spring, DualVerb, Reverse, ModEchoVerb, Void, WarpVerb, TremoloVerb, DynaVerb, Shimmer; 10 knobs per algorithm, presets, freeze. Half width.",
 	// keys: 3 played / triggered, 2 often, 1 sometimes, 0 no key (code.js: keyAssign)
 	key_prio: [["^fs_", 3], ["^encoder$", 2], ["", 1]],
 	category: "Effects",

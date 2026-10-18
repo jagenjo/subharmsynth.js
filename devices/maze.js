@@ -1,5 +1,5 @@
 // devices/maze.js
-// Maze module, a replica of the Moog Labyrinth: settings, the 32 point patch bay and the panel: two rows of voice controls
+// Maze module, a generative semi-modular synthesizer: settings, the 32 point patch bay and the panel: two rows of voice controls
 // (oscillators, mixer, wavefolder, filter, blend and envelopes), the two generative bit sequencers
 // below with their buttons, CORRUPT and CV RANGE, and the transport, quantizer and ORDER switch.
 // Bits can also be clicked directly to flip them. DSP in maze-worklet.js.
@@ -323,7 +323,7 @@ function drawPatchBay()
 WR.registerSynth( "maze", {
 	title: "MAZE",
 	description: "Maze: parallel generative synthesizer with two bit sequencers",
-	about: "After the Moog Labyrinth: two parallel bit-shift sequencers, two VCOs, a wavefolder and a state-variable filter. Generative patterns.",
+	about: "Two parallel bit-shift sequencers, two VCOs, a wavefolder and a state-variable filter. Generative patterns.",
 	// keys: 3 played / triggered, 2 often, 1 sometimes, 0 no key (code.js: keyAssign)
 	key_prio: [["^(run|reset|advance|trigger)$", 3], ["^bit\\d_\\d$", 3], ["^(length|flip|shift)\\d$", 2], ["", 1]],
 	category: "Synths",

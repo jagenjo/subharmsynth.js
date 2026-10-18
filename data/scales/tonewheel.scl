@@ -1,6 +1,6 @@
-! hammond.scl
+! tonewheel.scl
 !
-Hammond organ pitch wheel ratios, 1/1=320 Hz. Do "del 0" to get 12-tone scale
+Tonewheel organ pitch wheel ratios, 1/1=320 Hz. Do "del 0" to get 12-tone scale
  13
 !
  71/82

@@ -7,7 +7,7 @@
 var canvas = document.getElementById("panel");
 var ctx = canvas.getContext("2d");
 var FONT = "Antonio, Oswald, 'Arial Narrow', sans-serif";
-// two panel layouts: "hardware" mirrors the real front panels, "classic" is the original compact
+// two panel layouts: "hardware" is the full front panels, "classic" is the first compact
 // layout of the Subharm. The rack is as wide as the Subharm's panel; other synths are scaled to fit
 var LAYOUTS = {
 	hardware: { w: 1568, name: "Hardware" },
@@ -1493,7 +1493,7 @@ function fmtDiv( v ) { return "÷" + v; }
 var DEVICE_GAP = 10; // between two half width devices in a row
 
 // wood cheeks + black panel, shared by the main panel and the devices
-// whether the device being drawn has wooden sides (Moog style: its def.wood); the others fill the
+// whether the device being drawn has wooden sides (the classic synths: its def.wood); the others fill the
 // rack's whole width, their ends as rack ears with screws
 var casing_wood = false;
 function drawCasing( x, y, w, h )

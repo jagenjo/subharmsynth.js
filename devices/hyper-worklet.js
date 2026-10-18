@@ -1,6 +1,6 @@
 // devices/hyper-worklet.js
 // HYPER DSP, hosted by the rack processor: a lo-fi stereo distortion and bit crusher, after the
-// warm, broken-console sound of Disasterpeace's soundtracks (Fez, Hyper Light Drifter):
+// warm, broken-console sound of indie game soundtracks:
 //   WOBBLE (tape wow and flutter: a modulated short delay) -> DRIVE through a TYPE of saturation
 //   (TAPE, TUBE, FUZZ, FOLD) -> TONE (low pass) -> RATE (sample rate reduction, aliasing included)
 //   -> BITS (1-16, continuous) -> MIX with the dry signal.

@@ -1,5 +1,5 @@
 // devices/maze-worklet.js
-// Maze DSP (a replica of the Moog Labyrinth), hosted by the rack processor (rack-worklet.js): a parallel generative voice
+// Maze DSP (a generative semi-modular synthesizer), hosted by the rack processor (rack-worklet.js): a parallel generative voice
 // and two generative 8 bit sequencers.
 //   voice: sine VCO and triangle MOD VCO (MOD VCO -> VCO FM, ring modulation, MOD VCO sync), a
 //   saturating mixer with tone-adjustable noise, then two paths, a wavefolder (VCW) and a 2-pole

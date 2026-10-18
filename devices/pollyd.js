@@ -1,7 +1,7 @@
 // devices/pollyd.js
-// PARA D module, a replica of the Behringer Poly D (a four-oscillator, four-voice Minimoog). Its
+// PARA D module, a four-oscillator, four-voice paraphonic analog synthesizer in the classic style. Its
 // panel is laid out as the original's tilted front: CONTROLLERS, OSCILLATOR BANK, MIXER, MODIFIERS and
-// OUTPUT (with the chorus and the distortion), black with white print, black Moog knobs with numbered
+// OUTPUT (with the chorus and the distortion), black with white print, black knobs with numbered
 // scales, blue and orange rocker switches. Below, on the keyboard deck: the pitch and mod wheels, glide,
 // LFO and transpose, the sequencer / arpeggiator, and the CV sockets of its back panel. Wooden sides.
 // DSP in pollyd-worklet.js.
@@ -139,7 +139,7 @@ function hot( id, x, y, w, h )
 	return { hover: hover, clicked: clicked || kb.pressed, held: (ui.active === full && ui.down) || kb.held };
 }
 
-// a Moog knob: the numbers 0..10 printed around it (or labels), its name above
+// a knob: the numbers 0..10 printed around it (or labels), its name above
 function mknob( id, cx, cy, r, value, min, max, label, o )
 {
 	o = o || {};
@@ -188,7 +188,7 @@ function glyph( kind, x, y, color )
 	ctx.stroke();
 }
 
-// a Minimoog rocker switch: on = the top half pressed in. caption above, its state below
+// a rocker switch: on = the top half pressed in. caption above, its state below
 function rocker( id, cx, cy, on, color, caption, onText, offText, tooltip )
 {
 	var w = 18, h = 30, x = cx - w / 2, y = cy - h / 2;
@@ -592,8 +592,8 @@ function onState( m, state )
 
 WR.registerSynth( "pollyd", {
 	title: "PARA D",
-	description: "PARA D: 4-voice paraphonic analog synthesizer (Minimoog style), chorus, distortion, arpeggiator and sequencer",
-	about: "After the Behringer Poly D: a Minimoog with four oscillators, played mono, in unison or as four voices through the ladder filter, with a stereo chorus, a distortion, an arpeggiator and a 32-step sequencer.",
+	description: "PARA D: 4-voice paraphonic analog synthesizer, chorus, distortion, arpeggiator and sequencer",
+	about: "A classic analog monosynth design with four oscillators, played mono, in unison or as four voices through the ladder filter, with a stereo chorus, a distortion, an arpeggiator and a 32-step sequencer.",
 	// keys: 3 played / triggered, 2 often, 1 sometimes, 0 no key (code.js: keyAssign)
 	key_prio: [["^step\\d$", 3], ["^(play|rec|arp|hold|reset)$", 3], ["^(pattern|shift|page)$", 2], ["^(glide_on|osc_mod|filter_mod|chorus_on|dist_on|osc\\d_on|noise_on)$", 1], ["", 0]],
 	knob_jacks: [["^cutoff$", ["filter_in"]], ["^(tune|osc\\d_fine)$", ["osc_in"]], ["^volume$", ["loud_in"]], ["^mod_mix$", ["mod_in"]], ["^tempo$", ["sync_in"]], ["^vel_adj$", ["vel_out"]]],

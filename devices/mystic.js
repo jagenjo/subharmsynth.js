@@ -1,6 +1,5 @@
 // devices/mystic.js
-// MYSTIC module, a replica of the ASM Hydrasynth (simplified): settings and a panel laid out as the
-// Hydrasynth's: CV / GATE jacks, ARPEGGIATOR, MAIN SYSTEMS (the waves after the mutants), MASTER
+// MYSTIC module, a wave-scanning polyphonic synthesizer: settings and a panel laid out in sections: CV / GATE jacks, ARPEGGIATOR, MAIN SYSTEMS (the waves after the mutants), MASTER
 // CONTROL (8 LED ring encoders around an OLED, editing the module chosen in MODULE SELECT) and FILTER
 // CONTROLS. Polyphonic (8 voices): it plays every note of its MIDI channel, so it has no
 // sequencer of its own; the song or the keys play it. DSP in mystic-worklet.js.
@@ -9,7 +8,7 @@
 
 var SIZE = [1568, Math.round( 16 + (760 - 30) * (1568 - 44) / (1470 - 40) )];
 var WAVE_NAMES = ["SINE", "TRIANGLE", "SAW", "SQUARE", "PULSE", "ORGAN", "VOX", "DIGITAL"];
-var MUT_MODES = [["off", "OFF"], ["fm", "FM-LIN"], ["stack", "WAVSTACK"], ["sync", "OSC SYNC"], ["pw", "PW-ASM"], ["harmonic", "HARMONIC"], ["phazdist", "PHAZDIST"]];
+var MUT_MODES = [["off", "OFF"], ["fm", "FM-LIN"], ["stack", "WAVSTACK"], ["sync", "OSC SYNC"], ["pw", "PW-ASYM"], ["harmonic", "HARMONIC"], ["phazdist", "PHAZDIST"]];
 var F1_TYPES = [["lp24", "LP LADDER 24"], ["lp12", "LP 12"], ["bp", "BAND PASS"], ["hp", "HIGH PASS"], ["vowel", "VOWEL"], ["comb", "COMB"]];
 var LFO_SHAPES = [["sine", "SINE"], ["tri", "TRIANGLE"], ["saw", "SAW"], ["square", "SQUARE"], ["sh", "S&H"]];
 var ARP_MODES = [["up", "UP"], ["down", "DOWN"], ["updown", "UP/DOWN"], ["random", "RANDOM"], ["order", "AS PLAYED"]];
@@ -95,7 +94,7 @@ function randomize( s )
 }
 
 // ---------------------------------------------------------------------------
-// the panel, laid out as the Hydrasynth Desktop's (the manual's top panel drawing): CV / GATE,
+// the panel: CV / GATE,
 // ARPEGGIATOR and FILTER CONTROLS on the left, MAIN SYSTEMS (patch encoder, left OLED), MASTER
 // CONTROL (8 LED ring encoders around four OLED windows) on the right, MODULE SELECT and the 24
 // pads below. The OLEDs use a 5x7 dot matrix font. Coordinates are the drawing's, scaled by X() / Y()
@@ -386,7 +385,7 @@ function drawMasterVolume()
 	t( "MASTER", 160, 360, 9, WHITE, "center", true ); t( "VOLUME", 160, 372, 9, WHITE, "center", true );
 }
 
-// a 3.5 mm jack as on the Hydrasynth's top panel; registered for the cables
+// a 3.5 mm jack on the top panel; registered for the cables
 function miniJack( id, cx, cy, type, label )
 {
 	var full = id_prefix + id;
@@ -634,7 +633,7 @@ function drawMasterControl()
 }
 
 // MODULE SELECT: the signal flow; a button shows its module on MASTER CONTROL. The modules this
-// replica does not have are dimmed
+// synth does not have are dimmed
 function drawModuleSelect()
 {
 	var s = M.settings;
@@ -643,7 +642,7 @@ function drawModuleSelect()
 	ctx.fillStyle = TITLEBAR; ctx.beginPath(); ctx.roundRect( X(70), Y(525), Sz(180), Sz(24), [5, 0, 5, 0] ); ctx.fill();
 	t( "MODULE SELECT", 160, 537.5, 13, RED, "center", true );
 	var B = function(k, x, y, label, missing) {
-		var r = hyButton( "mod_" + k, x, y, 56, 30, label, s.ui_module == k, "access", missing ? label.replace( "\n", " " ) + ": NOT IN THIS REPLICA" : (MODULES[k] || {}).name + " ON MASTER CONTROL", missing );
+		var r = hyButton( "mod_" + k, x, y, 56, 30, label, s.ui_module == k, "access", missing ? label.replace( "\n", " " ) + ": NOT HERE" : (MODULES[k] || {}).name + " ON MASTER CONTROL", missing );
 		if(!missing && r.clicked) { s.ui_module = k; s.ui_browse = false; }
 	};
 	ctx.strokeStyle = "#5a5a60"; ctx.lineWidth = Sz(3);
@@ -727,7 +726,7 @@ function send( msg ) { var m = M; act(function(){ m.post( msg ); }); }
 WR.registerSynth( "mystic", {
 	title: "MYSTIC",
 	description: "MYSTIC: polyphonic wave morphing synthesizer with mutators",
-	about: "After the ASM Hydrasynth: 8 voices, wave-scanning oscillators with mutants, two filters, three envelopes, an arpeggiator. Edit pages around an OLED.",
+	about: "8 voices, wave-scanning oscillators with mutants, two filters, three envelopes, an arpeggiator. Edit pages around an OLED.",
 	// keys: 3 played / triggered, 2 often, 1 sometimes, 0 no key (code.js: keyAssign)
 	key_prio: [["^pad\\d_\\d$", 3], ["^(arp_on|arp_latch|arp_tap|home|prev|next)$", 2], ["^(shift|random|arp_trip|filt[12]|page_up|page_down|exit)$", 1], ["^mod_", 1], ["^(encbtn\\d|save|sysset|browse|init|macro|modmatrix|voice)$", 0]],
 	// a knob's sockets, lit when the mouse is over it (code.js: controlJacks)

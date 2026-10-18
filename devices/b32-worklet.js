@@ -1,5 +1,5 @@
 // devices/b32-worklet.js
-// Brother-32 DSP (a replica of the Moog Mother-32), hosted by the rack processor (rack-worklet.js): a VCO (saw / pulse with
+// Brother-32 DSP (a semi-modular synthesizer), hosted by the rack processor (rack-worklet.js): a VCO (saw / pulse with
 // pulse width, linear FM, EG or LFO modulation of frequency or pulse width), a VCO / noise mixer,
 // a ladder filter (LP / HP), an AD envelope with a sustain switch, a VCA (EG or always on), an LFO
 // (triangle / square), glide, the VC mix crossfader, a mult, and the 32 step sequencer with a note,

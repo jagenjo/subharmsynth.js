@@ -1,6 +1,6 @@
-# subharmsynth.js
+# SYNTHS
 
-**SYNTHS** is a browser rack of semi-modular synthesizers built on the WebAudio API: replicas of the Moog Subharmonicon (polyrhythmic synthesizer), DFAM (percussion synthesizer, here called DRAM), Mother-32 (synthesizer with a 32 step sequencer, here called Brother-32) Labyrinth (parallel generative synthesizer, here called Maze) ASM Hydrasynth (polyphonic wave morphing synthesizer, here called Mystic) Behringer LM Drum (LinnDrum-style sampling drum machine, here called LLM Dram) and Elta Music Solar 42 (ambient drone machine, here called Lunar 21), plus the Hologram Microcosm (granular looper pedal, here called Universe) and the Eventide Space (reverb pedal, here called Cosmos), with a mixer, LFOs, compressors, reverbs and delays, all patchable with each other.
+**SYNTHS** is a browser rack of synthesizers built on the WebAudio API, inspired by classic instruments: a polyrhythmic synthesizer (Subharm), an analog percussion synthesizer (DRAM), a semi-modular synthesizer with a 32 step sequencer (Brother-32), a generative synthesizer (Maze), wave-scanning and wavetable polyphonic synthesizers (Mystic, Mount), a four-oscillator paraphonic synthesizer (Para D), an early 80s style drum machine (LLM Dram), an ambient drone machine (Lunar 21) and a note grid sequencer (Grid 32), plus a granular looper (Universe), a multi-algorithm reverb (Cosmos) and a lo-fi distortion (Hyper), with a mixer, LFOs, compressors, reverbs and delays, all patchable with each other. Every name in it is its own; it is not affiliated with any instrument maker.
 
 All synthesis runs in real time in one `AudioWorkletProcessor` (`rack-worklet.js`), which hosts each synth's DSP and copies the patch cables between them every sample. Oscillators, filters, envelopes, clocks, sequencers and the cables are all computed per sample, so patching between synths is sample-accurate. The reverb and delay are native WebAudio nodes after it.
 
@@ -16,7 +16,7 @@ Needs a browser with AudioWorklet support, served over `https://` or `localhost`
 | `sequencer.js` | the song sequencer in the bottom bar: tracks, piano roll, transport, recording, scheduling |
 | `sessions.js` | sessions: the rack autosaved in the browser, the Sessions panel |
 | `code.js` | the rack UI: canvas widgets (knobs, buttons, switches, jacks), cables, shared devices, scrolling and zoom, toolbar, keyboard shortcuts |
-| `devices/subharm.js`, `devices/subharm-worklet.js` | the Subharmonicon: panel, jacks and settings; DSP |
+| `devices/subharm.js`, `devices/subharm-worklet.js` | the Subharm: panel, jacks and settings; DSP |
 | `devices/dram.js`, `devices/dram-worklet.js` | the DRAM |
 | `devices/b32.js`, `devices/b32-worklet.js` | the Brother-32 |
 | `devices/maze.js`, `devices/maze-worklet.js` | the Maze |
@@ -31,14 +31,14 @@ Needs a browser with AudioWorklet support, served over `https://` or `localhost`
 | `devices/universe.js`, `devices/universe-worklet.js` | Universe, the granular / looper effect |
 | `devices/hyper.js`, `devices/hyper-worklet.js` | Hyper, the distortion / bit crusher |
 | `devices/cosmos.js`, `devices/cosmos-worklet.js` | Cosmos, the 12 algorithm reverb |
-| `devices/pollyd.js`, `devices/pollyd-worklet.js` | Para D, the four-voice Minimoog |
+| `devices/pollyd.js`, `devices/pollyd-worklet.js` | Para D, the four-voice paraphonic synthesizer |
 | `devices/grid.js`, `devices/grid-worklet.js` | Grid 32, the note matrix sequencer |
 | `devices/mount.js`, `devices/mount-worklet.js` | Mount, the eight voice polyphonic synthesizer |
 | `devices/reroute.js`, `devices/reroute-worklet.js` | Reroute, front to back and back again |
 | `devices/reverb.js`, `devices/reverb-worklet.js` | the convolution reverb: native nodes, bridged through a send / return slot |
 | `data/patches.json` | factory patches |
-| `old/` | the original version of this replica, as in the first commit |
-| `data/impulses/` | reverb impulse responses from Voxengo's free "IM Reverbs" pack, redistributed unaltered under its `license.txt` (© Aleksey Vaneev) |
+| `old/` | the first version of this project, as in the first commit |
+| `data/impulses/` | free reverb impulse responses, redistributed unaltered under their `license.txt` |
 | `data/scales/` | Scala `.scl` scales, plus `index.json` used by the scale picker |
 
 ## The rack
@@ -116,7 +116,7 @@ A 6 channel line mixer in the same panel style as the synths. Insert it from *Ad
 
 ## Mount
 
-A replica of the Novation Peak: eight voices of three oscillators, laid out as the Peak's panel. PATCH, LFO 1 and 2, GLIDE, ARP, the MENU with its OLED, ANIMATE and MASTER are along the top; the three OSCILLATOR rows, MIXER, FILTER, the envelope sliders and EFFECTS are below. The buttons light up red, and LED columns show the stepped choices.
+An eight voice polyphonic synthesizer with three oscillators a voice and wavetables. PATCH, LFO 1 and 2, GLIDE, ARP, the MENU with its OLED, ANIMATE and MASTER are along the top; the three OSCILLATOR rows, MIXER, FILTER, the envelope sliders and EFFECTS are below. The buttons light up red, and LED columns show the stepped choices.
 
 - **Patch:** the PATCH encoder and PATCH − / + step through 12 factory patches and 16 user slots. SAVE stores the sound in a user slot (the patch's own, or the first empty one). INITIALISE loads the init patch. COMPARE, held, plays the patch as saved. AUDITION plays middle C.
 - **Oscillators** (three alike):
@@ -155,7 +155,7 @@ A pattern sequencer on a 32 × 32 LED matrix, half a rack wide like the effects.
 
 ## Para D
 
-A replica of the Behringer Poly D (its type in saved racks is still `pollyd`): a Minimoog with four oscillators, played as one voice or as four. Its panel is laid out as the original's: black with white print, Moog knobs with numbered scales, blue, orange and white rocker switches, and wooden sides. Below the panel, on the keyboard deck, are the wheels, the sequencer and the sockets of the back panel.
+A classic analog synthesizer design with four oscillators, played as one voice or as four (its type in saved racks is `pollyd`). Its panel: black with white print, black knobs with numbered scales, blue, orange and white rocker switches, and wooden sides. Below the panel, on the keyboard deck, are the wheels, the sequencer and the sockets of the back panel.
 
 - **Controllers:**
   - TUNE, GLIDE (with its ON switch on the deck), MODULATION MIX.
@@ -165,8 +165,8 @@ A replica of the Behringer Poly D (its type in saved racks is still `pollyd`): a
 - **Oscillator bank:** four oscillators, each with RANGE (LO, 32', 16', 8', 4', 2'), FREQUENCY (OSC 2–4, ±7 semitones) and WAVEFORM (triangle, tri / saw, saw, square, wide and narrow pulse; OSC 4 has a reverse saw instead of the tri / saw). **OSC 4 CONTROL** off takes OSC 4 off the keyboard: a drone or a modulation oscillator, and POLY has three voices.
 - **Mixer:** the four oscillators, EXT IN (the EXT SIGNAL IN socket on the back, with its OVERLOAD light) and NOISE (white or pink), each with its volume and switch.
 - **Modifiers:** the 24 dB ladder filter (CUTOFF, EMPHASIS, AMOUNT OF CONTOUR, low or high pass) and its contour (attack, decay, sustain). KEYBOARD CONTROL 1 and 2 track the keys by 1/3, 2/3 or (both) fully. Then the loudness contour. **DECAY** on: both contours release with their decay time; off, at once.
-  - In POLY, the four voices share the filter and the contours (paraphonic, as the original). The contours start again when a key is pressed with none held.
-- **Output:** VOLUME, the stereo BBD **CHORUS** (I, II, or both: fast and shallow) and a **DISTORTION** (DS-1 style: DISTORTION, TONE, LEVEL).
+  - In POLY, the four voices share the filter and the contours (paraphonic). The contours start again when a key is pressed with none held.
+- **Output:** VOLUME, the stereo bucket brigade **CHORUS** (I, II, or both: fast and shallow) and a **DISTORTION** (DISTORTION, TONE, LEVEL).
 - **Deck:** the PITCH wheel (±2 semitones, springs back), the MOD wheel, the LFO (0.05–200 Hz, triangle or square) and TRANSPOSE (±1 octave).
 - **Sequencer:** 8 patterns of up to 32 steps. Each step holds a note or a chord (up to 4), an accent, a glide (tied into the next step) and a ratchet (1–4 repeats).
   - **TEMPO**, GATE, SWING, and SYNC (follow the rack's tempo: its first device with a clock). It also follows MIDI clock (the song with SYNC on) or the SYNC IN socket (a step per pulse).
@@ -179,9 +179,9 @@ A replica of the Behringer Poly D (its type in saved racks is still `pollyd`): a
 
 ## Mystic
 
-A replica of the ASM Hydrasynth Desktop, simplified; named Mystic here. It is the rack's only **polyphonic** synth: it plays every note of its MIDI channel on 8 voices (POLY), or one voice with legato and GLIDE (MONO). Play it from the keys, a MIDI device, the song sequencer or its own pads.
+A wave-scanning polyphonic synthesizer. It is the rack's only **polyphonic** synth: it plays every note of its MIDI channel on 8 voices (POLY), or one voice with legato and GLIDE (MONO). Play it from the keys, a MIDI device, the song sequencer or its own pads.
 
-- **Panel:** laid out as the Desktop's top panel in the owner's manual. It has a matte black panel with red section titles, silver knobs, LED ring encoders, aluminium end cheeks, orange-lettered access buttons and white-lettered function buttons. The screens are white dot matrix OLEDs (a 5×7 font).
+- **Panel:** laid out in sections. It has a matte black panel with red section titles, silver knobs, LED ring encoders, aluminium end cheeks, orange-lettered access buttons and white-lettered function buttons. The screens are white dot matrix OLEDs (a 5×7 font).
   - **CV / GATE:** inputs MOD 1 (cutoff), MOD 2 (WAVSCAN), PITCH, GATE and CLOCK; outputs PITCH, GATE, MOD 1 (ENV 1), MOD 2 (LFO 1), ENV 3 and CLOCK (a pulse on each arpeggiator step).
   - **ARPEGGIATOR:** MODE, OCTAVE, DIVISION (1/4 to 1/32) and SWING; ON, LATCH, TRIPLET and TAP TEMPO. SHIFT + ON (EDIT) shows its page.
   - **FILTER CONTROLS:** CUTOFF, RESONANCE and DRIVE / MORPH, on FILTER 1 or FILTER 2.
@@ -190,15 +190,15 @@ A replica of the ASM Hydrasynth Desktop, simplified; named Mystic here. It is th
     - **Buttons:** INIT resets the module shown (SHIFT: the whole patch) and RANDOM makes a random sound. HOME shows the 8 macros (SHIFT + HOME: PANIC).
   - **MASTER CONTROL:** 8 encoders around four OLED windows (a parameter's name and value above and below a line) edit the module picked.
     - **Buttons:** the white buttons reset their parameter. PAGE ▲ ▼ steps through the pages, EXIT goes home, and VOICE shows polyphony and glide. MOD MATRIX shows the modulation amounts.
-  - **MODULE SELECT:** the signal flow. ENV 4–5, LFO 2–5, PRE-FX and POST-FX, which this replica does not have, are dimmed.
+  - **MODULE SELECT:** the signal flow. ENV 4–5, LFO 2–5, PRE-FX and POST-FX, which it does not have, are dimmed.
   - **24 pads:** play the notes of a scale (CHORDS mode: triads); roots are tinted. With SHIFT they do what is printed under them: OCT − / +, PAD MODE, KEY, and the 16 scales.
 - **DELAY and REVERB** after the amp: DELAY has TIME, FEEDBACK, WET TONE and DRY/WET; REVERB has TIME, TONE and DRY/WET.
 - **OSC 1 and OSC 2:** each scans through 8 single-cycle waves (SINE, TRIANGLE, SAW, SQUARE, PULSE, ORGAN, VOX, DIGITAL) with **WAVSCAN**, plus SEMI and CENT.
-- **Mutators:** each of OSC 1 and OSC 2 goes through two (MUTANT 1–4 on the panel, as on the Hydrasynth), each with a mode, RATIO, DEPTH and DRY/WET:
+- **Mutators:** each of OSC 1 and OSC 2 goes through two (MUTANT 1–4 on the panel), each with a mode, RATIO, DEPTH and DRY/WET:
   - **FM-LIN:** phase modulation by a sine at RATIO × the oscillator.
   - **WAVSTACK:** three detuned copies; RATIO sets the spread.
   - **OSC SYNC:** a hard-synced slave up to RATIO × 2.
-  - **PW-ASM:** squeezes the first half of the wave.
+  - **PW-ASYM:** squeezes the first half of the wave.
   - **HARMONIC:** sweeps to the upper harmonics.
   - **PHAZDIST:** phase distortion.
 - **OSC 3:** one wave, with SEMI and CENT.
@@ -212,21 +212,21 @@ A replica of the ASM Hydrasynth Desktop, simplified; named Mystic here. It is th
 - **LFO:** RATE, SHAPE (SINE, TRIANGLE, SAW, SQUARE, S&H), sent to PITCH, WAVSCAN, CUTOFF and MUTATORS.
 - **ARPEGGIATOR:** UP, DOWN, UP/DOWN, RANDOM or AS PLAYED, with DIVISION (1/4 to 1/32), OCTAVES (1–4), GATE, LATCH and TEMPO. MIDI clock (or a cable in CLOCK) takes over from TEMPO.
 - **Factory patches:** *Glass Pad*, *FM Bells* and *Mutant Arp*.
-- **Simplified:** the original's mod matrix (32 slots), assignable macros, ENV 4–5, LFO 2–5, pre / post effects, and patch saving inside the synth are replaced by the fixed routings and pages above; the waves are 8 instead of 219.
+- **Simplified:** no mod matrix, assignable macros, ENV 4–5, LFO 2–5, pre / post effects, and patch saving inside the synth are replaced by the fixed routings and pages above; the waves are 8 instead of 219.
 - **CPU:** it is the heaviest device. In tests, 8 voices took about 13% of a CPU core, up to 30% with all four mutators stacking.
 
 ## Universe
 
-A replica of the Hologram Microcosm granular / looper pedal, named Universe here. It is a half-width effect with stereo IN / OUT on the back.
+A granular / looper / delay effect pedal. It is a half-width effect with stereo IN / OUT on the back.
 
-- **Panel:** laid out as the pedal's. It is a light grey enclosure with navy print and black knobs with grey tops (the GREY CAP knob style), on a dark rack shelf. The CV jacks are on its top edge.
+- **Panel:** a pedal: a light grey enclosure with navy print and black knobs with grey tops (the GREY CAP knob style), on a dark rack shelf. The CV jacks are on its top edge.
   - **Knobs:** ACTIVITY, SHAPE, FILTER, MIX on top; TIME (on its blue ¼×…8× scale), REPEATS, SPACE, LOOP LEVEL below. **SHIFT** switches them to the secondary controls printed in grey: MOD FREQ, RESONANCE, EFFECT VOLUME, LOOPER SPEED, MOD DEPTH, REVERB TIME and FADE TIME.
   - **SELECT:** sets whether TIME is the subdivision (SUBDIV light) or the tempo (TEMPO light).
   - **Preset knob:** turns through all 44 presets, among the four outlined groups whose LEDs pick an effect. FWD/REV plays the effect backwards. The four A–D lights show and pick the variation.
   - **PHRASE LOOPER box:** PRE-FX, LOOPER ONLY, BURST, QUANTIZE and REVERSE. Its centre button engages the looper.
   - **Footswitches:** TAP (with the looper: REC / PLAY / DUB, or with BURST, record while held), bypass, and HOLD (with the looper: STOP, held a second to ERASE).
 - **How it works:** it keeps the last 11 seconds of its input. Each effect plays small pieces of it ("grains") back, at other speeds, looped, reversed or bit-crushed, timed by the tempo.
-- **Effects:** 11 effects, each with variations A–D (44 presets). The display shows what the variation does. What each variation does, and what ACTIVITY and REPEATS do in each effect, follow the pedal's manual:
+- **Effects:** 11 effects, each with variations A–D (44 presets). The display shows what the variation does. What each variation does, and what ACTIVITY and REPEATS do in each effect, are:
 
   | Effect | A | B | C | D | ACTIVITY |
   |---|---|---|---|---|---|
@@ -249,7 +249,7 @@ A replica of the Hologram Microcosm granular / looper pedal, named Universe here
 - **HOLD** freezes the buffer: the effect keeps playing what it holds while you play on top. **BYPASS** passes the dry signal.
 - **Phrase looper** (up to 60 s): REC → PLAY → DUB (overdub) → PLAY, STOP and ERASE, plus REVERSE, PRE-FX (record the dry input), LOOPER ONLY (the effect off, only the loop and the dry signal), BURST, QUANTIZE (the loop trimmed to the nearest beat) and FADE TIME (STOP fades it out). The bar shows the loop's position.
 - **CV:** CLOCK, HOLD (a gate toggles it), ACTIVITY and MIX (±5 V) in; CLOCK (a pulse each step) and ENV (input level) out.
-- **Not the pedal's algorithms:** each effect follows the manual's description of what it does, but the sound is my own approximation. User presets are the rack's patches, and the loop is not saved with them.
+- **Algorithms:** each effect is its own approximation. User presets are the rack's patches, and the loop is not saved with them.
 
 ## Reroute
 
@@ -262,7 +262,7 @@ Patch a signal into one Reroute's front, cable its back to another Reroute's bac
 
 ## Cosmos
 
-A replica of the Eventide Space reverb pedal, named Cosmos here. It is a half-width device with stereo IN / OUT on the back. The panel is laid out as the pedal's (the Space user guide's overview), with a 12 character, 14 segment display.
+A multi-algorithm stereo reverb pedal. It is a half-width device with stereo IN / OUT on the back, with a 12 character, 14 segment display.
 
 - **The 12 algorithms:**
   - **HALL:** 3 bands, with low and high decay multipliers and band levels.
@@ -275,17 +275,17 @@ A replica of the Eventide Space reverb pedal, named Cosmos here. It is a half-wi
   - **BLACKHOLE:** huge; gravity or inverse gravity, feedback.
   - **MANGLEDVERB:** a reverb into EQ and distortion, wobble.
   - **TREMOLOVERB:** 9 tremolo shapes, mono or stereo.
-  - **DYNAVERB:** an Omnipressor-style gate / expander / compressor / limiter / reverser on the reverb, its side chain from the input or the reverb.
+  - **DYNAVERB:** a gate / expander / compressor / limiter / reverser on the reverb, its side chain from the input or the reverb.
   - **SHIMMER:** two pitch shifters in the feedback.
 - **Knobs:** MIX, DECAY, SIZE, DELAY, LOW, HIGH, XNOB, YNOB, FXMIX and CONTOUR. What each does depends on the algorithm, as in the guide; the display names the parameter and its value as you turn it. A decay knob's top is [INF], then [FREEZE].
-- **PRESET encoder:** turn it for the presets (30 of the factory presets, from Eventide's list). Click it for ALGORITHM mode, where turning it chooses an algorithm. EDITED lights when a knob was turned.
+- **PRESET encoder:** turn it for the presets (30 factory presets). Click it for ALGORITHM mode, where turning it chooses an algorithm. EDITED lights when a knob was turned.
 - **TEMPO:** the DELAY knobs in note values of the tempo tapped on TAP.
 - **Footswitches:** ACTIVE (bypass with the tails ringing on), HOTSWITCH (freeze the reverb) and TAP.
-- **Not the pedal's algorithms:** they follow the guide's description of each; the sound is my own. The HotSwitch is a freeze here, not a programmable set of knob positions. No expression pedal or MIDI.
+- **Algorithms:** approximations of classic studio reverbs. The HotSwitch is a freeze here, not a programmable set of knob positions. No expression pedal or MIDI.
 
 ## Hyper
 
-A lo-fi distortion and bit crusher (half width, stereo IN / OUT on the back), for the warm, crunchy, slightly broken sound of Disasterpeace's soundtracks (*Fez*, *Hyper Light Drifter*). The signal goes through, in order:
+A lo-fi distortion and bit crusher (half width, stereo IN / OUT on the back), for the warm, crunchy, slightly broken sound of indie game soundtracks. The signal goes through, in order:
 
 - **WOBBLE:** tape wow (0.55 Hz) and flutter (6.3 Hz), a short delay whose length moves, so the pitch bends.
 - **DRIVE** (up to +36 dB) into a **TYPE** of saturation: TAPE (soft), TUBE (asymmetric, even harmonics), FUZZ (hard clipping) or FOLD (the wave folds back on itself). The level is compensated as DRIVE goes up.
@@ -300,13 +300,13 @@ These settings are my reading of that sound, not a recipe from the artist. His m
 
 ## LLM Dram
 
-A replica of the Behringer LM Drum (itself after the Linn LM-1 and LinnDrum), named LLM Dram here. Its panel follows the hardware's layout and look: charcoal with orange outlined sections, grey rectangular buttons, black skirted knobs, 16 pads and slider banks.
+An early 80s style sampling drum machine. Its panel: charcoal with orange outlined sections, grey rectangular buttons, black skirted knobs, 16 pads and slider banks.
 
 - **Sounds:** 24 pad sounds on 16 mixer channels.
   - **Bottom row:** SIDESTICK, SNARE 1–3, BASS 1–2, CRASH, and PERCUSSION, which switches the top row (as does BANK).
   - **Top row:** HI HAT 1, 2 and OPEN, TOMS HI / MID / LO and RIDE 1–2; or, with PERCUSSION on, CABASA 1–2, TAMBOURINE 1–2, CONGAS HI / LO, COWBELL and CLAPS.
   - **CLICK:** the 16th channel, a metronome while recording.
-  - **The samples:** not the original samples: they are synthesized in code at start, at 28 kHz, and stored as 8-bit companded and 12-bit samples played back without interpolation, for the grain of the early sampling drum machines. 32 samples in all; SAMP gives any pad sound any of them.
+  - **The samples:** they are synthesized in code at start, at 28 kHz, and stored as 8-bit companded and 12-bit samples played back without interpolation, for the grain of the early sampling drum machines. 32 samples in all; SAMP gives any pad sound any of them.
 - **Mixer:** PAN (top sliders) and LEVEL (bottom faders) per channel, and VOICE SELECT. Press a voice again to cycle its sounds (SNARE 1 / 2 / 3, …). MUTE and SOLO act on the selected voice.
 - **Display:** the selected voice's BIT (8 / 12), SAMP, DIST, PLAY (forward / reverse), TUNE, LEV, STRT, LEN and LOOP. Move with the arrows, change with the encoder, the wheel or NO- / YES+. MENU switches to the pattern's PATT, LEN, SWNG, BPM, QUAN, SYNC, FILL, SREP and PERC.
 - **TUNE:** SNARE, TOMS HI / MID / LO and CONGAS HI / LO (±12 semitones), and HI HAT DECAY. A closed hi hat cuts an open one.
@@ -321,7 +321,7 @@ A replica of the Behringer LM Drum (itself after the Linn LM-1 and LinnDrum), na
 
 ## Lunar 21
 
-A replica of the Elta Music Solar 42 ambient drone machine, named Lunar 21 here. Its panel is laid out as the original's: cream with black print, black, red and blue knobs (the FLAT knob style), mini jacks, the touch plates and the drone buttons.
+An ambient drone machine. Its panel: cream with black print, black, red and blue knobs (the FLAT knob style), mini jacks, the touch plates and the drone buttons.
 
 - **Drone voices 1, 2, 6 and 7:** 5 reed-like oscillators each.
   - **Per oscillator:** MUTE, TUNE (−12 to +24 semitones, fine enough for microtonal chords) and MOD (a slow drift of its own, for beating).
@@ -334,9 +334,9 @@ A replica of the Elta Music Solar 42 ambient drone machine, named Lunar 21 here.
   - **Playing them:** from the touch plates or MIDI, through **EG VCA 1 / 2** (ADSR; HOLD keeps them open, LOOP repeats attack / decay).
 - **Touch plates:** the 12 notes of an octave, with OCTAVE ▽ △ and a HOLD button. The display switches SINGLE (both VCOs on the last note) or TWIN (the last two notes). They output V/OCT and GATE ×2.
 - **Mixer:** PAN and VOL for the 8 voices, EXT.AUDIO and PREAMP.
-- **FILTER L / R:** 12 dB, Polivoks-like: driven, and resonant up to whistling. They have CV FREQ with its amount, and LINK.
+- **FILTER L / R:** 12 dB, aggressive: driven, and resonant up to whistling. They have CV FREQ with its amount, and LINK.
 - **DUAL EFFECTOR:** a cartridge on each side, with X / Y / Z, CV X / Y / Z, BLEND and MASTER VOLUME.
-  - **Cartridges:** 10 of the original's, with their 3 programs each, from the original's cartridge chart: CATHEDRAL, TIME, MAGIC, INFINITY, VIBROTREM, VIBE, PITCH SHIFTER, STRING RINGER, DIGITAL and FILTER.
+  - **Cartridges:** 10, with 3 programs each: CATHEDRAL, TIME, MAGIC, INFINITY, VIBROTREM, VIBE, PITCH SHIFTER, STRING RINGER, DIGITAL and FILTER.
   - **Editing:** click the slot for the next cartridge. The L/R switch picks the side that the knobs and the program buttons edit.
   - **What's different:** the programs are my own versions of what the chart names. SYNTEX-1 and GENERATOR are left out.
 - **CV sources:** LFO A / B (WAVE triangle → square, RATE, 0–10 V), the **JOYSTICK** (drag it; X / Y with offsets), the **5 STEP SEQUENCER** (PULSER clock or CLOCK in, STAGES 4 / 5, a gate switch per step, CV and GATE out), the **PREAMP** and the **ENVELOPE FOLLOWER** (ENVELOPE and GATE out).
@@ -345,7 +345,7 @@ A replica of the Elta Music Solar 42 ambient drone machine, named Lunar 21 here.
 
 ## Maze
 
-A replica of the Moog Labyrinth, following its manual, named Maze here. Patches that still use the old `labyrinth` name load as Maze.
+A generative semi-modular synthesizer with two parallel bit-shift sequencers.
 
 - **Oscillators:**
   - A sine VCO (20 Hz–5 kHz) and a triangle MOD VCO (0.05 Hz–1.3 kHz).
@@ -368,13 +368,13 @@ A replica of the Moog Labyrinth, following its manual, named Maze here. Patches 
 - **32-point patch bay:**
   - 20 inputs: VCO 1V/OCT, M VCO SYNC, M VCO 1V/OCT, BLEND, VCW IN, VCW FOLD, VCW VCA CV, VCF IN, CUTOFF, VCF VCA CV, U MIX 1 (RING), U MIX 2, EG2 TRIG, CLOCK 1, BIT FLIP 1, CLOCK 2, BIT FLIP 2, MIDI, TRIGGER, RESET.
   - 12 outputs: VCA, M VCO, NOISE, MIXER, EG1, EG2, U MIX 1+2, SEQ1 CV, SEQ1 TRIG, SEQ2 CV, SEQ2 TRIG, CLOCK.
-  - Normalled connections, as on the hardware: EG1 into VCW FOLD and CUTOFF, EG2 into both VCA CVs, the mixer into VCW IN and VCF IN, the ring modulation into U MIX 1, the internal clock into CLOCK 1 and CLOCK 1 into CLOCK 2.
+  - Normalled connections: EG1 into VCW FOLD and CUTOFF, EG2 into both VCA CVs, the mixer into VCW IN and VCF IN, the ring modulation into U MIX 1, the internal clock into CLOCK 1 and CLOCK 1 into CLOCK 2.
 - **MIDI** (cabled from the keys when it's added): notes transpose the VCO and fire the envelopes; MIDI clock and start / stop drive the sequencers.
 - **Factory patches:** *Alien Bells* and *Folded Bongos*.
 
 ## Brother-32
 
-A replica of the Moog Mother-32, named Brother-32 here. Patches that still use the old `mother32` name load as Brother-32.
+A semi-modular mono synthesizer with a 32 step sequencer.
 
 - **VCO:**
   - FREQUENCY (C1–C7; the sequence and the keys add to it, C4 = 0 V) and PULSE WIDTH.
@@ -399,7 +399,7 @@ A replica of the Moog Mother-32, named Brother-32 here. Patches that still use t
 
 ## DRAM
 
-A replica of the Moog DFAM ("Drummer From Another Mother"), named DRAM here. Patches that still use the old `dfam` name load as DRAM.
+An analog percussion synthesizer with an 8 step sequencer.
 
 - **Two VCOs**, 10 Hz to 10 kHz, each with a triangle / square switch.
   - A shared decay-only **VCO EG**, set by VCO DECAY. It goes to each VCO through a bipolar EG AMOUNT (±5 octaves).
@@ -420,9 +420,9 @@ A replica of the Moog DFAM ("Drummer From Another Mother"), named DRAM here. Pat
   - A cable in ADV / CLOCK replaces the internal clock: each pulse advances a step. To sync the DRAM to the Subharm, patch the Subharm's CLOCK output there.
   - A cable in VCA CV replaces the envelope on the VCA.
   - The decay inputs stretch their decay time by one octave of time per volt.
-- Like the hardware, it has no MIDI. Play it from the keys device with cables, e.g. KEY 1 → VCO 1 CV and TRIG → TRIGGER.
+- It has no MIDI. Play it from the keys device with cables, e.g. KEY 1 → VCO 1 CV and TRIG → TRIGGER.
 
-## Subharmonicon
+## Subharm
 
 - **2 VCOs, each with 2 subharmonics.** VCO FREQ spans C4 to C8. The subs are true frequency dividers (÷1 fully clockwise to ÷16) of their VCO, so they stay phase-locked. The 3-position wave switch sets all square (up), pulse VCO with saw subs and SUB 1 normalled to the PWM input (middle), or all saw (down). Oscillators are band-limited (polyBLEP) and have a little analog drift.
 - **Mixer** with 6 levels, driving a **4-pole ladder low-pass filter** with input saturation. The filter self-oscillates at the top of the resonance range.
@@ -431,7 +431,7 @@ A replica of the Moog DFAM ("Drummer From Another Mother"), named DRAM here. Pat
 - **Quantizer**: 12-ET, 8-ET, 12-JI, 8-JI or off, applied to the VCO pitch (knob + sequencer + MIDI + the patched VCO 1 / VCO 2 pitch inputs).
 - **Polyrhythm**: the tempo clock (20 to 3000 BPM) feeds 4 rhythm dividers (÷1 to ÷16). Each divider can clock SEQ 1 and/or SEQ 2. Coincident pulses count once, and every sequencer step fires both envelopes.
 - **PLAY, RESET, TRIGGER and NEXT.** TRIGGER holds the envelopes while pressed.
-- **32-point patch bay** with the hardware's layout. Outputs have inverted labels. Inputs accept one cable each; outputs can feed several. Audio-rate patching works, e.g. VCO 2 into VCO 1 for FM.
+- **32-point patch bay.** Outputs have inverted labels. Inputs accept one cable each; outputs can feed several. Audio-rate patching works, e.g. VCO 2 into VCO 1 for FM.
 
 Patch bay signal levels: audio ±5 V, envelopes 0 to 5 V, SEQ outputs 1 V/oct, clock/trigger outputs 5 ms pulses at 5 V. Pitch and cutoff inputs track 1 V/oct.
 
@@ -499,14 +499,14 @@ The **KEYS** row above the synth is where notes come in:
 - **Split**: *SPLIT* divides the keyboard at the marker above the keys (drag it). The lower zone drives KEY 1 / GATE 1, the upper zone KEY 2 / GATE 2. Without split both pairs carry all notes.
 - **Outputs**: GATE 1 / 2 (5 V while a key of that zone is held), KEY 1 / 2 (1 V/oct, C4 = 0 V, last-note priority), TRIG (a 5 ms pulse on every key press, whatever the split), and MIDI OUT on the back. All notes from every source (MIDI device, on-screen keys, QWERTY, the song) go to MIDI OUT.
 
-As on the hardware, MIDI reaches the synth only through its MIDI IN jack, so the MIDI output is cabled to it by default (patches from before the keys device get that cable automatically). Unplug it to use the keyboard only as CV, e.g. KEY 1 → VCO 1 and GATE 1 → TRIGGER. What the synth does with MIDI:
+MIDI reaches the synth only through its MIDI IN jack, so the MIDI output is cabled to it by default (patches from before the keys device get that cable automatically). Unplug it to use the keyboard only as CV, e.g. KEY 1 → VCO 1 and GATE 1 → TRIGGER. What the synth does with MIDI:
 
 - **Notes** transpose both VCOs relative to C4, with last-note priority. They retrigger both envelopes and hold them while the key is down.
 - **Pitch bend**: ±2 semitones.
-- **Clock**: 24 ppqn MIDI clock drives the master clock in 16ths, as on the hardware. While clock messages are arriving, they replace the TEMPO knob. A cable in the CLOCK input takes priority over both.
+- **Clock**: 24 ppqn MIDI clock drives the master clock in 16ths. While clock messages are arriving, they replace the TEMPO knob. A cable in the CLOCK input takes priority over both.
 - **Start / Stop / Continue** run, stop and resume the sequencer.
 
-## Beyond the hardware
+## Extras
 
 - **Scala scales.** Type a scale name in the toolbar to add a fifth quantize mode, SCALA. It uses the selected `.scl` file, rooted at C.
 - **Sessions** (toolbar): your work is saved automatically in this browser, a few seconds after every change and when you leave the page.
@@ -525,7 +525,7 @@ As on the hardware, MIDI reaches the synth only through its MIDI IN jack, so the
   - **Delay**: TIME (free 10 ms – 2 s, or tempo divisions 1/16 – 1/1 with SYNC), FEEDBACK, TONE (lowpass in the feedback), MIX, PING-PONG and ON. Off by default.
 - **Collapsible devices**: the chevron on the top left corner of the KEYS, LFO, compressor, reverb and delay devices folds the whole row (both devices sharing it) into slim bars; their jacks stay on the bar as small sockets, so cables stay connected.
 - **Device row** below the synth, in the same style, patchable from and to the main patch bay:
-  - **Dual LFO**: per LFO RATE (0.01–100 Hz), SHAPE (sine, triangle, saw, ramp, square, sample & hold), LEVEL (an attenuator, since the Subharmonicon has none), RATE CV inputs (1 V/oct) and SYNC inputs (a gate restarts the cycle). Outputs are ±5 V.
+  - **Dual LFO**: per LFO RATE (0.01–100 Hz), SHAPE (sine, triangle, saw, ramp, square, sample & hold), LEVEL (an attenuator, since the Subharm has none), RATE CV inputs (1 V/oct) and SYNC inputs (a gate restarts the cycle). Outputs are ±5 V.
   - **Compressor** on the master output, before the reverb: THRESHOLD, RATIO, ATTACK, RELEASE, MAKEUP, MIX (parallel), ON, a gain reduction meter, a SIDECHAIN input (the detector rectifies, so use envelopes or gates for ducking) and a GR output (gain reduction as CV, 4 dB per volt). A small green CRT oscilloscope under its jacks shows the signal patched into its SCOPE input (±5 V full scale) or, with nothing patched, the master output. Click the screen to cycle the time base (5 ms, 20 ms, 100 ms: triggered; 500 ms, 2 s: scrolling roll mode).
 - **Options** (toolbar) opens a small panel:
   - **Layout:** Hardware or Classic, for the Subharm (see below).
@@ -533,7 +533,7 @@ As on the hardware, MIDI reaches the synth only through its MIDI IN jack, so the
   - **Mouse wheel turns the knob under the cursor:** off, the wheel always scrolls the rack, so scrolling over the panels can't move a knob or fader by accident.
   - The choices are remembered in the browser.
 - **Randomize** (toolbar) rolls a new playable sound on every synth and the LFOs. It keeps the volumes, compressor, reverb, cables and the loaded scale.
-- **Two panel layouts** for the Subharm, switched in *Options*. *Hardware* places every control where it is on the real front panel; *Classic* is the original compact layout of this replica, grouped by section. The rest of the rack follows its width.
+- **Two panel layouts** for the Subharm, switched in *Options*. *Hardware* lays the controls out as a full front panel; *Classic* is the first, compact layout of this project, grouped by section. The rest of the rack follows its width.
 
 ## Controls
 
@@ -541,14 +541,14 @@ As on the hardware, MIDI reaches the synth only through its MIDI IN jack, so the
 - Drag from a jack to patch. Drag a cable off an input to move or remove it. Double-click or right-click a jack to unplug it.
 - Keys: `Space` play/stop (every synth); the other keys press the buttons of the device in the middle of the screen (hold `Shift` to see them, `` ` `` switches banks).
 
-## Approximations
+## Design notes
 
-Some details are educated guesses, not measurements of the hardware:
+Some choices made in the sound engines and panels:
 
-- Mount: the oscillators (no FPGA here), what SHAPE does to the sine, triangle and saw, the 8 wavetables (made for it), the filter and envelope curves, the effects' algorithms, and the matrix (6 slots, not 16)
+- Mount: what SHAPE does to the sine, triangle and saw, the 8 wavetables, the filter and envelope curves, the effects' algorithms, and a 6 slot matrix
 - Para D: the curves and ranges of the knobs, the modulation depths, how UNISON spreads the oscillators, the chorus and distortion circuits, the arpeggiator modes, and the layout of the sequencer's buttons on the deck
-- Maze: how much CORRUPT changes per pass, the ranges of the amounts, the wavefolder and filter curves, the scales after the ones the manual lists, how notes are handled over MIDI, and the panel layout (an arrangement of the manual's controls, not a copy of the panel)
-- Brother-32: the placement of the patch bay jacks within the 4 × 8 grid, the ranges of the knobs, the ASSIGN choices, and the step editing (a step grid instead of the button modes)
+- Maze: how much CORRUPT changes per pass, the ranges of the amounts, the wavefolder and filter curves, the scales, how notes are handled over MIDI, and the panel layout
+- Brother-32: the placement of the patch bay jacks within the 4 × 8 grid, the ranges of the knobs, the ASSIGN choices, and the step editing (a step grid)
 - DRAM: the order of the patch bay jacks within their rows, the envelope curves and ranges, the FM depth and the HP filter (a 4-pole high pass from the same ladder)
 - how strongly the SUB and RHYTHM CV inputs (and sequencers assigned to a sub) shift the division: 3 steps per volt
 - the envelope curves

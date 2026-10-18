@@ -1,11 +1,11 @@
 // devices/pollyd-worklet.js
-// PARA D DSP, after the Behringer Poly D (a Minimoog with four oscillators): four VCOs (6 ranges, 6
+// PARA D DSP (a classic analog synthesizer with four oscillators): four VCOs (6 ranges, 6
 // waves), played as one voice (MONO, UNISON: the four on the last note) or as four (POLY: an
 // oscillator a note, through the same filter and contours: paraphonic, AUTO DAMP silencing the keys let
 // go), the mixer (OSC 1-4, NOISE white / pink, EXT IN), the 24 dB ladder filter (low / high pass,
 // keyboard control 0, 1/3, 2/3, full) with its contour, the loudness contour (DECAY switch: release =
 // decay), the modulation mix (OSC 4 or filter contour, noise or LFO) by the mod wheel to the
-// oscillators and / or the filter, glide, a distortion (DS-1 style), the BBD stereo chorus (I, II,
+// oscillators and / or the filter, glide, a distortion (classic pedal style), the bucket brigade stereo chorus (I, II,
 // I+II), an arpeggiator and a 32-step sequencer with 8 patterns (chords, accent, glide, ratchets).
 // It gets the raw notes of its MIDI channel (POLY).
 (function(){
@@ -441,7 +441,7 @@ class ParaDSP {
 		// ---- loudness ----
 		y *= this.leg * this.loud;
 
-		// ---- distortion (DS-1 style): high pass, gain, asymmetric clipping, tone, level ----
+		// ---- distortion (classic pedal style): high pass, gain, asymmetric clipping, tone, level ----
 		const d = s.dist;
 		if (d.on) {
 			this.dHp += (y - this.dHp) * 0.02;
@@ -451,7 +451,7 @@ class ParaDSP {
 			y = (this.dLp * (1 - d.tone * 0.4) + (z - this.dLp) * d.tone * 0.5) * d.level * 0.8;
 		}
 
-		// ---- BBD chorus (I: slow, II: deeper, I+II: fast and shallow), stereo ----
+		// ---- bucket brigade chorus (I: slow, II: deeper, I+II: fast and shallow), stereo ----
 		let l = y, r = y;
 		if (uni) { const sp = 0.35; l = y + (left - right) * sp * this.leg * 0.2; r = y - (left - right) * sp * this.leg * 0.2; }
 		const c = s.chorus;
@@ -468,7 +468,7 @@ class ParaDSP {
 			};
 			const wl = read(0.0055 + depth * tri), wr = read(0.0055 - depth * tri);
 			this.cpos = (this.cpos + 1) % n;
-			this.cLpL += (wl - this.cLpL) * 0.35; this.cLpR += (wr - this.cLpR) * 0.35; // the BBD's dark repeats
+			this.cLpL += (wl - this.cLpL) * 0.35; this.cLpR += (wr - this.cLpR) * 0.35; // the bucket brigade's dark repeats
 			l = l * 0.7 + this.cLpL * 0.7; r = r * 0.7 + this.cLpR * 0.7;
 		}
 

@@ -1,12 +1,12 @@
 // devices/cosmos-worklet.js
-// COSMOS DSP (a replica of the Eventide Space reverb pedal), hosted by the rack processor: stereo, 12
+// COSMOS DSP (a multi-algorithm stereo reverb), hosted by the rack processor: stereo, 12
 // algorithms, each with the pedal's ten knobs (0..1 here, meaning per algorithm, as in the Space's user
 // guide): MIX, DECAY, SIZE, DELAY, LOW, HIGH, XNOB, YNOB, FXMIX, CONTOUR.
-//   HALL, ROOM, PLATE, SPRING, DUALVERB, REVERSE, MODECHOVERB, BLACKHOLE, MANGLEDVERB, TREMOLOVERB,
+//   HALL, ROOM, PLATE, SPRING, DUALVERB, REVERSE, MODECHOVERB, VOID, WARPVERB, TREMOLOVERB,
 //   DYNAVERB, SHIMMER
 // One reverb core for all: an 8-line feedback delay network (size, 3-band decay, damping, diffusion,
 // random modulation, INF and FREEZE), with each algorithm's own processing around it. The pedal's
-// algorithms are Eventide's; these are approximations from their descriptions.
+// algorithms are approximations from descriptions of classic studio reverbs.
 
 (function(){
 
@@ -140,7 +140,7 @@ class CosmosDSP {
 		this.patched = new Uint8Array(IN_IDS.length);
 		this.midiConnected = false;
 		const sr = sampleRate;
-		this.rev = new Fdn(5);            // BLACKHOLE is the biggest
+		this.rev = new Fdn(5);            // VOID is the biggest
 		this.rev2 = new Fdn(2.5);         // DUALVERB's B, REVERSE's forward reverb
 		this.pre = [new Line(Math.round(sr * 2.1)), new Line(Math.round(sr * 2.1))];
 		this.pre2 = [new Line(Math.round(sr * 2.1)), new Line(Math.round(sr * 2.1))];
@@ -208,7 +208,7 @@ class CosmosDSP {
 				X.modType = P[K.FX] < 1 / 3 ? 0 : (P[K.FX] < 2 / 3 ? 1 : 2); X.modDepth = (P[K.FX] * 3) % 1; X.rate = 0.05 * Math.pow(160, P[K.Y]);
 				X.eq = [levelGain(P[K.LOW]), 1, levelGain(P[K.HIGH]), c350, c2k];
 				break;
-			case 7: { // BLACKHOLE: huge; GRAVITY (or inverse below the middle), feedback around it all
+			case 7: { // VOID: huge; GRAVITY (or inverse below the middle), feedback around it all
 				const inv = dk < 0.5, grav = inv ? 1 - dk * 2 : (dk - 0.5) * 2;
 				Object.assign(base, { scale: 0.25 + size * 0.75, t60: 1 + grav * grav * 60, inf: false, freeze: hot || P[K.FX] >= FREEZE_AT, mod: P[K.X] * 1.5, diff: 0.8 });
 				this.rev.modRate.forEach((r, i) => this.rev.modRate[i] = (0.1 + i * 0.05) * Math.pow(10, P[K.Y] * 1.3));
@@ -217,7 +217,7 @@ class CosmosDSP {
 				X.win = Math.round((0.3 + grav * 1.5) * sampleRate);
 				break;
 			}
-			case 8: // MANGLEDVERB: reverb into a 3-band EQ into distortion; wobble
+			case 8: // WARPVERB: reverb into a 3-band EQ into distortion; wobble
 				Object.assign(base, { t60: 0.1 + dk * dk * 8, inf: false, freeze: hot, scale: 0.05 + size * 0.9 });
 				X.eq = [levelGain(P[K.LOW]), levelGain(P[K.CONTOUR]), levelGain(P[K.HIGH]), xLo, xHi];
 				X.dist = P[K.X]; X.out = P[K.Y]; X.wobble = P[K.FX];
@@ -228,7 +228,7 @@ class CosmosDSP {
 				X.depth = P[K.FX] < 0.5 ? P[K.FX] * 2 : (P[K.FX] - 0.5) * 2; X.stereo = P[K.FX] >= 0.5;
 				X.speed = 0.1 * Math.pow(200, P[K.Y]); X.shape = Math.min(8, Math.floor(P[K.X] * 9));
 				break;
-			case 10: { // DYNAVERB: an Omnipressor on the reverb
+			case 10: { // DYNAVERB: a gate / expander / compressor on the reverb
 				Object.assign(base, { scale: 0.2 + size * 0.8, t60: dk < 0.01 ? 0.05 : t60 });
 				X.solo = dk < 0.01; X.thr = -80 + P[K.FX] * 80; X.atk = onePole(1 / (0.0002 * Math.pow(2500, P[K.DELAY]) * 6.28));
 				X.rel = onePole(1 / (0.005 * Math.pow(400, P[K.Y]) * 6.28)); X.sc = P[K.CONTOUR];
@@ -404,7 +404,7 @@ class CosmosDSP {
 				wr = this.eq[1].process(mr, X.eq[0], 1, X.eq[2], X.eq[3], X.eq[4]);
 				break;
 			}
-			case 7: { // BLACKHOLE
+			case 7: { // VOID
 				this.rev.process(xl + this.fbl * X.fb, xr + this.fbr * X.fb);
 				let rl = this.rev.outL, rr = this.rev.outR;
 				this.fbl = tanh(rl); this.fbr = tanh(rr);
@@ -421,7 +421,7 @@ class CosmosDSP {
 				wr = this.eq[1].process(rr, X.eq[0] * res, 1, X.eq[2] * res, X.eq[3], X.eq[4]);
 				break;
 			}
-			case 8: { // MANGLEDVERB
+			case 8: { // WARPVERB
 				this.rev.process(xl, xr);
 				let rl = this.rev.outL, rr = this.rev.outR;
 				if (X.wobble > 0.01) { // a spooky detune
@@ -456,7 +456,7 @@ class CosmosDSP {
 				wl = rl * g(this.lfo); wr = rr * g(X.stereo ? frac(this.lfo + 0.25) : this.lfo);
 				break;
 			}
-			case 10: { // DYNAVERB: the Omnipressor on the reverb, side chain from the input and / or the reverb
+			case 10: { // DYNAVERB: a gate / expander / compressor on the reverb, side chain from the input and / or the reverb
 				let rl = xl, rr = xr;
 				if (!X.solo) { this.rev.process(xl, xr); rl = this.rev.outL; rr = this.rev.outR; }
 				const det = (Math.abs(dl) + Math.abs(dr)) * (1 - X.sc) + (Math.abs(this.fbl) + Math.abs(this.fbr)) * X.sc;

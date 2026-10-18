@@ -1,11 +1,11 @@
 // devices/dram.js
-// DRAM module for the rack, a replica of the Moog DFAM ("Drummer From Another Mother"): settings, patch bay and panel,
+// DRAM module for the rack, an analog percussion synthesizer: settings, patch bay and panel,
 // laid out like the hardware's front panel: two rows of synth controls, the 8-step sequencer
 // with a PITCH and a VELOCITY knob per step, and the 24 point patch bay. DSP in dram-worklet.js.
 
 (function(){
 
-var SIZE = [1568, 596]; // same 60HP case as the Subharmonicon
+var SIZE = [1568, 596]; // same 60HP case as the SUBHARM
 var VCO_MIN_FREQ = 10, VCO_MAX_FREQ = 10000; // ten octaves
 var TEMPO_MIN = 10, TEMPO_MAX = 10000;      // BPM with a step per 16th: 0.7Hz..700Hz steps
 var STEPS = 8;
@@ -269,7 +269,7 @@ function drawPatchBay()
 WR.registerSynth( "dram", {
 	title: "DRAM",
 	description: "DRAM: semi-modular analog percussion synthesizer",
-	about: "After the Moog DFAM: an 8-step analog percussion voice, 2 VCOs, noise, a ladder filter and decays per step. Kicks, toms, clanks.",
+	about: "An 8-step analog percussion voice, 2 VCOs, noise, a ladder filter and decays per step. Kicks, toms, clanks.",
 	// keys: 3 played / triggered, 2 often, 1 sometimes, 0 no key (code.js: keyAssign)
 	key_prio: [["^(run|trigger|advance)$", 3], ["", 1]],
 	// a knob's sockets, lit when the mouse is over it (code.js: controlJacks)

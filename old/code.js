@@ -1,4 +1,4 @@
-//https://www.recordcase.de/media/image/0d/5a/dc/Moog-Subharmonicon-4.jpg
+// the first version of the rack's polyrhythmic synthesizer
 
 var canvas = document.querySelector("canvas");
 var ctx = canvas.getContext("2d");

@@ -1,5 +1,5 @@
 // devices/universe-worklet.js
-// UNIVERSE DSP (a replica of the Hologram Microcosm), hosted by the rack processor: a stereo granular,
+// UNIVERSE DSP (a granular / looper / delay effect), hosted by the rack processor: a stereo granular,
 // looping and delay effect. The input goes into a ring buffer (about 11 s); an effect engine plays
 // "grains" from it (pieces of what was just played, at other speeds, looped, reversed, filtered,
 // crushed), timed by the tempo and TIME. 11 effects x 4 variations (A-D) = 44 presets:

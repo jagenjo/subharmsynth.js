@@ -10,7 +10,7 @@ var H = 150;
 var REAR_JACKS = [["IN L","ain","in_l"], ["IN R","ain","in_r"], ["OUT L","aout","out_l"], ["OUT R","aout","out_r"]];
 
 // reverb rooms, short to long: [name, impulse file]; a null file is generated in code.
-// data/impulses/ are Voxengo "IM Reverbs" (see data/impulses/license.txt)
+// data/impulses/: free impulse responses, redistributed under data/impulses/license.txt
 WR.REVERB_ROOMS = [
 	["DRUM ROOM S", "data/impulses/Small Drum Room.wav"],
 	["DRUM ROOM", "data/impulses/Nice Drum Room.wav"],
