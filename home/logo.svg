@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 64" width="280" height="64" role="img" aria-label="GASFREE">
+	<title>GASFREE</title>
+	<defs><radialGradient id="knob" cx="0.38" cy="0.32" r="0.75"><stop offset="0" stop-color="#4a4a47"/><stop offset="0.6" stop-color="#1f1f1d"/><stop offset="1" stop-color="#0b0b0a"/></radialGradient></defs>
+	<rect x="1" y="1" width="62" height="62" rx="14" fill="#151514" stroke="#2c2c2a" stroke-width="2"/>
+	<line x1="18.92" y1="42.08" x2="15.03" y2="45.97" stroke="#8d8a83" stroke-width="2.4" stroke-linecap="round"/>
+	<line x1="12.38" y1="32.90" x2="8.46" y2="33.68" stroke="#8d8a83" stroke-width="1.8" stroke-linecap="round"/>
+	<line x1="13.52" y1="21.35" x2="9.83" y2="19.82" stroke="#8d8a83" stroke-width="1.8" stroke-linecap="round"/>
+	<line x1="20.89" y1="12.37" x2="18.67" y2="9.04" stroke="#8d8a83" stroke-width="1.8" stroke-linecap="round"/>
+	<line x1="32.00" y1="9.00" x2="32.00" y2="5.00" stroke="#8d8a83" stroke-width="1.8" stroke-linecap="round"/>
+	<line x1="43.11" y1="12.37" x2="45.33" y2="9.04" stroke="#8d8a83" stroke-width="1.8" stroke-linecap="round"/>
+	<line x1="50.48" y1="21.35" x2="54.17" y2="19.82" stroke="#8d8a83" stroke-width="1.8" stroke-linecap="round"/>
+	<line x1="51.62" y1="32.90" x2="55.54" y2="33.68" stroke="#e2574c" stroke-width="1.8" stroke-linecap="round"/>
+	<line x1="45.08" y1="42.08" x2="48.97" y2="45.97" stroke="#e2574c" stroke-width="2.4" stroke-linecap="round"/>
+	<circle cx="32" cy="29" r="14" fill="url(#knob)" stroke="#000" stroke-opacity="0.6"/>
+	<line x1="32" y1="29" x2="40.49" y2="37.49" stroke="#e2574c" stroke-width="3.6" stroke-linecap="round"/>
+	<path d="M18 4H2V32H18M2 18H14" transform="translate(11 49) scale(0.3)" fill="none" stroke="#8d8a83" stroke-width="6"/>
+	<path d="M18 4H2V32M2 18H14" transform="translate(47 49) scale(0.3)" fill="none" stroke="#e2574c" stroke-width="6"/>
+	<path d="M18 4H2V32H18V18H10" transform="translate(84 14)" fill="none" stroke="#ece8df" stroke-width="5" stroke-linecap="square"/>
+	<path d="M2 32V4H18V32M2 18H18" transform="translate(111 14)" fill="none" stroke="#ece8df" stroke-width="5" stroke-linecap="square"/>
+	<path d="M18 4H2V18H18V32H2" transform="translate(138 14)" fill="none" stroke="#ece8df" stroke-width="5" stroke-linecap="square"/>
+	<path d="M18 4H2V32M2 18H14" transform="translate(175 14)" fill="none" stroke="#e2574c" stroke-width="5" stroke-linecap="square"/>
+	<path d="M2 32V4H18V18H2M12 21L18 32" transform="translate(202 14)" fill="none" stroke="#e2574c" stroke-width="5" stroke-linecap="square"/>
+	<path d="M18 4H2V32H18M2 18H14" transform="translate(229 14)" fill="none" stroke="#e2574c" stroke-width="5" stroke-linecap="square"/>
+	<path d="M18 4H2V32H18M2 18H14" transform="translate(256 14)" fill="none" stroke="#e2574c" stroke-width="5" stroke-linecap="square"/>
+</svg>
