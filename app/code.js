@@ -666,7 +666,7 @@ function knob( id, cx, cy, r, value, min, max, o )
 	if(skin != "classic" && skin != "aluminium")
 	{
 		var tk = o.ticks || steps || (style == "ring" ? 11 : 31);
-		if(skin != "ledring") // the LED ring is its own scale
+		if(skin != "ledring" && !o.noScale) // the LED ring is its own scale; noScale: no printed scale
 			drawKnobScale( cx, cy, r, tk, o.bipolar, style == "small" ? "small" : style );
 		drawSkinKnob( skin, cx, cy, r, clamp( toN(value), 0, 1 ), hover || ui.active === id, o.bipolar );
 		if(o.label)
@@ -1719,10 +1719,11 @@ var EMPTY_RACK_H = 60;
 // width a module gets in the rack
 function slotW( def ) { return def.half ? (PANEL_W - DEVICE_GAP) * 0.5 : PANEL_W; }
 
-// panel size in its own coordinates and the scale that fits it in the rack
-function moduleFit( def )
+// panel size in its own coordinates and the scale that fits it in the rack (m: a device whose size
+// depends on its settings, as the custom synths)
+function moduleFit( def, m )
 {
-	var size = def.size( layout );
+	var size = def.size( layout, m && m.settings );
 	return { w: size[0], h: size[1], k: slotW( def ) / size[0] };
 }
 
@@ -1730,7 +1731,7 @@ function moduleRowH( m )
 {
 	if(collapsed[ m.id ])
 		return DEVICE_COLLAPSED_H;
-	var fit = moduleFit( WR.types[ m.type ] );
+	var fit = moduleFit( WR.types[ m.type ], m );
 	return fit.h * fit.k;
 }
 
@@ -1845,18 +1846,26 @@ function drawModules( y0 )
 		row.mods.forEach(function(m, col){
 			var i = mods.indexOf( m );
 			var x = col ? (PANEL_W + DEVICE_GAP) * 0.5 : 0, w = slotW( m.def );
-			var fit = moduleFit( m.def );
+			var fit = moduleFit( m.def, m );
 			if(show_rear)
 			{
 				beginFrame( x, y, collapsed[ m.id ] ? 1 : fit.k );
-				drawRearDevice( m.id, 0, 0, collapsed[ m.id ] ? w : fit.w, fit.h, m.def.title );
+				if(m.def.drawRear && !collapsed[ m.id ]) // a device drawing its own back (the custom synths)
+				{
+					id_prefix = m.id + ".";
+					m.def.drawRear( m, fit.w, fit.h );
+					id_prefix = "";
+					collapseButton( m.id, 36, 11 );
+				}
+				else
+					drawRearDevice( m.id, 0, 0, collapsed[ m.id ] ? w : fit.w, fit.h, m.def.title );
 				endFrame();
 			}
 			else if(collapsed[ m.id ])
 			{
 				beginFrame( x, y, 1 );
 				id_prefix = m.id + ".";
-				var end = drawCollapsedBar( m.id, 0, 0, w, m.def.title, m.def.jacks );
+				var end = drawCollapsedBar( m.id, 0, 0, w, m.def.title, m.def.jacksOf ? m.def.jacksOf( m.settings ) : m.def.jacks );
 				id_prefix = "";
 				moduleButtons( m, i, mods.length, function(k){ return [ end + 22 + k * 22, DEVICE_COLLAPSED_H * 0.5 ]; } );
 				endFrame();
@@ -2018,7 +2027,10 @@ function rearSockets( id )
 {
 	var m = rack.settings.modules.find(function(m){ return m.id == id; });
 	if(m)
-		return (WR.types[ m.type ].rear_jacks || []).map(function(j){ return [ j[0], j[1], WR.jackId( id, j[2] ) ]; });
+	{
+		var def = WR.types[ m.type ];
+		return ((def.rearJacksOf ? def.rearJacksOf( m.settings ) : def.rear_jacks) || []).map(function(j){ return [ j[0], j[1], WR.jackId( id, j[2] ) ]; });
+	}
 	return WR.REAR_JACKS[id] || [];
 }
 
@@ -3131,6 +3143,7 @@ function addDevice( type )
 	setStatus( "Added " + def.title + " (" + m.id + ") at the bottom of the rack" + how );
 	// show it: scroll to the bottom
 	view.sy = 1e9;
+	if(def.onAdd) def.onAdd( m );
 	return m;
 }
 
@@ -3146,7 +3159,7 @@ function renderAddPanel()
 	var html = '<div class="add-head"><input id="add-search" type="search" placeholder="Search devices\u2026" autocomplete="off" />' +
 		'<span class="add-hint">Click a device to add it at the bottom of the rack</span></div>';
 	cats.forEach(function(c){
-		var types = WR.order.filter(function(type){ return (WR.types[ type ].category || "Synths") == c; });
+		var types = WR.order.filter(function(type){ return (WR.types[ type ].category || "Synths") == c && !WR.types[ type ].hidden; });
 		if(!types.length)
 			return;
 		html += '<div class="add-cat" data-cat="' + escHtml( c ) + '"><h3>' + escHtml( c ) + '</h3><div class="add-grid">';
@@ -3165,6 +3178,8 @@ function renderAddPanel()
 				(def.about ? '<div class="add-about">' + escHtml( def.about ) + '</div>' : '') +
 				'<div class="add-tags">' + tags.map(function(t){ return '<span>' + t + '</span>'; }).join("") + '</div></div></button>';
 		});
+		// more cards for the category (the Synth Editor's saved synths): WR.addPanelCards( category ) -> HTML
+		if(WR.addPanelCards) html += WR.addPanelCards( c );
 		html += '</div></div>';
 	});
 	$("add-panel").innerHTML = html;
@@ -3207,6 +3222,7 @@ $("add-panel").addEventListener("click", function(e){
 	var card = e.target.closest ? e.target.closest( ".add-card" ) : null;
 	if(!card)
 		return;
+	if(card.hasAttribute( "data-extra" )) { closeAddPanel(); if(WR.onAddPanelCard) WR.onAddPanelCard( card ); return; }
 	if(addDevice( card.getAttribute( "data-type" ) ))
 		closeAddPanel();
 });
@@ -3254,7 +3270,7 @@ function drawPreview()
 		canvas.width = Math.round( w * dpr );
 		canvas.height = Math.round( h * dpr );
 	}
-	var size = m.def.size( layout ), k = w / size[0];
+	var size = m.def.size( layout, m.settings ), k = w / size[0];
 	ctx.setTransform( 1, 0, 0, 1, 0, 0 );
 	ctx.fillStyle = "#ff00ff";
 	ctx.fillRect( 0, 0, canvas.width, canvas.height );

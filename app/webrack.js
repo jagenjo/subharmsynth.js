@@ -277,8 +277,12 @@ WRContext.prototype.init = function()
 	var v = "?v=" + WR.VERSION;
 	// the module DSPs register into the worklet's global scope before the rack processor is created
 	var load = Promise.resolve();
+	var loaded = {}; // two types can share a file (the custom synths: full and half width)
 	WR.order.forEach(function(type){
-		load = load.then(function(){ return ctx.audioWorklet.addModule( WR.types[type].worklet + v ); });
+		var file = WR.types[type].worklet;
+		if(loaded[ file ]) return;
+		loaded[ file ] = true;
+		load = load.then(function(){ return ctx.audioWorklet.addModule( file + v ); });
 	});
 	this._initializing = load.then(function(){ return ctx.audioWorklet.addModule( "rack-worklet.js" + v ); }).then(function(){
 		var node = that.node = new AudioWorkletNode( ctx, "webrack", {
