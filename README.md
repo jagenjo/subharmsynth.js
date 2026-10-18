@@ -1,6 +1,6 @@
 # GASFREE
 
-**GASFREE** (from GAS, Gear Acquisition Syndrome, and FREE: all the gear, none of the buying) is a browser rack of synthesizers built on the WebAudio API, inspired by classic instruments: a polyrhythmic synthesizer (Subharm), an analog percussion synthesizer (DRAM), a semi-modular synthesizer with a 32 step sequencer (Brother-32), a generative synthesizer (Maze), wave-scanning and wavetable polyphonic synthesizers (Mystic, Mount), a four-oscillator paraphonic synthesizer (Para D), an early 80s style drum machine (LLM Dram), an ambient drone machine (Lunar 21) and a note grid sequencer (Grid 32), plus a granular looper (Universe), a multi-algorithm reverb (Cosmos) and a lo-fi distortion (Hyper), with a mixer, LFOs, compressors, reverbs and delays, all patchable with each other. Every name in it is its own; it is not affiliated with any instrument maker.
+**GASFREE** (from GAS, Gear Acquisition Syndrome, and FREE: all the gear, none of the buying) is a browser rack of synthesizers built on the WebAudio API, inspired by classic instruments: a polyrhythmic synthesizer (Subharm), an analog percussion synthesizer (DRAM), a semi-modular synthesizer with a 32 step sequencer (Brother-32), a generative synthesizer (Maze), wave-scanning and wavetable polyphonic synthesizers (Mystic, Mount), a four-oscillator paraphonic synthesizer (Para D), an early 80s style drum machine (LLM Dram), an ambient drone machine (Lunar 21) and a note grid sequencer (Grid 32), plus a granular looper (Universe), a multi-algorithm reverb (Cosmos) a lo-fi distortion (Hyper) and a tape machine (Tape), with a mixer, LFOs, compressors, reverbs and delays, all patchable with each other. Every name in it is its own; it is not affiliated with any instrument maker.
 
 All synthesis runs in real time in one `AudioWorkletProcessor` (`rack-worklet.js`), which hosts each synth's DSP and copies the patch cables between them every sample. Oscillators, filters, envelopes, clocks, sequencers and the cables are all computed per sample, so patching between synths is sample-accurate. The reverb and delay are native WebAudio nodes after it.
 
@@ -35,6 +35,7 @@ The repository has three parts: the app in `app/` (open `app/index.html`), the h
 | `app/devices/delay.js`, `app/devices/delay-worklet.js` | the stereo / ping-pong delay |
 | `app/devices/universe.js`, `app/devices/universe-worklet.js` | Universe, the granular / looper effect |
 | `app/devices/hyper.js`, `app/devices/hyper-worklet.js` | Hyper, the distortion / bit crusher |
+| `app/devices/tape.js`, `app/devices/tape-worklet.js` | Tape, the tape machine (wow, flutter, saturation, hiss) |
 | `app/devices/cosmos.js`, `app/devices/cosmos-worklet.js` | Cosmos, the 12 algorithm reverb |
 | `app/devices/pollyd.js`, `app/devices/pollyd-worklet.js` | Para D, the four-voice paraphonic synthesizer |
 | `app/devices/grid.js`, `app/devices/grid-worklet.js` | Grid 32, the note matrix sequencer |
@@ -92,7 +93,7 @@ The page is a rack. From the top:
 
 1. The **AUDIO I/O** device.
 2. The **KEYS** device.
-3. The devices, in the order you choose. Synths and mixers take a full row. The half-width devices (dual LFO, compressor, reverb, delay, Universe, Hyper, Cosmos) sit side by side when two are next to each other.
+3. The devices, in the order you choose. Synths and mixers take a full row. The half-width devices (dual LFO, compressor, reverb, delay, Universe, Hyper, Tape, Cosmos) sit side by side when two are next to each other.
 
 A new rack has a Subharm, an LFO and a compressor, then a reverb and a delay, cabled as the default audio path.
 
@@ -103,11 +104,11 @@ One patch bay spans all of them: any output can be cabled to any input of any de
   - The pictures are in `app/previews/`, made by `tools/make-previews.sh` (headless Chrome and ImageMagick). It opens `app/index.html?preview=<type>`, which draws only that device, then trims and saves the picture. Run it again after changing a panel; give it device types to redo only those.
   - You can have several of the same kind (`dram`, `dram2`, …). Reverbs are limited to 8, one per send / return slot of the audio engine.
   - A new LFO, compressor, reverb or delay arrives unpatched: patch its audio on the back (Tab).
-  - A new Universe, Hyper or Cosmos goes in just before the speakers (between the last device and MAIN IN), so you hear it right away.
+  - A new Universe, Hyper, Tape or Cosmos goes in just before the speakers (between the last device and MAIN IN), so you hear it right away.
   - A synth with a MIDI IN (Subharm, Brother-32, Maze) gets the keys' MIDI through **MASTER MIDI** instead of a long cable across the rack (see *MIDI on the back*).
   - A new synth's audio goes to the first free mixer channel; with no mixer, to wherever the other synths go (or the compressor).
   - A new mixer takes over the synths that weren't on a mixer: they move onto its channels, and its MAIN L / R go where they went.
-- Each synth has three buttons on its right wood cheek: **move up**, **move down** and **remove**. A full-width device moves past a whole row: a pair of half-width devices stays together. Removing asks first and unplugs that device's cables. When an effect (compressor, reverb, delay, Universe, Hyper) or a mixer is removed, what came into it is cabled on to where it went (IN L → OUT L, IN R → OUT R, mixer channels → MAIN), so the audio keeps reaching the speakers.
+- Each synth has three buttons on its right wood cheek: **move up**, **move down** and **remove**. A full-width device moves past a whole row: a pair of half-width devices stays together. Removing asks first and unplugs that device's cables. When an effect (compressor, reverb, delay, Universe, Hyper, Tape) or a mixer is removed, what came into it is cabled on to where it went (IN L → OUT L, IN R → OUT R, mixer channels → MAIN), so the audio keeps reaching the speakers.
 - The chevron on the top left folds a synth into a slim bar like the other devices. Its jacks stay on the bar, so cables stay connected.
 - **Scale:** the rack fills the window width; more devices make it taller and it scrolls vertically.
   - Zoom **−** / **+** (toolbar) change the scale; the percentage button goes back to 100%. The zoom is remembered in the browser.
@@ -342,6 +343,22 @@ A lo-fi distortion and bit crusher (half width, stereo IN / OUT on the back), fo
 - **CV:** DRIVE (±5 V = the whole range), BITS (1 V = 3 bits fewer), RATE (1 V/oct).
 
 These settings are my reading of that sound, not a recipe from the artist. His music gets much of it from the synths and samples themselves; Hyper adds the grit and the wobble.
+
+## Tape
+
+A tape machine (half width, stereo IN / OUT on the back) for hazy, wobbly, nostalgic sound: the warm, slightly seasick pitch and faded highs of an old cassette played back on a tired deck. A cassette on the panel turns with the tape. The signal goes through, in order:
+
+- **The tape:** a delay line read at a moving point. **WOW** is a slow, uneven drift (a sine plus a wandering random, the two sides drifting a little apart); **FLUTTER** is fast. Together they bend the pitch from a few cents to seasick.
+- **SATURATE:** tape compression, a little asymmetric, then the head bump (a lift in the low end).
+- **TONE:** the tape's high cut (12 dB/oct).
+- **AGE:** dropouts: now and then the level dips and the sound darkens; an older tape is also duller overall.
+- **HISS**, then **MIX** with the dry signal, **OUTPUT** and **ON** (off: dry through).
+- **MACHINE:** CASSETTE (darker, a slow uneven wow), REEL (cleaner, a big low end, faster flutter) or VHS (warbly, brighter hiss).
+- **STOP:** hold it and the tape winds down to a halt, its pitch falling, in **STOP TIME** (0.05 to 4 s); let go and it spins up again.
+- **Starting points:** HAZY (a warm old cassette), WARPED (a tape left in the sun), VHS (a worn video tape) and STUDIO (a good reel to reel).
+- **CV:** WOW (±5 V = the whole range), TONE (1 V/oct), STOP (a gate: high holds it).
+
+Put it after a pad or a slow arpeggio, with WOW around 0.4 and TONE near 5 kHz, and add a reverb after it.
 
 ## LLM Dram
 
