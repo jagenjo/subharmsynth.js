@@ -226,6 +226,7 @@ var sched_timer = setInterval( scheduler, TICK );
 
 function start()
 {
+	if(window.gfTrack) gfTrack( "song-play", null, true );
 	act(function(){
 		var now = ctxTime() + 0.05;
 		play.t0 = now;
@@ -274,6 +275,7 @@ function wavSeconds() { return wav && rack.context ? Math.max( 0, ctxTime() - wa
 function exportWav()
 {
 	if(wav) { finishWav(); return; } // a second click: stop and save what is there
+	if(window.gfTrack) gfTrack( "export-wav" );
 	act(function(){
 		if(!rack.node || !rack.recordStart) return;
 		if(play.on) stop();
@@ -683,6 +685,7 @@ function midiFileInput()
 			return;
 		f.arrayBuffer().then(function(buf){
 			var sg = loadMidiFile( buf );
+			if(window.gfTrack) gfTrack( "midi-file", { tracks: sg.tracks.length } );
 			if(window.setStatus) setStatus( f.name + ": " + sg.tracks.length + " tracks, " + sg.bars + " bars at " + Math.round( sg.bpm ) + " BPM" );
 		}).catch(function(err){ W().alert( "Could not load " + f.name + ": " + err.message ); });
 	});
@@ -1116,6 +1119,7 @@ function detach()
 	if(pop) return;
 	var w = window.open( "", "synths_sequencer", "popup,width=" + Math.max( 900, Math.round( cv.clientWidth * 0.85 ) ) + ",height=" + Math.max( 360, view.h ) );
 	if(!w) { if(window.setStatus) setStatus( "The browser blocked the window: allow pop-ups for this page" ); return; }
+	if(window.gfTrack) gfTrack( "detach-sequencer" );
 	var links = Array.prototype.map.call( document.querySelectorAll( "link[rel=stylesheet], link[rel=preconnect]" ), function(l){ return l.outerHTML; } ).join( "" );
 	var d = w.document;
 	d.open();

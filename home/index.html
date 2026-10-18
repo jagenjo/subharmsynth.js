@@ -10,6 +10,7 @@
 <meta property="og:image" content="img/rack.jpg" />
 <link rel="icon" href="icon.svg" type="image/svg+xml" />
 <link rel="apple-touch-icon" href="icon-180.png" />
+<script src="../app/analytics.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Antonio:wght@500;700&family=Oswald:wght@500&display=swap" rel="stylesheet">
@@ -127,7 +128,7 @@
 			<a href="#devices">Devices</a>
 			<a href="#start">Start</a>
 		</nav>
-		<a class="btn small" href="../app/">Launch</a>
+		<a class="btn small" href="../app/" onclick="gfTrack('launch',{from:'header'})">Launch</a>
 	</div>
 </header>
 
@@ -138,8 +139,8 @@
 		<div class="why">All the gear, none of the <abbr title="Gear Acquisition Syndrome: the urge to buy one more synth">GAS</abbr>.</div>
 		<p class="lead">Synthesizers, drum machines, sequencers and effects that you patch together with cables. Play them from the computer keyboard or a MIDI controller, and write songs in the built-in sequencer. Nothing to install.</p>
 		<div class="cta">
-			<a class="btn" href="../app/"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>Launch the app</a>
-			<a class="btn ghost" href="#devices">See the devices</a>
+			<a class="btn" href="../app/" onclick="gfTrack('launch',{from:'hero'})"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>Launch the app</a>
+			<a class="btn ghost" href="#devices" onclick="gfTrack('see-devices')">See the devices</a>
 		</div>
 		<div class="note">Free · runs in a modern desktop browser · best with headphones or speakers</div>
 		<div class="shot" data-full="img/rack.jpg"><img src="img/rack.jpg" alt="The rack: a note grid sequencer patched into a paraphonic synthesizer, a lo-fi effect and the keyboard" /></div>
@@ -235,7 +236,7 @@
 	<div class="wrap">
 		<h2>Ready to make some noise?</h2>
 		<p>The whole studio opens in a browser tab.</p>
-		<a class="btn" href="../app/"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>Launch the app</a>
+		<a class="btn" href="../app/" onclick="gfTrack('launch',{from:'bottom'})"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>Launch the app</a>
 	</div>
 </div>
 

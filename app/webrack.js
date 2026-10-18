@@ -13,7 +13,7 @@ var WR = {
 	order: []
 };
 
-WR.VERSION = "20261018j"; // bump together with the ?v= in index.html so browsers reload the scripts
+WR.VERSION = "20261018k"; // bump together with the ?v= in index.html so browsers reload the scripts
 
 // def: {
 //   title, description,           names for menus and the panel
@@ -1230,6 +1230,7 @@ WRContext.prototype.initMIDI = function()
 	return navigator.requestMIDIAccess().then(function(access){
 		that.midi.access = access;
 		that.midi.status = "on";
+		if(window.gfTrack) gfTrack( "midi-on", { inputs: access.inputs.size }, true );
 		access.onstatechange = function(){ that.bindMIDI(); };
 		that.bindMIDI();
 		return true;

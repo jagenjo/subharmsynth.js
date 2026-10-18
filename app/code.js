@@ -174,6 +174,9 @@ var keyctl = {
 	overlay: false,    // SHIFT held: show the keys
 	rects: []          // the devices' rectangles this frame: the target is the one in the middle
 };
+// usage statistics (analytics.js); nothing when it is not configured or not there
+var gfTrack = window.gfTrack || function(){};
+
 var NOKEY = { pressed: false, held: false };
 
 // ---------------------------------------------------------------------------
@@ -402,7 +405,7 @@ function clamp(v,a,b) { return v < a ? a : (v > b ? b : v); }
 function ensureAudio()
 {
 	if(!rack.context)
-		return rack.init().then(updateToolbar, function(err){
+		return rack.init().then(function(){ gfTrack( "audio-on", null, true ); updateToolbar(); }, function(err){
 			console.error(err);
 			setStatus("Audio engine failed to start: " + err.message);
 		});
@@ -3081,12 +3084,14 @@ $("patch-select").addEventListener("change", function(e){
 		var p = factory_patches[ v.substr(2) ];
 		rack.setSettings( p.settings );
 		afterPatchLoad( p.name );
+		gfTrack( "load-patch", { patch: p.name, group: p.group || "" } );
 	}
 	else if(v.substr(0, 2) == "u:")
 	{
 		var name = v.substr(2);
 		rack.setSettings( rack.getUserPatches()[ name ] );
 		afterPatchLoad( name );
+		gfTrack( "load-patch", { patch: "(user patch)" } ); // their own names stay private
 	}
 	$("patch-delete").hidden = v.substr(0, 2) != "u:";
 	e.target.blur();
@@ -3110,6 +3115,7 @@ function addDevice( type )
 	if(!def)
 		return null;
 	var m = rack.addModule( type );
+	if(m) gfTrack( "add-device", { device: def.title } );
 	if(!m)
 	{
 		setStatus( "The rack can't hold more than " + def.max + " " + def.title + " devices" );
@@ -3305,6 +3311,7 @@ $("patch-delete").addEventListener("click", function(){
 
 $("patch-export").addEventListener("click", function(e){
 	var name = currentPatchName() || "synths-patch";
+	gfTrack( "export-patch", { to: e.shiftKey ? "clipboard" : "file" } );
 	if(e.shiftKey) // SHIFT + EXPORT: the patch on the clipboard instead of a file
 	{
 		var json = rack.exportPatch( name );
@@ -3333,6 +3340,7 @@ $("patch-file").addEventListener("change", function(e){
 		return;
 	file.text().then(function(text){
 		var name = rack.importPatch( text ) || file.name.replace(/\.json$/i, "");
+		gfTrack( "import-patch" );
 		refreshPatchList();
 		afterPatchLoad( name + " (from file, use Save as\u2026 to keep it)" );
 	}).catch(function(err){

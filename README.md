@@ -14,6 +14,7 @@ The repository has three parts: the app in `app/` (open `app/index.html`), the h
 |---|---|
 | `index.html` | sends the project's address to the home page |
 | `app/index.html` | the app: page and toolbar |
+| `app/analytics.js` | anonymous, cookie-free usage statistics (Umami), shared with the home page; off until `UMAMI_SRC` and `UMAMI_ID` are set at its top |
 | `app/webrack.js` | the rack controller: synth registry, settings and patches, audio graph, post FX, Scala parser, Web MIDI, keys |
 | `app/rack-worklet.js` | the audio processor: hosts the synths' DSP, routes the cables, runs the keys outputs, LFOs, compressor and scope |
 | `app/sequencer.js` | the song sequencer in the bottom bar: tracks, piano roll, transport, recording, scheduling |
@@ -45,6 +46,15 @@ The repository has three parts: the app in `app/` (open `app/index.html`), the h
 | `old/` | the first version of this project, as in the first commit |
 | `app/data/impulses/` | free reverb impulse responses, redistributed unaltered under their `license.txt` |
 | `app/data/scales/` | Scala `.scl` scales, plus `index.json` used by the scale picker |
+
+## Usage statistics
+
+`app/analytics.js` sends anonymous events to [Umami](https://umami.is), a privacy-friendly analytics tool: no cookies, no personal data, and browsers with Do Not Track on are not counted. It does nothing until its two settings are filled in: `UMAMI_SRC` (the tracker script of your Umami, e.g. `https://umami.example.com/script.js`) and `UMAMI_ID` (the website id from the Umami dashboard). `UMAMI_DOMAINS` can limit it to the real site, so local copies are not counted.
+
+Besides the page views of the home page and the app, it records:
+
+- **Home page:** `launch` (which button: header, hero or bottom) and `see-devices`.
+- **App:** `audio-on` (once a visit), `add-device` (the device), `load-patch` (a factory patch's name and group; user patches only as "user patch"), `export-patch` (file or clipboard), `import-patch`, `midi-on` (once, with the number of MIDI inputs), `song-play` (once a visit), `export-wav`, `midi-file` (its number of tracks) and `detach-sequencer`.
 
 ## The rack
 
