@@ -145,7 +145,7 @@
 				<label title="The first, compact layout of the Subharm"><input type="radio" name="opt-layout" value="classic" /> Classic</label>
 			</div>
 			<label title="Hide the cables and keep only their plugs on the jacks"><input type="checkbox" id="opt-wires" /> Show wires</label>
-			<label title="Off: the mouse wheel always scrolls the rack, even over a knob or a fader"><input type="checkbox" id="opt-wheel" /> Mouse wheel turns the knob under the cursor</label>
+			<label title="Off: the mouse wheel always scrolls the rack, even over a knob or a fader (Ctrl + wheel still turns it)"><input type="checkbox" id="opt-wheel" /> Mouse wheel turns the knob under the cursor</label>
 			<div class="row"><button id="opt-midilearn" title="Click a knob, fader or button, then move a MIDI controller or press a key / pad">MIDI learn</button></div>
 			<div id="opt-midimap"></div>
 		</div>
@@ -162,7 +162,7 @@
 			<p class="help-about"><a href="../home/" target="_blank">About GASFREE: the devices and screenshots</a></p>
 			<h3>Mouse</h3>
 			<ul>
-				<li><b>Knobs, sliders:</b> drag up / down (Shift: fine). Double-click: the default. The wheel over a knob turns it (Options can turn that off).</li>
+				<li><b>Knobs, sliders:</b> drag up / down (Shift: fine). Double-click: the default. The wheel over a knob turns it (Options can turn that off; Ctrl + wheel always turns it).</li>
 				<li><b>Hovering a knob</b> lights the sockets that modulate it.</li>
 				<li><b>Pads:</b> hold the button down and slide across them to play each one you pass over.</li>
 				<li><b>Cables:</b> drag from a jack to another. Drag a cable off an input to move or remove it. Double-click or right-click a jack to unplug it.</li>
@@ -193,29 +193,29 @@
 </header>
 <canvas id="panel"></canvas>
 <canvas id="seq"></canvas>
-<script src="webrack.js?v=20261018i"></script>
+<script src="webrack.js?v=20261018j"></script>
 <!-- synths: each registers itself in the rack (panel here, DSP in its -worklet.js) -->
-<script src="devices/subharm.js?v=20261018i"></script>
-<script src="devices/dram.js?v=20261018i"></script>
-<script src="devices/b32.js?v=20261018i"></script>
-<script src="devices/maze.js?v=20261018i"></script>
-<script src="devices/mystic.js?v=20261018i"></script>
-<script src="devices/llmdram.js?v=20261018i"></script>
-<script src="devices/lunar.js?v=20261018i"></script>
-<script src="devices/mixer.js?v=20261018i"></script>
-<script src="devices/lfo.js?v=20261018i"></script>
-<script src="devices/comp.js?v=20261018i"></script>
-<script src="devices/reverb.js?v=20261018i"></script>
-<script src="devices/delay.js?v=20261018i"></script>
-<script src="devices/universe.js?v=20261018i"></script>
-<script src="devices/hyper.js?v=20261018i"></script>
-<script src="devices/cosmos.js?v=20261018i"></script>
-<script src="devices/pollyd.js?v=20261018i"></script>
-<script src="devices/grid.js?v=20261018i"></script>
-<script src="devices/mount.js?v=20261018i"></script>
-<script src="devices/reroute.js?v=20261018i"></script>
-<script src="code.js?v=20261018i"></script>
-<script src="sequencer.js?v=20261018i"></script>
-<script src="sessions.js?v=20261018i"></script>
+<script src="devices/subharm.js?v=20261018j"></script>
+<script src="devices/dram.js?v=20261018j"></script>
+<script src="devices/b32.js?v=20261018j"></script>
+<script src="devices/maze.js?v=20261018j"></script>
+<script src="devices/mystic.js?v=20261018j"></script>
+<script src="devices/llmdram.js?v=20261018j"></script>
+<script src="devices/lunar.js?v=20261018j"></script>
+<script src="devices/mixer.js?v=20261018j"></script>
+<script src="devices/lfo.js?v=20261018j"></script>
+<script src="devices/comp.js?v=20261018j"></script>
+<script src="devices/reverb.js?v=20261018j"></script>
+<script src="devices/delay.js?v=20261018j"></script>
+<script src="devices/universe.js?v=20261018j"></script>
+<script src="devices/hyper.js?v=20261018j"></script>
+<script src="devices/cosmos.js?v=20261018j"></script>
+<script src="devices/pollyd.js?v=20261018j"></script>
+<script src="devices/grid.js?v=20261018j"></script>
+<script src="devices/mount.js?v=20261018j"></script>
+<script src="devices/reroute.js?v=20261018j"></script>
+<script src="code.js?v=20261018j"></script>
+<script src="sequencer.js?v=20261018j"></script>
+<script src="sessions.js?v=20261018j"></script>
 </body>
 </html>

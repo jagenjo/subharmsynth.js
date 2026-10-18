@@ -535,7 +535,7 @@ MIDI reaches the synth only through its MIDI IN jack, so the MIDI output is cabl
 - **Options** (toolbar) opens a small panel:
   - **Layout:** Hardware or Classic, for the Subharm (see below).
   - **Show wires:** off hides the patch cables and leaves only their coloured plugs on the jacks.
-  - **Mouse wheel turns the knob under the cursor:** off, the wheel always scrolls the rack, so scrolling over the panels can't move a knob or fader by accident.
+  - **Mouse wheel turns the knob under the cursor:** off, the wheel always scrolls the rack, so scrolling over the panels can't move a knob or fader by accident. Ctrl (Cmd on a Mac) + wheel still turns the knob or fader under the cursor.
   - The choices are remembered in the browser.
 - **Randomize** (toolbar) rolls a new playable sound on every synth and the LFOs. It keeps the volumes, compressor, reverb, cables and the loaded scale.
 - **Two panel layouts** for the Subharm, switched in *Options*. *Hardware* lays the controls out as a full front panel; *Classic* is the first, compact layout of this project, grouped by section. The rest of the rack follows its width.

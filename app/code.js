@@ -506,6 +506,7 @@ canvas.addEventListener("wheel", function(e){
 		ui.wheel_x += Math.sign( e.deltaX );
 	else
 		ui.wheel += Math.sign( e.deltaY );
+	ui.wheel_ctrl = e.ctrlKey || e.metaKey; // Ctrl (Cmd) + wheel turns the knob even with the option off
 	e.preventDefault();
 }, { passive: false });
 canvas.addEventListener("contextmenu", function(e){ e.preventDefault(); });
@@ -637,7 +638,7 @@ function knob( id, cx, cy, r, value, min, max, o )
 		value = fromN( clamp( ui.startN + (ui.startY - ui.y) / travel, 0, 1 ) );
 	}
 	var wheeled = false;
-	if(hover && ui.wheel && ui.active === null && wheel_knobs)
+	if(hover && ui.wheel && ui.active === null && (wheel_knobs || ui.wheel_ctrl))
 	{
 		var dn = -ui.wheel * (o.step ? o.step / (max - min) : (ui.shift ? 0.005 : 0.025));
 		value = fromN( clamp( toN(value) + dn, 0, 1 ) );
@@ -1253,7 +1254,7 @@ function fader( id, x, y, h, value, o )
 		value = clamp( ui.startN + (ui.startY - ui.y) / (h * (ui.shift ? 5 : 1)), 0, 1 );
 	}
 	var wheeled = false;
-	if(hover && ui.wheel && ui.active === null && wheel_knobs)
+	if(hover && ui.wheel && ui.active === null && (wheel_knobs || ui.wheel_ctrl))
 	{
 		value = clamp( value - ui.wheel * (ui.shift ? 0.005 : 0.02), 0, 1 );
 		ui.wheel = 0;
@@ -2806,6 +2807,7 @@ function loop()
 
 	ui.pressed = ui.released = ui.rpressed = ui.dbl = false;
 	ui.wheel = ui.wheel_x = 0;
+	ui.wheel_ctrl = false;
 	if(!ui.down && ui.active !== null)
 		ui.active = null;
 }
