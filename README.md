@@ -42,6 +42,7 @@ The repository has three parts: the app in `app/` (open `app/index.html`), the h
 | `app/devices/reverb.js`, `app/devices/reverb-worklet.js` | the convolution reverb: native nodes, bridged through a send / return slot |
 | `app/data/patches.json` | factory patches |
 | `home/` | the project's home page: features, screenshots (`home/img/`), every device, and a button to launch the app |
+| `home/img/share.jpg` | the picture shown when a link to the site is shared (1200 × 630; the home page's and the app's `og:image`, at `https://gasfree.app/img/share.jpg`) |
 | `home/logo.svg`, `home/icon.svg`, `tools/make-logo.py` | the GASFREE logo (a knob drawn as a fuel gauge, turned to F) and the mark alone (the home page's icon), and the script that draws them |
 | `old/` | the first version of this project, as in the first commit |
 | `app/data/impulses/` | free reverb impulse responses, redistributed unaltered under their `license.txt` |
