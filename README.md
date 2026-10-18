@@ -55,13 +55,14 @@ Build your own synth: design its front panel, then wire what is behind it.
 
 - **Start:** ADD DEVICE › Custom › CUSTOM SYNTH adds one and opens the editor. The ✎ button on a custom synth's left ear opens it again. It starts as an example synth (MIDI, oscillator, filter, envelope, VCA); **Empty panel** starts from scratch.
 - **The panel:** choose its width (full or half rack), height (1 to 5 units), colour, knob style and wooden sides.
-- **FRONT PANEL:** the palette shows each item as it will look (in the panel's colours and knob style): knobs (three sizes), sliders, buttons (a gate while held), switches, LEDs, jacks in and out, labels, sections, rectangles, lines and screws.
+- **FRONT PANEL:** the palette shows each item as it will look (in the panel's colours and knob style): knobs (small, medium, large, XL and huge), sliders, buttons (a gate while held), switches, LEDs, jacks in and out, labels, sections, rectangles, lines and screws.
   - Drag one onto the panel: it follows the mouse at its real size and lands where it is dropped. A click adds it in a free place.
+  - **Knobs** have their own scale: where it starts and ends (a turn from 7 to 5 o'clock, almost a full turn, a full turn, the top half, a quarter, or any angles), its lines (automatic, a number, or none), and whether the knob turns smoothly or clicks through a number of steps (2 to 64).
   - Drag an item to move it. Drag the corner of a section, rectangle, slider or button to resize it, and the ends of a line to change it.
   - Delete removes it, the arrows nudge it, and Ctrl+D duplicates it. The properties on the right set its label, size, colour and range.
 - **BACK PANEL:** what the rack shows with Tab. MAIN OUT L / R (where the AUDIO OUT module's sound leaves, cabled to the speakers when the synth is added) and MIDI IN (with its channel switches) are always there; move them where you like. Add AUDIO IN sockets (audio from the rack into the synth: it can be an effect too), AUDIO OUT sockets (more outputs), labels, rectangles, lines, vents and screws. It starts with vents and a sticker with the synth's name.
 - **Lines and rectangles** (front and back): their colour is the panel's print (normal or dim), its line colour, or a fixed one (red, orange, yellow, green, blue, white, black, cream). Rectangles can be filled and have rounded corners; lines and outlines have a width.
-- **INSIDE:** every item with an input or output is a node, in its place on the panel spread a little apart, next to the modules:
+- **INSIDE:** every item with an input or output is a node, in its place on the panel spread a little apart, next to the modules. The nodes of the panel's items show the gadget itself, live: a knob at its value, an LED lit with its input. The modules:
   - **Inputs:** MIDI IN (pitch, gate, velocity).
   - **Sources:** OSCILLATOR (sine, triangle, saw, square with pulse width), NOISE.
   - **Modulation:** LFO, ENVELOPE (ADSR), CLOCK, STEP SEQUENCER (8 steps), SAMPLE & HOLD, SLEW, QUANTIZER.

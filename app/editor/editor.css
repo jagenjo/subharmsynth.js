@@ -20,7 +20,7 @@
 .se-done { background: #2f6b3a !important; border-color: #3d8a4b !important; font-weight: 700; }
 
 .se-body { flex: 1; display: flex; min-height: 0; }
-.se-palette { width: 170px; flex: none; overflow-y: auto; background: #131312; border-right: 1px solid #2c2c2a; padding: 8px; }
+.se-palette { width: 180px; flex: none; overflow-y: auto; background: #131312; border-right: 1px solid #2c2c2a; padding: 8px; }
 .se-palette h4 { margin: 10px 0 6px; font-size: 12px; letter-spacing: 0.1em; color: #f0a43a; }
 .se-palette h4:first-child { margin-top: 0; }
 .se-pal { display: flex; align-items: center; gap: 8px; width: 100%; box-sizing: border-box; margin-bottom: 5px; padding: 4px 6px; cursor: grab; touch-action: none;
@@ -31,11 +31,15 @@
 .se-pal-mod { display: block; }
 .se-pal-mod b { font-weight: 700; }
 .se-thumb { width: 64px; height: 48px; flex: none; border-radius: 4px; }
+.se-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 8px; }
+.se-grid .se-pal { flex-direction: column; gap: 3px; margin: 0; padding: 4px 2px 5px; text-align: center; font-size: 11px; line-height: 1.1; }
+.se-grid .se-thumb { width: 72px; height: 50px; }
 .se-note { color: #8c8a84; font: 12px/1.4 system-ui, sans-serif; letter-spacing: 0; margin: 0; }
 .se-ghost { position: fixed; z-index: 60; pointer-events: none; opacity: 0.85; filter: drop-shadow(0 8px 16px rgba(0,0,0,0.6)); }
 .se-ghost-node { position: static; width: 168px; }
 .se-ghost-node .se-ports { padding: 6px 8px; color: #8c8a84; font: 11px system-ui, sans-serif; }
 .se-node.rear { background: #2a2a2e; border-color: #4a4a52; }
+.se-gadget { display: block; width: 166px; cursor: move; border-bottom: 1px solid #35505f; }
 .se-node.rear .se-head { background: #34343a; }
 
 .se-stage { flex: 1; position: relative; overflow: hidden; background: #0b0b0a radial-gradient(#1c1c1b 1px, transparent 1px) 0 0 / 20px 20px; }

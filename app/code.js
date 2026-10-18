@@ -666,7 +666,7 @@ function knob( id, cx, cy, r, value, min, max, o )
 	if(skin != "classic" && skin != "aluminium")
 	{
 		var tk = o.ticks || steps || (style == "ring" ? 11 : 31);
-		if(skin != "ledring") // the LED ring is its own scale
+		if(skin != "ledring" && !o.noScale) // the LED ring is its own scale; noScale: no printed scale
 			drawKnobScale( cx, cy, r, tk, o.bipolar, style == "small" ? "small" : style );
 		drawSkinKnob( skin, cx, cy, r, clamp( toN(value), 0, 1 ), hover || ui.active === id, o.bipolar );
 		if(o.label)

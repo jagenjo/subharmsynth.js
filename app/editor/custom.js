@@ -10,7 +10,7 @@
 
 var CAT = WR_DSP.custom.CATALOG;
 var HEIGHTS = [130, 260, 390, 520, 650];          // 1 to 5 units
-var KNOB_R = { s: 14, m: 20, l: 28 };
+var KNOB_R = { s: 14, m: 20, l: 28, xl: 40, h: 56 };
 var COLORS = {
 	dark:   { name: "Dark",   bg: "#1d1d1c", ink: "#e8e4dc", dim: "#8c8a84", section: "#262624", line: "#3a3936" },
 	black:  { name: "Black",  bg: "#0f0f0f", ink: "#f2f2ee", dim: "#8a8a86", section: "#191919", line: "#2e2e2e" },
@@ -172,9 +172,19 @@ function drawItem( it, col )
 			break;
 		case "screw": drawScrew( it.x, it.y ); break;
 		case "knob":
+			// its own scale: where it starts and ends (degrees from 12 o'clock), its lines, continuous or in steps
 			var r = knobRange( it ), dn = CAT.toN( r, r.def ), n0 = it.value === undefined ? dn : it.value;
-			var v = knob( it.id, it.x, it.y, KNOB_R[ it.size ] || 20, n0, 0, 1, { label: it.label, def: dn, style: "small", labelSize: 11, bipolar: r.min < 0 && r.max > 0,
-				format: function(n){ return (it.label ? it.label + " " : "") + CAT.fmt( r, CAT.fromN( r, n ) ); } } );
+			var steps = it.steps > 1 ? Math.round( it.steps ) : 0, keepA = [ KNOB_A0, KNOB_SWEEP ];
+			var a0 = it.start === undefined ? -135 : +it.start, a1 = it.end === undefined ? 135 : +it.end;
+			if(a1 <= a0) a1 = a0 + 10;
+			KNOB_A0 = (a0 - 90) * Math.PI / 180; KNOB_SWEEP = (a1 - a0) * Math.PI / 180;
+			if(steps) dn = Math.round( dn * (steps - 1) ) / (steps - 1);
+			try {
+				var v = knob( it.id, it.x, it.y, KNOB_R[ it.size ] || 20, n0, 0, 1, { label: it.label, def: dn, style: "small", labelSize: it.size == "h" || it.size == "xl" ? 13 : 11,
+					bipolar: r.min < 0 && r.max > 0, ticks: it.ticks > 1 ? Math.round( it.ticks ) : undefined, noScale: it.ticks === 0, step: steps ? 1 / (steps - 1) : undefined,
+					format: function(n){ return (it.label ? it.label + " " : "") + CAT.fmt( r, CAT.fromN( r, n ) ); } } );
+			}
+			finally { KNOB_A0 = keepA[0]; KNOB_SWEEP = keepA[1]; }
 			if(v !== n0) it.value = v;
 			break;
 		case "slider":
@@ -268,10 +278,10 @@ function drawRear( mod, w, h )
 }
 
 // one item alone, for the editor's palette (the rack's globals are made inert by the caller)
-function drawPreview( mod, it, back )
+function drawPreview( mod, it, back, st )
 {
-	M = mod; S = mod.settings; ST = { leds: {} };
-	ST.leds[ it.id ] = 1; // an LED lit, to be seen
+	M = mod; S = mod.settings; ST = st || { leds: {} };
+	if(!st) ST.leds[ it.id ] = 1; // an LED lit, to be seen (unless the state is given: live)
 	drawItems([ it ], back ? BACK : (COLORS[ S.color ] || COLORS.dark) );
 	M = null; S = null; ST = null;
 }

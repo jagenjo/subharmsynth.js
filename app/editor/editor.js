@@ -23,6 +23,8 @@ var FRONT_ITEMS = [
 	["knob:s", "KNOB SMALL", "", { kind: "knob", size: "s", label: "KNOB" }],
 	["knob:m", "KNOB", "", { kind: "knob", size: "m", label: "KNOB" }],
 	["knob:l", "KNOB LARGE", "", { kind: "knob", size: "l", label: "KNOB" }],
+	["knob:xl", "KNOB XL", "", { kind: "knob", size: "xl", label: "KNOB" }],
+	["knob:h", "KNOB HUGE", "", { kind: "knob", size: "h", label: "KNOB" }],
 	["slider", "SLIDER", "", { kind: "slider", h: 60, label: "SLIDER" }],
 	["button", "BUTTON", "a gate while held", { kind: "button", w: 70, h: 26, label: "BUTTON" }],
 	["toggle", "SWITCH", "on / off", { kind: "toggle", w: 70, h: 26, label: "SWITCH", on: true }],
@@ -78,19 +80,22 @@ function inert( c, fn )
 function fakeMod() { var m = mod(); return { id: m.id, type: m.type, def: def(), settings: m.settings, state: rack.module_state[ m.id ] || {}, post: function(){}, editing: true }; }
 
 // an item alone, centred in a canvas (k: its scale; 0 = fit)
-function drawSample( cv, item, back, k, bg )
+function drawSample( cv, item, back, k, bg, st )
 {
-	var dpr = window.devicePixelRatio || 1, b0 = CS.box( Object.assign( { x: 0, y: 0 }, item ) );
-	var W = cv.width / dpr, H = cv.height / dpr;
+	// the item at the origin (a line keeps its shape), then centred in the canvas
+	var dpr = window.devicePixelRatio || 1, base = Object.assign( { id: "__pv" }, item );
+	if(item.x2 !== undefined && item.x !== undefined) { base.x2 = item.x2 - item.x; base.y2 = item.y2 - item.y; }
+	base.x = 0; base.y = 0;
+	var b0 = CS.box( base ), W = cv.width / dpr, H = cv.height / dpr;
 	k = k || Math.min( (W - 8) / b0.w, (H - 8) / b0.h, 1.3 );
-	var it = Object.assign( { id: "__pv" }, item );
+	var it = Object.assign( {}, base );
 	it.x = (W / k - b0.w) / 2 - b0.x; it.y = (H / k - b0.h) / 2 - b0.y;
-	if(it.kind == "line") { it.x2 = it.x + (item.x2 || 0); it.y2 = it.y + (item.y2 || 0); }
+	if(it.kind == "line") { it.x2 = it.x + (base.x2 || 0); it.y2 = it.y + (base.y2 || 0); }
 	var c = cv.getContext( "2d" );
 	c.setTransform( 1, 0, 0, 1, 0, 0 ); c.clearRect( 0, 0, cv.width, cv.height );
 	if(bg) { c.fillStyle = bg; c.fillRect( 0, 0, cv.width, cv.height ); }
 	c.setTransform( dpr * k, 0, 0, dpr * k, 0, 0 );
-	inert( c, function(){ CS.drawPreview( fakeMod(), it, back ); } );
+	inert( c, function(){ CS.drawPreview( fakeMod(), it, back, st ); } );
 	return it;
 }
 
@@ -217,11 +222,12 @@ function renderPalette()
 	var h = "";
 	if(ed.view != "inside")
 	{
-		h += "<h4>" + (ed.view == "back" ? "BACK PANEL" : "FRONT PANEL") + "</h4>";
+		h += "<h4>" + (ed.view == "back" ? "BACK PANEL" : "FRONT PANEL") + '</h4><div class="se-grid">';
 		(ed.view == "back" ? BACK_ITEMS : FRONT_ITEMS).forEach(function(it, i){
-			h += '<div class="se-pal se-pal-item" data-add="' + it[0] + '" data-i="' + i + '" title="' + esc( it[1] + (it[2] ? ": " + it[2] : "") ) + '">' +
-				'<canvas class="se-thumb"></canvas><span>' + it[1] + (it[2] ? '<small>' + it[2] + '</small>' : '') + '</span></div>';
+			h += '<div class="se-pal se-pal-item" data-add="' + it[0] + '" data-i="' + i + '" title="' + esc( it[1] + (it[2] ? ": " + it[2] : "") + " (drag it onto the panel, or click)" ) + '">' +
+				'<canvas class="se-thumb"></canvas><span>' + it[1] + '</span></div>';
 		});
+		h += '</div><p class="se-note">Drag an item onto the panel, or click it to add it in a free place.</p>';
 	}
 	else
 	{
@@ -239,7 +245,7 @@ function renderPalette()
 	var bg = back ? CS.BACK.bg : (CS.COLORS[ s.color ] || CS.COLORS.dark).bg;
 	el.palette.querySelectorAll( ".se-pal-item" ).forEach(function(p){
 		var list = back ? BACK_ITEMS : FRONT_ITEMS, item = list[ +p.getAttribute( "data-i" ) ][3], cv = p.querySelector( "canvas" );
-		cv.width = 64 * dpr; cv.height = 48 * dpr;
+		cv.width = 72 * dpr; cv.height = 50 * dpr;
 		drawSample( cv, item, back, 0, bg );
 	});
 }
@@ -414,7 +420,7 @@ function loop()
 	if(el.root.hidden) return;
 	if(!mod()) { close(); return; } // the device was removed
 	if(ed.view != "inside") renderPanel();
-	else if(ed.leds) updateInsideLeds();
+	else if((ed.frame = (ed.frame || 0) + 1) % 2 == 0) drawGadgets(); // live: values, LEDs
 }
 
 function renderPanel()
@@ -570,7 +576,7 @@ function renderInside()
 {
 	var s = S();
 	el.nodes.innerHTML = "";
-	ed.ports = {}; ed.leds = [];
+	ed.ports = {}; ed.gadgets = [];
 	portItems().concat( s.nodes ).forEach(function(x){
 		var sp = CAT.specOf( x.kind ), isCtl = !CAT.MODULES[ x.kind ], p = innerPos( x );
 		var n = $e( "div", "se-node" + (isCtl ? " ctl" : "") + (isBackItem( x ) ? " rear" : "") );
@@ -579,6 +585,16 @@ function renderInside()
 		var head = $e( "div", "se-head", esc( sp.title ) + (isCtl && nameOf( x ) != sp.title ? '<small>' + esc( nameOf( x ) ) + '</small>' : '') );
 		head.setAttribute( "data-drag", x.id );
 		n.appendChild( head );
+		// the gadget itself, live: the knob at its value, the LED lit with its input...
+		if(isCtl)
+		{
+			var b = CS.box( x ), cv = $e( "canvas", "se-gadget" ), dpr = window.devicePixelRatio || 1;
+			var gh = Math.round( Math.max( 34, Math.min( 110, b.h * 0.8 ) ) );
+			cv.width = 166 * dpr; cv.height = gh * dpr; cv.style.height = gh + "px";
+			cv.setAttribute( "data-drag", x.id ); // dragging it moves the node
+			n.appendChild( cv );
+			ed.gadgets.push({ cv: cv, x: x });
+		}
 		var ports = $e( "div", "se-ports" ), ci = $e( "div", "se-col in" ), co = $e( "div", "se-col out" );
 		sp.ins.forEach(function(inp){
 			var w = wiredInto( x.id, inp[0] ), row = $e( "div", "se-row" ), dot = $e( "span", "se-port in" + (w ? " on" : "") );
@@ -600,12 +616,23 @@ function renderInside()
 		});
 		ports.appendChild( ci ); ports.appendChild( co );
 		n.appendChild( ports );
-		if(x.kind == "led") ed.leds.push({ id: x.id, el: head });
 		el.nodes.appendChild( n );
 	});
 	markSelection();
 	applyWorld();
+	drawGadgets();
 	drawWires();
+}
+
+// the gadgets in the nodes, in the panel's colours, with the synth's live state (its LEDs)
+function drawGadgets()
+{
+	if(!ed.gadgets || !ed.gadgets.length) return;
+	var st = rack.module_state[ ed.mid ] || {}, s = S();
+	ed.gadgets.forEach(function(g){
+		var back = isBackItem( g.x ), bg = back ? CS.BACK.bg : (CS.COLORS[ s.color ] || CS.COLORS.dark).bg;
+		drawSample( g.cv, g.x, back, 0, bg, st );
+	});
 }
 
 function constOf( x, inp ) { var c = x.consts && x.consts[ inp[0] ]; return c !== undefined ? c : inp[4]; }
@@ -648,11 +675,6 @@ function markSelection()
 	el.nodes.querySelectorAll( ".se-node" ).forEach(function(n){ n.classList.toggle( "sel", !!ed.sel && ed.sel.type != "wire" && ed.sel.id == n.getAttribute( "data-id" ) ); });
 }
 
-function updateInsideLeds()
-{
-	var st = rack.module_state[ ed.mid ] || {}, leds = st.leds || {};
-	ed.leds.forEach(function(l){ var v = leds[ l.id ] || 0; l.el.style.boxShadow = v > 0.05 ? "inset 0 0 0 999px rgba(255,59,47," + (0.15 + v * 0.5) + ")" : ""; });
-}
 
 function insideCenter()
 {
@@ -819,8 +841,9 @@ function renderProps()
 		switch(x.kind)
 		{
 			case "knob":
-				p.appendChild( field( "Size", selIn( x.size, [["s", "Small"], ["m", "Medium"], ["l", "Large"]], function(v){ x.size = v; } ) ) );
+				p.appendChild( field( "Size", selIn( x.size, [["s", "Small"], ["m", "Medium"], ["l", "Large"], ["xl", "XL"], ["h", "Huge"]], function(v){ x.size = v; } ) ) );
 				rangeFields( p, x );
+				scaleFields( p, x );
 				break;
 			case "slider":
 				p.appendChild( field( "Length", numIn( x.h || 120, function(v){ x.h = Math.max( 40, v ); }, 40, 600 ) ) );
@@ -906,6 +929,27 @@ function renderProps()
 	var b = $e( "div", "se-btns" );
 	if(x.kind != "out" && !sp.fixed) { b.appendChild( btn( "Duplicate", function(){ duplicate( x.id ); } ) ); b.appendChild( btn( "Delete", function(){ remove( sel ); }, "se-danger" ) ); }
 	p.appendChild( b );
+}
+
+// a knob's scale: where it starts and ends, its lines, continuous or in steps
+function scaleFields( p, x )
+{
+	p.appendChild( $e( "h4", "", "SCALE" ) );
+	var presets = [["std", "Standard (7 to 5 o'clock)", -135, 135], ["wide", "Wide (almost a full turn)", -165, 165], ["full", "Full turn", -180, 180],
+		["top", "Top half (9 to 3 o'clock)", -90, 90], ["right", "Right quarter", 0, 90], ["left", "Left quarter", -90, 0]];
+	var a0 = x.start === undefined ? -135 : x.start, a1 = x.end === undefined ? 135 : x.end;
+	var cur = presets.find(function(q){ return q[2] == a0 && q[3] == a1; });
+	p.appendChild( field( "Turn", selIn( cur ? cur[0] : "custom", presets.map(function(q){ return [ q[0], q[1] ]; }).concat( cur ? [] : [["custom", "Custom"]] ), function(v){
+		var q = presets.find(function(q){ return q[0] == v; }); if(q) { x.start = q[2]; x.end = q[3]; renderProps(); } } ) ) );
+	p.appendChild( field( "Starts at (degrees from 12 o'clock, -180..180)", numIn( a0, function(v){ x.start = Math.max( -180, Math.min( 179, v ) ); renderProps(); }, -180, 179 ) ) );
+	p.appendChild( field( "Ends at", numIn( a1, function(v){ x.end = Math.max( -179, Math.min( 180, v ) ); renderProps(); }, -179, 180 ) ) );
+	var cont = !(x.steps > 1);
+	p.appendChild( check( "Continuous (off: it clicks through steps)", cont, function(v){ if(v) delete x.steps; else x.steps = 5; renderProps(); } ) );
+	if(!cont) p.appendChild( field( "Steps (positions)", numIn( x.steps, function(v){ x.steps = Math.max( 2, Math.min( 64, Math.round( v ) ) ); renderProps(); }, 2, 64 ) ) );
+	var auto = x.ticks === undefined;
+	p.appendChild( check( "Scale lines: automatic", auto, function(v){ if(v) delete x.ticks; else x.ticks = cont ? 11 : x.steps; renderProps(); } ) );
+	if(!auto) p.appendChild( field( "Lines (0: none)", numIn( x.ticks, function(v){ x.ticks = Math.max( 0, Math.min( 101, Math.round( v ) ) ); }, 0, 101 ) ) );
+	else p.appendChild( $e( "p", "", cont ? "Automatic: 31 fine lines." : "Automatic: a line for each step." ) );
 }
 
 // a knob's or slider's range: automatic (its first wire's input), or its own
