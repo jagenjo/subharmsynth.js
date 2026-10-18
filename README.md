@@ -14,6 +14,7 @@ The repository has three parts: the app in `app/` (open `app/index.html`), the h
 |---|---|
 | `index.html` | sends the project's address to the home page |
 | `app/index.html` | the app: page and toolbar |
+| `app/editor/` | the Synth Editor and the custom synths, apart from the other devices: `custom-worklet.js` (the module catalog and the engine that plays a design), `custom.js` (the device: its panel in the rack), `editor.js` and `editor.css` (the editor) |
 | `app/analytics.js` | anonymous, cookie-free usage statistics (Umami), shared with the home page; off until `UMAMI_SRC` and `UMAMI_ID` are set at its top |
 | `app/webrack.js` | the rack controller: synth registry, settings and patches, audio graph, post FX, Scala parser, Web MIDI, keys |
 | `app/rack-worklet.js` | the audio processor: hosts the synths' DSP, routes the cables, runs the keys outputs, LFOs, compressor and scope |
@@ -47,6 +48,30 @@ The repository has three parts: the app in `app/` (open `app/index.html`), the h
 | `old/` | the first version of this project, as in the first commit |
 | `app/data/impulses/` | free reverb impulse responses, redistributed unaltered under their `license.txt` |
 | `app/data/scales/` | Scala `.scl` scales, plus `index.json` used by the scale picker |
+
+## Synth Editor
+
+Build your own synth: design its front panel, then wire what is behind it.
+
+- **Start:** ADD DEVICE › Custom › CUSTOM SYNTH adds one and opens the editor. The ✎ button on a custom synth's left ear opens it again. It starts as an example synth (MIDI, oscillator, filter, envelope, VCA); **Empty panel** starts from scratch.
+- **The panel:** choose its width (full or half rack), height (1 to 5 units), colour, knob style and wooden sides.
+- **FRONT PANEL:** drag items from the palette onto the panel, or click them: knobs (three sizes), sliders, buttons (a gate while held), switches, LEDs, jacks in and out, labels, sections and screws.
+  - Drag an item to move it. Drag the corner of a section, slider or button to resize it.
+  - Delete removes it, the arrows nudge it, and Ctrl+D duplicates it. The properties on the right set its label, size, colour and range.
+- **INSIDE:** every item with an input or output is a node, in its place on the panel spread a little apart, next to the modules:
+  - **Inputs:** MIDI IN (pitch, gate, velocity).
+  - **Sources:** OSCILLATOR (sine, triangle, saw, square with pulse width), NOISE.
+  - **Modulation:** LFO, ENVELOPE (ADSR), CLOCK, STEP SEQUENCER (8 steps), SAMPLE & HOLD, SLEW, QUANTIZER.
+  - **Processors:** FILTER (low, band and high pass), VCA, MIXER, DRIVE, DELAY.
+  - **Utilities:** MATH (A × B + C).
+  - **Outputs:** AUDIO OUT, to the rack's audio.
+- **Wiring:** drag from an output (right side) to an input (left side). An input takes one wire; drag a wired input to move its wire or drop it to remove it. Double-click a wire to remove it. Drag the background to pan; the wheel zooms.
+  - An input with no wire uses its own value, set in the properties of the selected module.
+  - A knob or slider takes the range of the first input it is wired to (CUTOFF, ATTACK...), starting at that input's default. Untick *Automatic range* to set your own.
+- **Signals:** audio is −1..1, gates 0 or 1, envelopes 0..1, pitch in octaves from C4. Jacks convert to the rack's volts: CV and audio ±5 V, pitch 1 V/oct, gates 5 V. Up to 8 jacks in and 8 out.
+- **It plays while you build it:** the design is the device's settings, so changes are heard at once (play the keys). It is saved with the rack, its patches and sessions. MIDI learn and CV tracks work on its knobs, and the computer keyboard presses its buttons.
+- **My synths:** *Save to My synths* keeps the design in this browser. ADD DEVICE › Custom adds it again, and the editor can load it into another custom synth or delete it.
+- **Not yet:** polyphony (a custom synth plays one voice), undo, and sharing designs as files (they can be shared inside exported patches).
 
 ## Usage statistics
 
