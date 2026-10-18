@@ -32,6 +32,7 @@ Needs a browser with AudioWorklet support, served over `https://` or `localhost`
 | `devices/hyper.js`, `devices/hyper-worklet.js` | Hyper, the distortion / bit crusher |
 | `devices/cosmos.js`, `devices/cosmos-worklet.js` | Cosmos, the 12 algorithm reverb |
 | `devices/pollyd.js`, `devices/pollyd-worklet.js` | Polly D, the four-voice Minimoog |
+| `devices/grid.js`, `devices/grid-worklet.js` | Grid 32, the note matrix sequencer |
 | `devices/reroute.js`, `devices/reroute-worklet.js` | Reroute, front to back and back again |
 | `devices/reverb.js`, `devices/reverb-worklet.js` | the convolution reverb: native nodes, bridged through a send / return slot |
 | `data/patches.json` | factory patches |
@@ -111,6 +112,22 @@ A 6 channel line mixer in the same panel style as the synths. Insert it from *Ad
 - **Front:** LEVEL CV 1–6 inputs act as a VCA on each channel (5 V = the fader's level), and a MIX output carries the mono mix at ±5 V, e.g. for the scope.
 - **Back:** IN 1–6, AUX SEND, AUX RET L / R, MAIN L / R.
 - **Reverb on an aux:** patch AUX SEND → REVERB IN L, REVERB OUT L / R → AUX RET L / R, and turn the reverb's **DRY** button off so it returns only the effect. The delay has the same DRY button. The *Mixer & Aux Reverb* factory patch is set up this way.
+
+## Grid 32
+
+A pattern sequencer on a 32 × 32 LED matrix, half a rack wide like the effects. Each column is a step and each row a note of the scale, the lowest at the bottom.
+
+- **Drawing:** click a cell to light it, and drag to paint a line of them. A drag that starts on a lit cell clears instead. The rows of the scale's root are marked and named, and the playing step glows.
+- **Notes:** SCALE (chromatic, major, minor, the modes, pentatonics, blues, harmonic minor, whole tone), ROOT and OCTAVE (the bottom row's note; OCTAVE 0 is C4).
+- **Timing:** TEMPO (or **SYNC**: the rack's tempo), LENGTH (1–32 steps, a red line on the screen), DIVISION (1/4 to 1/32, and triplets), GATE, SWING.
+- **Playing:** CHANCE drops notes at random. **TIE** makes cells side by side in a row one held note. DIRECTION plays forward, backward, ping-pong or at random.
+- **Patterns:** A–H (a dot marks the ones with notes). The tools CLEAR, RANDOM, COPY / PASTE (between patterns and GRIDs) and ◀ ▶ ▼ ▲ move the pattern in time or pitch.
+- **Outputs:**
+  - **KEY / GATE**: the lowest note of each step (1 V/oct, 0 V = C4).
+  - **KEY 2 / GATE 2**: the highest note.
+  - **TRIG** on every new note, **CLOCK OUT** on every step, **EOC** at the start of each cycle.
+- **Inputs:** CLOCK IN (a step a pulse), RESET, TRANSPOSE (1 V/oct) and RUN (plays while the gate is high). On the back, MIDI IN: it follows MIDI clock (start and stop too), and with **KBD** the keys transpose it (C4: as written).
+- **MIDI:** with it on (CH 1–16: click again for the next channel, Shift+click turns it off), the notes also go into the rack's MIDI on that channel, as the keys device's would. Every note of a step plays, so the polyphonic synths (MYSTIC, POLLY D) play its chords.
 
 ## Polly D
 
