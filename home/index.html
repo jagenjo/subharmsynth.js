@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>SYNTHS · a rack of synthesizers in the browser</title>
+<meta name="description" content="SYNTHS: a rack of synthesizers, drum machines and effects that runs in the browser. Patch cables, a song sequencer, MIDI, and nothing to install." />
+<meta property="og:title" content="SYNTHS" />
+<meta property="og:description" content="A rack of synthesizers, drum machines and effects in the browser." />
+<meta property="og:image" content="img/rack.jpg" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@500;700&family=Oswald:wght@500&display=swap" rel="stylesheet">
+<style>
+	:root {
+		--bg: #0d0d0c; --card: #1b1b1a; --line: #2c2c2a;
+		--ink: #ece8df; --dim: #9c988f; --accent: #e2574c; --accent2: #f0a43a; --green: #b6f06a;
+		--head: Antonio, Oswald, "Arial Narrow", sans-serif;
+		--body: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+		color-scheme: dark;
+	}
+	* { box-sizing: border-box; }
+	html { scroll-behavior: smooth; }
+	body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 var(--body); }
+	a { color: inherit; }
+	img { max-width: 100%; display: block; }
+	[hidden] { display: none !important; }
+	.wrap { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+	h1, h2, h3, h4 { font-family: var(--head); font-weight: 700; letter-spacing: 0.04em; line-height: 1.1; margin: 0; }
+
+	/* header */
+	header.top { position: sticky; top: 0; z-index: 10; background: rgba(13,13,12,0.88); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); padding-top: env(safe-area-inset-top, 0px); }
+	header.top .wrap { display: flex; align-items: center; gap: 24px; height: 56px; }
+	.logo { font: 700 22px var(--head); letter-spacing: 0.12em; text-decoration: none; }
+	.logo span { color: var(--accent); }
+	nav { display: flex; gap: 20px; margin-left: auto; font: 500 15px var(--head); letter-spacing: 0.08em; text-transform: uppercase; }
+	nav a { text-decoration: none; color: var(--dim); }
+	nav a:hover { color: var(--ink); }
+	.btn { display: inline-flex; align-items: center; gap: 10px; padding: 14px 28px; border-radius: 6px; background: var(--accent); color: #fff; text-decoration: none;
+		font: 700 20px var(--head); letter-spacing: 0.1em; text-transform: uppercase; box-shadow: 0 6px 24px rgba(226,87,76,0.35); transition: transform .15s, box-shadow .15s, background .15s; }
+	.btn:hover { background: #ee6559; transform: translateY(-1px); box-shadow: 0 10px 30px rgba(226,87,76,0.45); }
+	.btn.small { padding: 8px 16px; font-size: 15px; box-shadow: none; }
+	.btn.ghost { background: transparent; border: 1px solid #45443f; color: var(--ink); box-shadow: none; }
+	.btn.ghost:hover { border-color: var(--ink); background: transparent; }
+	.btn svg { width: 18px; height: 18px; }
+
+	/* hero */
+	.hero { padding: 72px 0 40px; text-align: center; background: radial-gradient(1200px 500px at 50% -10%, rgba(226,87,76,0.16), transparent 70%); }
+	.hero h1 { font-size: clamp(56px, 11vw, 120px); letter-spacing: 0.14em; }
+	.hero h1 span { color: var(--accent); }
+	.hero .sub { font: 500 clamp(20px, 3vw, 28px) var(--head); letter-spacing: 0.06em; margin: 14px 0 10px; }
+	.hero p.lead { color: var(--dim); max-width: 680px; margin: 0 auto 32px; font-size: 18px; }
+	.hero .cta { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+	.hero .note { color: var(--dim); font-size: 13px; margin-top: 14px; }
+	.shot { margin: 48px auto 0; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); box-shadow: 0 30px 80px rgba(0,0,0,0.6); cursor: zoom-in; }
+	.shot img { width: 100%; }
+
+	section { padding: 72px 0; border-top: 1px solid var(--line); }
+	section h2 { font-size: clamp(32px, 5vw, 48px); margin-bottom: 12px; }
+	section p.intro { color: var(--dim); max-width: 720px; margin: 0 0 36px; font-size: 17px; }
+
+	/* features */
+	.feats { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 18px; }
+	.feat { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 22px; }
+	.feat h3 { font-size: 22px; margin-bottom: 8px; display: flex; align-items: center; gap: 10px; }
+	.feat h3 i { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent); flex: none; }
+	.feat:nth-child(3n+2) h3 i { background: var(--accent2); box-shadow: 0 0 10px var(--accent2); }
+	.feat:nth-child(3n) h3 i { background: var(--green); box-shadow: 0 0 10px var(--green); }
+	.feat p { margin: 0; color: var(--dim); font-size: 15px; }
+
+	/* screenshots */
+	.shots { display: grid; grid-template-columns: repeat(2, 1fr); gap: 22px; }
+	.shots figure { margin: 0; background: var(--card); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+	.shots figure img { cursor: zoom-in; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; object-position: top; }
+	.shots figcaption { padding: 14px 18px 18px; color: var(--dim); font-size: 15px; }
+	.shots figcaption b { display: block; color: var(--ink); font: 700 19px var(--head); letter-spacing: 0.05em; margin-bottom: 4px; }
+
+	/* devices */
+	h3.cat { font-size: 24px; color: var(--accent2); margin: 36px 0 16px; letter-spacing: 0.08em; text-transform: uppercase; }
+	h3.cat:first-of-type { margin-top: 0; }
+	.devs { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 18px; }
+	.dev { background: var(--card); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
+	.dev img { width: 100%; aspect-ratio: 16 / 7; object-fit: cover; object-position: center; background: #000; }
+	.dev-body { padding: 14px 18px 18px; }
+	.dev h4 { font-size: 22px; margin-bottom: 6px; }
+	.dev p { margin: 0; color: var(--dim); font-size: 14.5px; }
+	.tag { display: inline-block; margin-top: 10px; font: 500 12px var(--head); letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim); border: 1px solid #3a3a37; border-radius: 3px; padding: 1px 7px; }
+
+	/* getting started */
+	.steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; counter-reset: s; }
+	.step { position: relative; padding: 22px 22px 22px 70px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; color: var(--dim); font-size: 15px; }
+	.step::before { counter-increment: s; content: counter(s); position: absolute; left: 22px; top: 16px; font: 700 34px var(--head); color: var(--accent); }
+	.step b { color: var(--ink); display: block; font: 700 19px var(--head); letter-spacing: 0.05em; margin-bottom: 4px; }
+
+	.final { text-align: center; padding: 88px 0; border-top: 1px solid var(--line); background: radial-gradient(900px 400px at 50% 120%, rgba(226,87,76,0.18), transparent 70%); }
+	.final h2 { font-size: clamp(32px, 5vw, 48px); margin-bottom: 18px; }
+	.final p { color: var(--dim); margin: 0 auto 30px; max-width: 560px; }
+
+	footer { border-top: 1px solid var(--line); padding: 28px 0 calc(28px + env(safe-area-inset-bottom, 0px)); color: #77746d; font-size: 13px; }
+	footer .wrap { display: flex; gap: 18px; justify-content: space-between; flex-wrap: wrap; }
+
+	/* full size screenshots */
+	#viewer { position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,0.92); display: flex; align-items: center; justify-content: center; padding: 20px; cursor: zoom-out; }
+	#viewer img { max-height: 92vh; border-radius: 6px; box-shadow: 0 20px 60px rgba(0,0,0,0.8); }
+
+	@media (max-width: 760px) {
+		nav { display: none; }
+		header.top .wrap { justify-content: space-between; }
+		.shots { grid-template-columns: 1fr; }
+		.devs { grid-template-columns: 1fr; }
+		.hero { padding-top: 48px; }
+		section { padding: 52px 0; }
+	}
+</style>
+</head>
+<body>
+<header class="top">
+	<div class="wrap">
+		<a class="logo" href="#">SYNTH<span>S</span></a>
+		<nav>
+			<a href="#features">Features</a>
+			<a href="#screenshots">Screenshots</a>
+			<a href="#devices">Devices</a>
+			<a href="#start">Start</a>
+		</nav>
+		<a class="btn small" href="../">Launch</a>
+	</div>
+</header>
+
+<div class="hero">
+	<div class="wrap">
+		<h1>SYNTH<span>S</span></h1>
+		<div class="sub">A rack of synthesizers in your browser</div>
+		<p class="lead">Synthesizers, drum machines, sequencers and effects that you patch together with cables. Play them from the computer keyboard or a MIDI controller, and write songs in the built-in sequencer. Nothing to install.</p>
+		<div class="cta">
+			<a class="btn" href="../"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>Launch the app</a>
+			<a class="btn ghost" href="#devices">See the devices</a>
+		</div>
+		<div class="note">Free · runs in a modern desktop browser · best with headphones or speakers</div>
+		<div class="shot" data-full="img/rack.jpg"><img src="img/rack.jpg" alt="The rack: a note grid sequencer patched into a paraphonic synthesizer, a lo-fi effect and the keyboard" /></div>
+	</div>
+</div>
+
+<section id="features">
+	<div class="wrap">
+		<h2>What's inside</h2>
+		<p class="intro">Every sound is made live, sample by sample, in one audio engine, so the cables between devices behave like real patch cables: audio, control voltages, gates and clocks can go anywhere.</p>
+		<div class="feats">
+			<div class="feat"><h3><i></i>Patch anything</h3><p>Drag cables from any output to any input on the front, and route the audio on the back of the rack (Tab turns it around).</p></div>
+			<div class="feat"><h3><i></i>19 devices</h3><p>Synths with up to 8 voices, drum machines, a drone machine, a note grid, LFOs, a mixer, a compressor and five effects. Add as many as you like.</p></div>
+			<div class="feat"><h3><i></i>Song sequencer</h3><p>Tracks on MIDI channels, a piano roll with selection and editing, recording, loops, MIDI file import, and export of the song as a WAV file.</p></div>
+			<div class="feat"><h3><i></i>Automation</h3><p>Turn any knob while recording and it is written into a CV track, played back with the song and editable as a curve.</p></div>
+			<div class="feat"><h3><i></i>MIDI and keyboard</h3><p>Play from a MIDI controller or the computer keyboard, map controllers to knobs with MIDI learn, and sync to MIDI clock.</p></div>
+			<div class="feat"><h3><i></i>Sessions and patches</h3><p>Dozens of factory patches, your own patches and sessions saved in the browser, and export or import as files.</p></div>
+			<div class="feat"><h3><i></i>Over 5000 tunings</h3><p>Retune the whole rack to historical, just and microtonal scales from a large archive of tunings.</p></div>
+			<div class="feat"><h3><i></i>Detachable sequencer</h3><p>Move the sequencer into a window of its own, on a second screen, and it comes back when you close it.</p></div>
+			<div class="feat"><h3><i></i>Made for the hands</h3><p>Every button can be pressed from the computer keyboard; hold Shift to see which key does what.</p></div>
+		</div>
+	</div>
+</section>
+
+<section id="screenshots">
+	<div class="wrap">
+		<h2>Screenshots</h2>
+		<p class="intro">Click a picture to see it full size.</p>
+		<div class="shots">
+			<figure><img src="img/patch.jpg" data-full="img/patch.jpg" alt="Two synthesizers patched together" loading="lazy" /><figcaption><b>Patch cables</b>A polyrhythmic synthesizer clocking and modulating a percussion synthesizer.</figcaption></figure>
+			<figure><img src="img/seq.jpg" data-full="img/seq.jpg" alt="The song sequencer under a polyphonic synthesizer" loading="lazy" /><figcaption><b>Song sequencer</b>Tracks, a piano roll, and CV tracks that move the knobs over the song.</figcaption></figure>
+			<figure><img src="img/rear.jpg" data-full="img/rear.jpg" alt="The back of the rack with audio cables" loading="lazy" /><figcaption><b>The back of the rack</b>Audio routing between synths, effects and the mixer.</figcaption></figure>
+			<figure><img src="img/add.jpg" data-full="img/add.jpg" alt="The add device panel" loading="lazy" /><figcaption><b>Add device</b>Pick from every instrument, effect and utility, each with its picture.</figcaption></figure>
+		</div>
+	</div>
+</section>
+
+<section id="devices">
+	<div class="wrap">
+		<h2>The devices</h2>
+		<p class="intro">Original instruments inspired by classic designs, each with its own panel, sound engine and patch sockets.</p>
+		<h3 class="cat">Synthesizers and drum machines</h3>
+		<div class="devs">
+				<article class="dev"><img src="../previews/subharm.jpg" alt="SUBHARM panel" loading="lazy" /><div class="dev-body"><h4>SUBHARM</h4><p>A polyrhythmic synthesizer: 2 VCOs with 4 subharmonics, 2 four-step sequencers and 4 polyrhythmic clock dividers. Polyrhythms that lock together.</p></div></article>
+				<article class="dev"><img src="../previews/dram.jpg" alt="DRAM panel" loading="lazy" /><div class="dev-body"><h4>DRAM</h4><p>An 8-step analog percussion voice, 2 VCOs, noise, a ladder filter and decays per step. Kicks, toms, clanks.</p></div></article>
+				<article class="dev"><img src="../previews/brother32.jpg" alt="BROTHER-32 panel" loading="lazy" /><div class="dev-body"><h4>BROTHER-32</h4><p>A mono semi-modular synth with a 32-step sequencer, ladder filter, envelope and a compact keyboard.</p></div></article>
+				<article class="dev"><img src="../previews/maze.jpg" alt="MAZE panel" loading="lazy" /><div class="dev-body"><h4>MAZE</h4><p>Two parallel bit-shift sequencers, two VCOs, a wavefolder and a state-variable filter. Generative patterns.</p></div></article>
+				<article class="dev"><img src="../previews/mystic.jpg" alt="MYSTIC panel" loading="lazy" /><div class="dev-body"><h4>MYSTIC</h4><p>8 voices, wave-scanning oscillators with mutants, two filters, three envelopes, an arpeggiator. Edit pages around an OLED.</p></div></article>
+				<article class="dev"><img src="../previews/llmdram.jpg" alt="LLM DRAM panel" loading="lazy" /><div class="dev-body"><h4>LLM DRAM</h4><p>An early 80s style drum machine: 24 gritty 8/12-bit sounds on 16 pads, a mixer, tuning, wave designer, filter and a 64-step sequencer.</p></div></article>
+				<article class="dev"><img src="../previews/lunar.jpg" alt="LUNAR 21 panel" loading="lazy" /><div class="dev-body"><h4>LUNAR 21</h4><p>An ambient drone machine: six drone voices, two VCOs on touch plates, aggressive resonant filters and a dual effector with cartridges. Ambient machine.</p></div></article>
+				<article class="dev"><img src="../previews/pollyd.jpg" alt="PARA D panel" loading="lazy" /><div class="dev-body"><h4>PARA D</h4><p>A classic analog monosynth design with four oscillators, played mono, in unison or as four voices through the ladder filter, with a stereo chorus, a distortion, an arpeggiator and a 32-step sequencer.</p></div></article>
+				<article class="dev"><img src="../previews/mount.jpg" alt="MOUNT panel" loading="lazy" /><div class="dev-body"><h4>MOUNT</h4><p>8 voices of 3 oscillators (with wavetables), a multimode filter, three envelopes, two LFOs, a mod matrix with ANIMATE buttons, an arpeggiator, and distortion, chorus, delay and reverb.</p></div></article>
+		</div>
+		<h3 class="cat">Sequencing and modulation</h3>
+		<div class="devs">
+				<article class="dev"><img src="../previews/grid.jpg" alt="GRID 32 panel" loading="lazy" /><div class="dev-body"><h4>GRID 32</h4><p>Draw notes on a 32 x 32 LED matrix: columns are steps, rows the notes of a scale. Two KEY / GATE pairs (lowest and highest note), ties, chance, swing, directions, 8 patterns, and MIDI to play the rack&#x27;s synths.</p><span class="tag">Half width</span></div></article>
+				<article class="dev"><img src="../previews/lfo.jpg" alt="DUAL LFO panel" loading="lazy" /><div class="dev-body"><h4>DUAL LFO</h4><p>Two LFOs (sine, triangle, saw, ramp, square, S&amp;H) with rate and level, and sync inputs. Half width.</p><span class="tag">Half width</span></div></article>
+		</div>
+		<h3 class="cat">Mixing and dynamics</h3>
+		<div class="devs">
+				<article class="dev"><img src="../previews/mixer.jpg" alt="MIXER panel" loading="lazy" /><div class="dev-body"><h4>MIXER</h4><p>Six mono channels with level, pan, mute / solo and an aux send / return, into the main stereo out.</p></div></article>
+				<article class="dev"><img src="../previews/comp.jpg" alt="COMPRESSOR panel" loading="lazy" /><div class="dev-body"><h4>COMPRESSOR</h4><p>A stereo compressor with sidechain input, gain reduction meter and an oscilloscope of the output. Half width.</p><span class="tag">Half width</span></div></article>
+		</div>
+		<h3 class="cat">Effects</h3>
+		<div class="devs">
+				<article class="dev"><img src="../previews/reverb.jpg" alt="REVERB panel" loading="lazy" /><div class="dev-body"><h4>REVERB</h4><p>Convolution reverb with 12 rooms, from drum rooms to churches, with pre-delay and tone. Half width.</p><span class="tag">Half width</span></div></article>
+				<article class="dev"><img src="../previews/delay.jpg" alt="DELAY panel" loading="lazy" /><div class="dev-body"><h4>DELAY</h4><p>Stereo / ping-pong delay, free or synced to the tempo, with feedback tone. Half width.</p><span class="tag">Half width</span></div></article>
+				<article class="dev"><img src="../previews/hyper.jpg" alt="HYPER panel" loading="lazy" /><div class="dev-body"><h4>HYPER</h4><p>Lo-fi distortion and bit crusher: tape wobble, 4 saturations, sample rate and bit reduction. Half width.</p><span class="tag">Half width</span></div></article>
+				<article class="dev"><img src="../previews/universe.jpg" alt="UNIVERSE panel" loading="lazy" /><div class="dev-body"><h4>UNIVERSE</h4><p>11 granular, looping, glitch and delay effects x 4 variations, a reverb and a phrase looper. Half width.</p><span class="tag">Half width</span></div></article>
+				<article class="dev"><img src="../previews/cosmos.jpg" alt="COSMOS panel" loading="lazy" /><div class="dev-body"><h4>COSMOS</h4><p>Hall, Room, Plate, Spring, DualVerb, Reverse, ModEchoVerb, Void, WarpVerb, TremoloVerb, DynaVerb, Shimmer; 10 knobs per algorithm, presets, freeze. Half width.</p><span class="tag">Half width</span></div></article>
+		</div>
+		<h3 class="cat">Utilities</h3>
+		<div class="devs">
+				<article class="dev"><img src="../previews/reroute.jpg" alt="REROUTE panel" loading="lazy" /><div class="dev-body"><h4>REROUTE</h4><p>A thin row of 8 channel pairs: a front socket goes out on the back, a back socket comes out on the front. Cable one REROUTE&#x27;s back to another&#x27;s back to carry a signal across the rack without a long cable.</p></div></article>
+		</div>
+	</div>
+</section>
+
+<section id="start">
+	<div class="wrap">
+		<h2>Getting started</h2>
+		<p class="intro">You can make sound in a few seconds.</p>
+		<div class="steps">
+			<div class="step"><b>Launch</b>Open the app and click <i>Audio on</i>: browsers need a click before they play sound.</div>
+			<div class="step"><b>Play</b>Press Space to start the sequencers, or play notes on the on-screen keys, the computer keyboard or a MIDI controller.</div>
+			<div class="step"><b>Patch</b>Drag from one jack to another to connect them; drag a cable off an input to move it. Tab shows the back.</div>
+			<div class="step"><b>Explore</b>Load a factory patch from the toolbar, add devices, open the sequencer, and press Help for everything else.</div>
+		</div>
+	</div>
+</section>
+
+<div class="final">
+	<div class="wrap">
+		<h2>Ready to make some noise?</h2>
+		<p>The whole studio opens in a browser tab.</p>
+		<a class="btn" href="../"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>Launch the app</a>
+	</div>
+</div>
+
+<footer>
+	<div class="wrap">
+		<span>SYNTHS · a browser rack of synthesizers</span>
+		<span>All instruments are original designs. Not affiliated with any instrument manufacturer.</span>
+	</div>
+</footer>
+
+<div id="viewer" hidden><img alt="" /></div>
+<script>
+// a click on a screenshot shows it full size; a click or Escape closes it
+var viewer = document.getElementById("viewer"), vimg = viewer.querySelector("img");
+document.querySelectorAll("[data-full]").forEach(function(el){
+	el.addEventListener("click", function(){
+		vimg.src = el.getAttribute("data-full");
+		vimg.alt = (el.querySelector("img") || el).alt || "";
+		viewer.hidden = false;
+	});
+});
+viewer.addEventListener("click", function(){ viewer.hidden = true; });
+document.addEventListener("keydown", function(e){ if(e.key == "Escape") viewer.hidden = true; });
+</script>
+</body>
+</html>

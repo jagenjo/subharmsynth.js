@@ -37,6 +37,7 @@ Needs a browser with AudioWorklet support, served over `https://` or `localhost`
 | `devices/reroute.js`, `devices/reroute-worklet.js` | Reroute, front to back and back again |
 | `devices/reverb.js`, `devices/reverb-worklet.js` | the convolution reverb: native nodes, bridged through a send / return slot |
 | `data/patches.json` | factory patches |
+| `home/` | the project's home page: features, screenshots (`home/img/`), every device, and a button to launch the app |
 | `old/` | the first version of this project, as in the first commit |
 | `data/impulses/` | free reverb impulse responses, redistributed unaltered under their `license.txt` |
 | `data/scales/` | Scala `.scl` scales, plus `index.json` used by the scale picker |
