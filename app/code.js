@@ -1850,7 +1850,15 @@ function drawModules( y0 )
 			if(show_rear)
 			{
 				beginFrame( x, y, collapsed[ m.id ] ? 1 : fit.k );
-				drawRearDevice( m.id, 0, 0, collapsed[ m.id ] ? w : fit.w, fit.h, m.def.title );
+				if(m.def.drawRear && !collapsed[ m.id ]) // a device drawing its own back (the custom synths)
+				{
+					id_prefix = m.id + ".";
+					m.def.drawRear( m, fit.w, fit.h );
+					id_prefix = "";
+					collapseButton( m.id, 36, 11 );
+				}
+				else
+					drawRearDevice( m.id, 0, 0, collapsed[ m.id ] ? w : fit.w, fit.h, m.def.title );
 				endFrame();
 			}
 			else if(collapsed[ m.id ])
@@ -2019,7 +2027,10 @@ function rearSockets( id )
 {
 	var m = rack.settings.modules.find(function(m){ return m.id == id; });
 	if(m)
-		return (WR.types[ m.type ].rear_jacks || []).map(function(j){ return [ j[0], j[1], WR.jackId( id, j[2] ) ]; });
+	{
+		var def = WR.types[ m.type ];
+		return ((def.rearJacksOf ? def.rearJacksOf( m.settings ) : def.rear_jacks) || []).map(function(j){ return [ j[0], j[1], WR.jackId( id, j[2] ) ]; });
+	}
 	return WR.REAR_JACKS[id] || [];
 }
 

@@ -55,9 +55,12 @@ Build your own synth: design its front panel, then wire what is behind it.
 
 - **Start:** ADD DEVICE › Custom › CUSTOM SYNTH adds one and opens the editor. The ✎ button on a custom synth's left ear opens it again. It starts as an example synth (MIDI, oscillator, filter, envelope, VCA); **Empty panel** starts from scratch.
 - **The panel:** choose its width (full or half rack), height (1 to 5 units), colour, knob style and wooden sides.
-- **FRONT PANEL:** drag items from the palette onto the panel, or click them: knobs (three sizes), sliders, buttons (a gate while held), switches, LEDs, jacks in and out, labels, sections and screws.
-  - Drag an item to move it. Drag the corner of a section, slider or button to resize it.
+- **FRONT PANEL:** the palette shows each item as it will look (in the panel's colours and knob style): knobs (three sizes), sliders, buttons (a gate while held), switches, LEDs, jacks in and out, labels, sections, rectangles, lines and screws.
+  - Drag one onto the panel: it follows the mouse at its real size and lands where it is dropped. A click adds it in a free place.
+  - Drag an item to move it. Drag the corner of a section, rectangle, slider or button to resize it, and the ends of a line to change it.
   - Delete removes it, the arrows nudge it, and Ctrl+D duplicates it. The properties on the right set its label, size, colour and range.
+- **BACK PANEL:** what the rack shows with Tab. MAIN OUT L / R (where the AUDIO OUT module's sound leaves, cabled to the speakers when the synth is added) and MIDI IN (with its channel switches) are always there; move them where you like. Add AUDIO IN sockets (audio from the rack into the synth: it can be an effect too), AUDIO OUT sockets (more outputs), labels, rectangles, lines, vents and screws. It starts with vents and a sticker with the synth's name.
+- **Lines and rectangles** (front and back): their colour is the panel's print (normal or dim), its line colour, or a fixed one (red, orange, yellow, green, blue, white, black, cream). Rectangles can be filled and have rounded corners; lines and outlines have a width.
 - **INSIDE:** every item with an input or output is a node, in its place on the panel spread a little apart, next to the modules:
   - **Inputs:** MIDI IN (pitch, gate, velocity).
   - **Sources:** OSCILLATOR (sine, triangle, saw, square with pulse width), NOISE.
@@ -68,7 +71,7 @@ Build your own synth: design its front panel, then wire what is behind it.
 - **Wiring:** drag from an output (right side) to an input (left side). An input takes one wire; drag a wired input to move its wire or drop it to remove it. Double-click a wire to remove it. Drag the background to pan; the wheel zooms.
   - An input with no wire uses its own value, set in the properties of the selected module.
   - A knob or slider takes the range of the first input it is wired to (CUTOFF, ATTACK...), starting at that input's default. Untick *Automatic range* to set your own.
-- **Signals:** audio is −1..1, gates 0 or 1, envelopes 0..1, pitch in octaves from C4. Jacks convert to the rack's volts: CV and audio ±5 V, pitch 1 V/oct, gates 5 V. Up to 8 jacks in and 8 out.
+- **Signals:** audio is −1..1, gates 0 or 1, envelopes 0..1, pitch in octaves from C4. Jacks convert to the rack's volts: CV and audio ±5 V, pitch 1 V/oct, gates 5 V. Up to 8 jacks in and 8 out on the front, 4 audio ins and 4 audio outs on the back (line level, −1..1).
 - **It plays while you build it:** the design is the device's settings, so changes are heard at once (play the keys). It is saved with the rack, its patches and sessions. MIDI learn and CV tracks work on its knobs, and the computer keyboard presses its buttons.
 - **My synths:** *Save to My synths* keeps the design in this browser. ADD DEVICE › Custom adds it again, and the editor can load it into another custom synth or delete it.
 - **Not yet:** polyphony (a custom synth plays one voice), undo, and sharing designs as files (they can be shared inside exported patches).

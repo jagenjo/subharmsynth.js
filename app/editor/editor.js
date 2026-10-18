@@ -1,7 +1,10 @@
 // editor/editor.js
 // SYNTH EDITOR: builds the custom synths (editor/custom.js). A full-screen overlay over the rack:
-//   FRONT PANEL: the device as it looks in the rack (drawn by its own code, with the rack's widgets
-//     made inert); drag items from the palette onto it, move them, resize sections, sliders, buttons.
+//   FRONT PANEL / BACK PANEL: the device as it looks in the rack (drawn by its own code, with the rack's
+//     widgets made inert). The palette shows each item as it will look; drag one onto the panel (it
+//     follows the mouse at its real size) or click it. Move items, resize sections, rectangles, sliders
+//     and buttons by their corner, lines by their ends. The back has the sockets: MAIN OUT, MIDI IN,
+//     audio ins and outs.
 //   INSIDE: every item with inputs or outputs, and the modules (oscillators, filters...), as nodes with
 //     ports; drag a wire from an output to an input (an input takes one wire; dragging a wired input
 //     takes the wire off it). The panel's items keep their places, a little further apart.
@@ -12,8 +15,35 @@
 
 var CS = WR.CustomSynth, CAT = CS.CAT;
 var SPREAD = 1.5, SNAP = 5, LIB_KEY = "GASFREE_synths";
-var ed = { mid: null, view: "front", sel: null, drag: null, hover: null, pan: { x: 40, y: 40 }, zoom: 0.75, fitted: false, raf: 0, fit: null, suppress: false };
+var ed = { mid: null, view: "front", sel: null, drag: null, hover: null, pan: { x: 40, y: 40 }, zoom: 0.75, fitted: false, raf: 0, fit: null, suppress: false, pal: null };
 var el = {};
+
+// the palettes: [what to add, name, note, a sample item drawn as its preview]
+var FRONT_ITEMS = [
+	["knob:s", "KNOB SMALL", "", { kind: "knob", size: "s", label: "KNOB" }],
+	["knob:m", "KNOB", "", { kind: "knob", size: "m", label: "KNOB" }],
+	["knob:l", "KNOB LARGE", "", { kind: "knob", size: "l", label: "KNOB" }],
+	["slider", "SLIDER", "", { kind: "slider", h: 60, label: "SLIDER" }],
+	["button", "BUTTON", "a gate while held", { kind: "button", w: 70, h: 26, label: "BUTTON" }],
+	["toggle", "SWITCH", "on / off", { kind: "toggle", w: 70, h: 26, label: "SWITCH", on: true }],
+	["led", "LED", "lights with its input", { kind: "led", color: "red" }],
+	["jackin", "JACK IN", "signals from the rack", { kind: "jackin", label: "IN", slot: 1 }],
+	["jackout", "JACK OUT", "signals to the rack", { kind: "jackout", label: "OUT", slot: 1 }],
+	["label", "LABEL", "", { kind: "label", text: "LABEL", size: 18 }],
+	["section", "SECTION", "an area with a title", { kind: "section", w: 150, h: 80, title: "SECTION" }],
+	["rect", "RECTANGLE", "", { kind: "rect", w: 120, h: 60, color: "ink", width: 2, radius: 4 }],
+	["line", "LINE", "", { kind: "line", x2: 120, y2: 0, color: "ink", width: 2 }],
+	["screw", "SCREW", "", { kind: "screw" }]
+];
+var BACK_ITEMS = [
+	["ain", "AUDIO IN", "audio from the rack", { kind: "ain", label: "AUDIO IN", slot: 1 }],
+	["aout", "AUDIO OUT", "audio to the rack", { kind: "aout", label: "AUDIO OUT", slot: 1 }],
+	["label", "LABEL", "", { kind: "label", text: "LABEL", size: 18 }],
+	["rect", "RECTANGLE", "", { kind: "rect", w: 120, h: 60, color: "cream", fill: true, radius: 4 }],
+	["line", "LINE", "", { kind: "line", x2: 120, y2: 0, color: "ink", width: 2 }],
+	["vents", "VENTS", "", { kind: "vents", w: 150, h: 70 }],
+	["screw", "SCREW", "", { kind: "screw" }]
+];
 
 function $e( tag, cls, html ) { var d = document.createElement( tag ); if(cls) d.className = cls; if(html !== undefined) d.innerHTML = html; return d; }
 function esc( t ) { return String( t ).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;"); }
@@ -22,10 +52,47 @@ function S() { var m = mod(); return m ? m.settings : null; }
 function def() { var m = mod(); return m ? WR.types[ m.type ] : null; }
 function snap( v ) { return Math.round( v / SNAP ) * SNAP; }
 function hint( t ) { el.hint.textContent = t; }
-function byId( id ) { var s = S(); return s.items.find(function(i){ return i.id == id; }) || s.nodes.find(function(n){ return n.id == id; }); }
+function byId( id ) { var s = S(); return CAT.findItem( s, id ); }
 function newId( kind ) { var s = S(); var id; do { id = kind + (s.next++); } while(byId( id )); return id; }
 function titleOf( x ) { var sp = CAT.specOf( x.kind ); return sp ? sp.title : x.kind; }
 function nameOf( x ) { return x.label || x.text || x.title || titleOf( x ); }
+function isBackItem( x ) { return (S().back || []).indexOf( x ) >= 0; }
+function panelList() { return ed.view == "back" ? S().back : S().items; }
+
+// ---------------------------------------------------------------------------
+// the rack's widgets made inert, drawing into another canvas (the panels, the previews, the ghost)
+
+function inert( c, fn )
+{
+	var keep = { ctx: ctx, ui: ui, jacks: jacks, id_prefix: id_prefix, tooltips: tooltips, cable_drag: cable_drag, knob_skin: knob_skin, learn: midictl.learn, hover: hover_control, frame: frame };
+	ctx = c; jacks = {}; id_prefix = "__se__."; tooltips = []; cable_drag = null; midictl.learn = false; frame = { ox: 0, oy: 0, k: 1 };
+	ui = { px: -1e9, py: -1e9, x: -1e9, y: -1e9, down: false, pressed: false, released: false, rpressed: false, dbl: false, shift: false, wheel: 0, wheel_x: 0,
+		active: "__se__", hot: null, startY: 0, startN: 0, dragShift: false, lastDownTime: 0, lastDownPos: [0, 0] };
+	knob_skin = S().knob_skin || def().knob_skin || null;
+	try { fn(); }
+	finally {
+		ctx = keep.ctx; ui = keep.ui; jacks = keep.jacks; id_prefix = keep.id_prefix; tooltips = keep.tooltips; cable_drag = keep.cable_drag;
+		knob_skin = keep.knob_skin; midictl.learn = keep.learn; hover_control = keep.hover; frame = keep.frame; casing_wood = false;
+	}
+}
+function fakeMod() { var m = mod(); return { id: m.id, type: m.type, def: def(), settings: m.settings, state: rack.module_state[ m.id ] || {}, post: function(){}, editing: true }; }
+
+// an item alone, centred in a canvas (k: its scale; 0 = fit)
+function drawSample( cv, item, back, k, bg )
+{
+	var dpr = window.devicePixelRatio || 1, b0 = CS.box( Object.assign( { x: 0, y: 0 }, item ) );
+	var W = cv.width / dpr, H = cv.height / dpr;
+	k = k || Math.min( (W - 8) / b0.w, (H - 8) / b0.h, 1.3 );
+	var it = Object.assign( { id: "__pv" }, item );
+	it.x = (W / k - b0.w) / 2 - b0.x; it.y = (H / k - b0.h) / 2 - b0.y;
+	if(it.kind == "line") { it.x2 = it.x + (item.x2 || 0); it.y2 = it.y + (item.y2 || 0); }
+	var c = cv.getContext( "2d" );
+	c.setTransform( 1, 0, 0, 1, 0, 0 ); c.clearRect( 0, 0, cv.width, cv.height );
+	if(bg) { c.fillStyle = bg; c.fillRect( 0, 0, cv.width, cv.height ); }
+	c.setTransform( dpr * k, 0, 0, dpr * k, 0, 0 );
+	inert( c, function(){ CS.drawPreview( fakeMod(), it, back ); } );
+	return it;
+}
 
 // ---------------------------------------------------------------------------
 // building the overlay (once)
@@ -42,7 +109,7 @@ function build()
 		'<label>Panel <select data-f="color">' + Object.keys( CS.COLORS ).map(function(k){ return '<option value="' + k + '">' + CS.COLORS[k].name + '</option>'; }).join("") + '</select></label>' +
 		'<label>Knobs <select data-f="knob_skin">' + WR.KNOB_SKINS.filter(function(k){ return k; }).map(function(k){ return '<option value="' + k + '">' + k + '</option>'; }).join("") + '</select></label>' +
 		'<label><input type="checkbox" data-f="wood" /> Wood sides</label>' +
-		'<div class="se-tabs"><button data-view="front">FRONT PANEL</button><button data-view="inside">INSIDE</button></div>' +
+		'<div class="se-tabs"><button data-view="front">FRONT PANEL</button><button data-view="back">BACK PANEL</button><button data-view="inside">INSIDE</button></div>' +
 		'<span class="se-spacer"></span>' +
 		'<button class="se-save" title="Keep this design in My synths (ADD DEVICE, Custom)">Save to My synths</button>' +
 		'<button class="se-done" title="Back to the rack (Escape)">Done</button>';
@@ -66,9 +133,8 @@ function build()
 	// the top bar
 	el.name.addEventListener("input", function(){
 		var s = S(), old = s.name, nu = el.name.value.toUpperCase().substr( 0, 24 );
-		// the panel's title label follows the name, while it shows the name
-		var title = s.items.find(function(i){ return i.kind == "label" && i.text == old; });
-		if(title) title.text = nu;
+		// the titles that show the name follow it (front and back)
+		s.items.concat( s.back ).forEach(function(i){ if(i.kind == "label" && i.text == old) i.text = nu; });
 		s.name = nu;
 	});
 	top.querySelectorAll( "[data-f]" ).forEach(function(f){
@@ -78,14 +144,16 @@ function build()
 			else if(k == "height") s.height = +f.value;
 			else if(k == "wood") s.wood = f.checked;
 			else s[k] = f.value;
+			if(k == "color" || k == "knob_skin") renderPalette(); // the previews in the new look
 		});
 	});
 	top.querySelectorAll( "[data-view]" ).forEach(function(b){ b.addEventListener("click", function(){ setView( b.getAttribute( "data-view" ) ); }); });
 	top.querySelector( ".se-done" ).addEventListener("click", close);
 	top.querySelector( ".se-save" ).addEventListener("click", saveToLibrary);
 
-	frontEvents();
+	panelEvents();
 	insideEvents();
+	paletteEvents();
 	window.addEventListener("keydown", onKey, true);
 	window.addEventListener("resize", function(){ if(!el.root.hidden && ed.view == "inside") drawWires(); });
 }
@@ -112,7 +180,7 @@ function close()
 	if(!el.root || el.root.hidden) return;
 	el.root.hidden = true;
 	cancelAnimationFrame( ed.raf ); ed.raf = 0;
-	ed.drag = null;
+	ed.drag = null; endPaletteDrag();
 }
 
 function refreshTop()
@@ -128,30 +196,32 @@ function refreshTop()
 
 function setView( v )
 {
+	if(ed.view != v && ed.sel && ed.sel.type == "item") { var x = byId( ed.sel.id ); if(x && v != "inside" && (v == "back") != isBackItem( x )) ed.sel = null; }
 	ed.view = v;
 	el.top.querySelectorAll( "[data-view]" ).forEach(function(b){ b.classList.toggle( "on", b.getAttribute( "data-view" ) == v ); });
-	el.front.hidden = v != "front";
+	el.front.hidden = v == "inside";
 	el.inside.hidden = v != "inside";
 	renderPalette();
+	renderProps();
 	if(v == "inside") { renderInside(); if(!ed.fitted) { fitInside(); ed.fitted = true; } }
-	hint( v == "front"
-		? "Drag items from the left onto the panel (or click them). Drag to move; drag the corner of a section, slider or button to resize it. Delete removes; arrows nudge; Ctrl+D duplicates. Play the keys to hear the synth."
+	hint( v == "front" ? "Drag items from the left onto the panel (or click them). Drag to move; drag the corner of a section, rectangle, slider or button to resize it, the ends of a line to change it. Delete removes; arrows nudge; Ctrl+D duplicates. Play the keys to hear the synth."
+		: v == "back" ? "The back: MAIN OUT L / R and MIDI IN are always there (move them where you like); add AUDIO IN and OUT sockets, labels, rectangles, lines, vents. Tab in the rack shows it."
 		: "Drag from an output (right) to an input (left) to wire them; drag a wired input to move or remove its wire. Drag a node by its title; drag the background to pan, the wheel zooms. A knob takes the range of the first input it is wired to." );
 }
 
 // ---------------------------------------------------------------------------
-// the palette
+// the palette: previews of the items; drag one out (it follows the mouse) or click it
 
 function renderPalette()
 {
 	var h = "";
-	if(ed.view == "front")
+	if(ed.view != "inside")
 	{
-		var items = [ ["knob:s", "KNOB SMALL"], ["knob:m", "KNOB"], ["knob:l", "KNOB LARGE"], ["slider", "SLIDER"], ["button", "BUTTON", "momentary: a gate while held"],
-			["toggle", "SWITCH", "on / off"], ["led", "LED", "lights with its input"], ["jackin", "JACK IN", "a socket: signals from the rack"], ["jackout", "JACK OUT", "a socket: signals to the rack"],
-			["label", "LABEL", "text"], ["section", "SECTION", "a panel area with a title"], ["screw", "SCREW"] ];
-		h += "<h4>PANEL ITEMS</h4>";
-		items.forEach(function(it){ h += '<button class="se-pal" draggable="true" data-add="' + it[0] + '">' + it[1] + (it[2] ? '<small>' + it[2] + '</small>' : '') + '</button>'; });
+		h += "<h4>" + (ed.view == "back" ? "BACK PANEL" : "FRONT PANEL") + "</h4>";
+		(ed.view == "back" ? BACK_ITEMS : FRONT_ITEMS).forEach(function(it, i){
+			h += '<div class="se-pal se-pal-item" data-add="' + it[0] + '" data-i="' + i + '" title="' + esc( it[1] + (it[2] ? ": " + it[2] : "") ) + '">' +
+				'<canvas class="se-thumb"></canvas><span>' + it[1] + (it[2] ? '<small>' + it[2] + '</small>' : '') + '</span></div>';
+		});
 	}
 	else
 	{
@@ -159,19 +229,89 @@ function renderPalette()
 		Object.keys( CAT.MODULES ).forEach(function(k){ var m = CAT.MODULES[k]; if(m.fixed) return; (cats[ m.cat ] = cats[ m.cat ] || []).push( k ); });
 		Object.keys( cats ).forEach(function(c){
 			h += "<h4>" + c.toUpperCase() + "</h4>";
-			cats[c].forEach(function(k){ var m = CAT.MODULES[k]; h += '<button class="se-pal" draggable="true" data-add="' + k + '" title="' + esc( m.about || "" ) + '">' + m.title + '</button>'; });
+			cats[c].forEach(function(k){ var m = CAT.MODULES[k]; h += '<div class="se-pal se-pal-mod" data-add="' + k + '" title="' + esc( m.about || "" ) + '"><b>' + m.title + '</b><small>' + esc( m.about || "" ) + '</small></div>'; });
 		});
-		h += '<h4>PANEL ITEMS</h4><p style="color:#8c8a84;font:12px system-ui;margin:0">Knobs, buttons, LEDs and jacks are added on the FRONT PANEL; they appear here with their ports.</p>';
+		h += '<h4>PANEL ITEMS</h4><p class="se-note">Knobs, buttons, LEDs and jacks are added on the FRONT PANEL, audio sockets on the BACK PANEL; they appear here with their ports.</p>';
 	}
 	el.palette.innerHTML = h;
-	el.palette.querySelectorAll( "[data-add]" ).forEach(function(b){
-		b.addEventListener("click", function(){ add( b.getAttribute( "data-add" ), null ); });
-		b.addEventListener("dragstart", function(e){ e.dataTransfer.setData( "text/plain", b.getAttribute( "data-add" ) ); e.dataTransfer.effectAllowed = "copy"; });
+	// the previews, drawn by the rack's widgets in the panel's colours
+	var dpr = window.devicePixelRatio || 1, s = S(), back = ed.view == "back";
+	var bg = back ? CS.BACK.bg : (CS.COLORS[ s.color ] || CS.COLORS.dark).bg;
+	el.palette.querySelectorAll( ".se-pal-item" ).forEach(function(p){
+		var list = back ? BACK_ITEMS : FRONT_ITEMS, item = list[ +p.getAttribute( "data-i" ) ][3], cv = p.querySelector( "canvas" );
+		cv.width = 64 * dpr; cv.height = 48 * dpr;
+		drawSample( cv, item, back, 0, bg );
 	});
 }
 
-// adds a panel item ("knob:m", "led"...) or a module ("osc"...); at: where (panel or inside coordinates)
-function add( what, at )
+function paletteEvents()
+{
+	el.palette.addEventListener("pointerdown", function(e){
+		var p = e.target.closest ? e.target.closest( "[data-add]" ) : null;
+		if(!p || e.button !== 0) return;
+		e.preventDefault();
+		var list = ed.view == "back" ? BACK_ITEMS : FRONT_ITEMS, i = p.getAttribute( "data-i" );
+		ed.pal = { what: p.getAttribute( "data-add" ), sample: i !== null ? list[ +i ][3] : null, sx: e.clientX, sy: e.clientY, moved: false, ghost: null };
+		document.addEventListener("pointermove", paletteMove);
+		document.addEventListener("pointerup", paletteUp);
+	});
+}
+
+function paletteMove( e )
+{
+	var d = ed.pal;
+	if(!d) return;
+	if(!d.moved && Math.abs( e.clientX - d.sx ) + Math.abs( e.clientY - d.sy ) > 5) { d.moved = true; makeGhost( d ); }
+	if(d.ghost) placeGhost( d, e );
+}
+
+function paletteUp( e )
+{
+	var d = ed.pal;
+	endPaletteDrag();
+	if(!d) return;
+	if(!d.moved) { add( d.what, null ); return; } // a click: in a free place
+	var over = document.elementFromPoint( e.clientX, e.clientY );
+	if(!over || !el.stage.contains( over )) return;
+	if(CAT.MODULES[ d.what ]) { if(ed.view == "inside") { var w = toWorld( e ); add( d.what, { x: w.x + 84 - d.gx / ed.zoom, y: w.y + 20 - d.gy / ed.zoom } ); } }
+	else if(ed.view != "inside" && ed.fit) add( d.what, toPanel( e ), true );
+}
+
+function endPaletteDrag()
+{
+	document.removeEventListener("pointermove", paletteMove);
+	document.removeEventListener("pointerup", paletteUp);
+	if(ed.pal && ed.pal.ghost) ed.pal.ghost.remove();
+	ed.pal = null;
+}
+
+// the item following the mouse: at its real size on the panel (or a node, inside)
+function makeGhost( d )
+{
+	var g = $e( "div", "se-ghost" );
+	if(d.sample && ed.fit)
+	{
+		var k = ed.fit.k, b = CS.box( Object.assign( { x: 0, y: 0 }, d.sample ) ), dpr = window.devicePixelRatio || 1;
+		var cv = $e( "canvas" ); cv.width = Math.ceil( b.w * k * dpr ) + 2; cv.height = Math.ceil( b.h * k * dpr ) + 2;
+		cv.style.width = (cv.width / dpr) + "px"; cv.style.height = (cv.height / dpr) + "px";
+		var it = drawSample( cv, d.sample, ed.view == "back", k, null );
+		// where the item's own point (x, y) is in the ghost: it goes under the mouse
+		d.gx = it.x * k; d.gy = it.y * k;
+		g.appendChild( cv );
+	}
+	else
+	{
+		var m = CAT.MODULES[ d.what ];
+		g.innerHTML = '<div class="se-node se-ghost-node"><div class="se-head">' + esc( m ? m.title : d.what ) + '</div><div class="se-ports"><small>' + esc( m && m.about || "" ) + '</small></div></div>';
+		d.gx = 20; d.gy = 12;
+	}
+	document.body.appendChild( g );
+	d.ghost = g;
+}
+function placeGhost( d, e ) { d.ghost.style.left = (e.clientX - d.gx) + "px"; d.ghost.style.top = (e.clientY - d.gy) + "px"; }
+
+// adds a panel item ("knob:m", "led"...) to the panel in view, or a module ("osc"...) inside; at: where
+function add( what, at, exact )
 {
 	var s = S(), kind = what.split( ":" )[0], sub = what.split( ":" )[1];
 	if(CAT.MODULES[ kind ])
@@ -183,9 +323,11 @@ function add( what, at )
 		renderInside();
 		return n;
 	}
-	var size = def().size( layout, s ), p = at || freeSpot( size );
+	var back = ed.view == "back" || kind == "ain" || kind == "aout" || kind == "vents";
+	var list = back ? s.back : s.items;
+	var size = def().size( layout, s ), p = at || freeSpot( size, list );
 	var it = { id: newId( kind ), kind: kind, x: snap( p.x ), y: snap( p.y ) };
-	var count = s.items.filter(function(i){ return i.kind == kind; }).length + 1;
+	var count = list.filter(function(i){ return i.kind == kind; }).length + 1;
 	switch(kind)
 	{
 		case "knob": it.size = sub || "m"; it.label = "KNOB " + count; break;
@@ -193,25 +335,35 @@ function add( what, at )
 		case "button": it.w = 70; it.h = 26; it.label = "BUTTON"; break;
 		case "toggle": it.w = 70; it.h = 26; it.label = "SWITCH"; break;
 		case "led": it.color = "red"; break;
-		case "jackin": case "jackout":
-			var used = s.items.filter(function(i){ return i.kind == kind; }).map(function(i){ return i.slot; });
+		case "jackin": case "jackout": case "ain": case "aout":
+			var max = kind == "ain" || kind == "aout" ? CAT.ASLOTS : CAT.SLOTS;
+			var used = list.filter(function(i){ return i.kind == kind; }).map(function(i){ return i.slot; });
 			var slot = 1; while(used.indexOf( slot ) >= 0) slot++;
-			if(slot > CAT.SLOTS) { hint( "No more " + (kind == "jackin" ? "input" : "output") + " jacks: " + CAT.SLOTS + " at most" ); return null; }
-			it.slot = slot; it.mode = "cv"; it.label = (kind == "jackin" ? "IN " : "OUT ") + slot; break;
+			if(slot > max) { hint( "No more " + CAT.specOf( kind ).title + " sockets: " + max + " at most" ); return null; }
+			it.slot = slot;
+			if(kind == "jackin" || kind == "jackout") { it.mode = "cv"; it.label = (kind == "jackin" ? "IN " : "OUT ") + slot; }
+			else it.label = (kind == "ain" ? "AUDIO IN " : "AUDIO OUT ") + slot;
+			break;
 		case "label": it.text = "LABEL"; it.size = 16; break;
-		case "section": it.w = 240; it.h = 150; it.title = "SECTION"; it.x = snap( p.x - 120 ); it.y = snap( p.y - 75 ); break;
+		case "section": it.w = 240; it.h = 150; it.title = "SECTION"; break;
+		case "rect": it.w = 200; it.h = 100; it.color = back ? "cream" : "ink"; it.width = 2; it.radius = 4; it.fill = back; break;
+		case "line": it.x2 = it.x + 160; it.y2 = it.y; it.color = "ink"; it.width = 2; break;
+		case "vents": it.w = 200; it.h = 100; break;
 	}
-	s.items.push( it );
+	// areas added with a click are centred where they land
+	if(!exact && (kind == "section" || kind == "rect" || kind == "vents")) { it.x = snap( p.x - it.w / 2 ); it.y = snap( p.y - it.h / 2 ); }
+	if(!exact && kind == "line") { it.x = snap( p.x - 80 ); it.x2 = it.x + 160; }
+	list.push( it );
 	select({ type: "item", id: it.id });
 	if(ed.view == "inside") renderInside();
 	return it;
 }
 
 // a place on the panel: the middle, moved along until nothing is there
-function freeSpot( size )
+function freeSpot( size, list )
 {
 	var x = size[0] / 2, y = size[1] / 2, tries = 0;
-	while(tries++ < 40 && hitItem({ x: x, y: y }, true)) { x += 60; if(x > size[0] - 60) { x = 120; y += 60; if(y > size[1] - 30) y = 60; } }
+	while(tries++ < 40 && hitItem({ x: x, y: y }, list)) { x += 60; if(x > size[0] - 60) { x = 120; y += 60; if(y > size[1] - 30) y = 60; } }
 	return { x: x, y: y };
 }
 
@@ -224,8 +376,11 @@ function remove( sel )
 	{
 		var x = byId( sel.id );
 		if(!x) return;
+		var sp = CAT.specOf( x.kind );
 		if(x.kind == "out") { hint( "The AUDIO OUT stays: it is where the synth's sound leaves" ); return; }
+		if(sp && sp.fixed) { hint( sp.title + " stays on the back (move it where you like)" ); return; }
 		s.items = s.items.filter(function(i){ return i.id != sel.id; });
+		s.back = s.back.filter(function(i){ return i.id != sel.id; });
 		s.nodes = s.nodes.filter(function(n){ return n.id != sel.id; });
 		s.wires = s.wires.filter(function(w){ return w.from[0] != sel.id && w.to[0] != sel.id; });
 	}
@@ -236,74 +391,77 @@ function remove( sel )
 
 function duplicate( id )
 {
-	var s = S(), x = byId( id );
-	if(!x || x.kind == "out") return;
-	if(x.kind == "jackin" || x.kind == "jackout") { var it = add( x.kind, { x: x.x + 50, y: x.y } ); if(it) { it.mode = x.mode; } return; }
+	var s = S(), x = byId( id ), sp = x && CAT.specOf( x.kind );
+	if(!x || x.kind == "out" || (sp && sp.fixed)) return;
+	if(["jackin", "jackout", "ain", "aout"].indexOf( x.kind ) >= 0) { var it = add( x.kind, { x: x.x + 50, y: x.y }, true ); if(it && x.mode) it.mode = x.mode; return; }
 	var c = JSON.parse( JSON.stringify( x ) );
 	c.id = newId( x.kind ); c.x += 30; c.y += 30; delete c.ix; delete c.iy;
-	(CAT.MODULES[ x.kind ] ? s.nodes : s.items).push( c );
-	select({ type: CAT.MODULES[ x.kind ] ? "node" : "item", id: c.id });
+	if(c.x2 !== undefined) { c.x2 += 30; c.y2 += 30; }
+	var isMod = !!CAT.MODULES[ x.kind ];
+	(isMod ? s.nodes : (isBackItem( x ) ? s.back : s.items)).push( c );
+	select({ type: isMod ? "node" : "item", id: c.id });
 	if(ed.view == "inside") renderInside();
 }
 
 function select( sel ) { ed.sel = sel; renderProps(); if(ed.view == "inside") markSelection(); }
 
 // ---------------------------------------------------------------------------
-// FRONT PANEL: drawn by the device's own code, the rack's widgets made inert
+// FRONT / BACK PANEL: drawn by the device's own code
 
 function loop()
 {
 	ed.raf = requestAnimationFrame( loop );
 	if(el.root.hidden) return;
 	if(!mod()) { close(); return; } // the device was removed
-	if(ed.view == "front") renderFront();
+	if(ed.view != "inside") renderPanel();
 	else if(ed.leds) updateInsideLeds();
 }
 
-function renderFront()
+function renderPanel()
 {
-	var cv = el.front, c = cv.getContext( "2d" ), dpr = window.devicePixelRatio || 1;
+	var cv = el.front, c = cv.getContext( "2d" ), dpr = window.devicePixelRatio || 1, back = ed.view == "back";
 	var W = el.stage.clientWidth, H = el.stage.clientHeight;
 	if(cv.width != Math.round( W * dpr ) || cv.height != Math.round( H * dpr )) { cv.width = Math.round( W * dpr ); cv.height = Math.round( H * dpr ); }
-	var m = mod(), d = def(), size = d.size( layout, m.settings );
+	var m = mod(), d = def(), size = d.size( layout, m.settings ), list = panelList();
 	var ext = [ size[0], size[1] ];
-	m.settings.items.forEach(function(it){ var b = CS.box( it ); ext[0] = Math.max( ext[0], b.x + b.w + 10 ); ext[1] = Math.max( ext[1], b.y + b.h + 10 ); });
+	list.forEach(function(it){ var b = CS.box( it ); ext[0] = Math.max( ext[0], b.x + b.w + 10 ); ext[1] = Math.max( ext[1], b.y + b.h + 10 ); });
 	var k = Math.min( (W - 60) / ext[0], (H - 60) / ext[1], 1.5 ), ox = (W - ext[0] * k) / 2, oy = (H - ext[1] * k) / 2;
 	ed.fit = { k: k, ox: ox, oy: oy, w: size[0], h: size[1] };
 	c.setTransform( 1, 0, 0, 1, 0, 0 );
 	c.clearRect( 0, 0, cv.width, cv.height );
 	c.setTransform( dpr * k, 0, 0, dpr * k, dpr * ox, dpr * oy );
-	var keep = { ctx: ctx, ui: ui, jacks: jacks, id_prefix: id_prefix, tooltips: tooltips, cable_drag: cable_drag, knob_skin: knob_skin, learn: midictl.learn, hover: hover_control, frame: frame };
-	ctx = c; jacks = {}; id_prefix = "__se__."; tooltips = []; cable_drag = null; midictl.learn = false; frame = { ox: 0, oy: 0, k: 1 };
-	ui = { px: -1e9, py: -1e9, x: -1e9, y: -1e9, down: false, pressed: false, released: false, rpressed: false, dbl: false, shift: false, wheel: 0, wheel_x: 0,
-		active: "__se__", hot: null, startY: 0, startN: 0, dragShift: false, lastDownTime: 0, lastDownPos: [0, 0] };
-	knob_skin = m.settings.knob_skin || d.knob_skin || null;
-	try { CS.draw({ id: m.id, type: m.type, def: d, settings: m.settings, state: rack.module_state[ m.id ] || {}, post: function(){}, editing: true }); }
-	finally {
-		ctx = keep.ctx; ui = keep.ui; jacks = keep.jacks; id_prefix = keep.id_prefix; tooltips = keep.tooltips; cable_drag = keep.cable_drag;
-		knob_skin = keep.knob_skin; midictl.learn = keep.learn; hover_control = keep.hover; frame = keep.frame; casing_wood = false;
-	}
+	inert( c, function(){ if(back) CS.drawRear( fakeMod(), size[0], size[1] ); else CS.draw( fakeMod() ); } );
 	// items left outside the panel (it was made smaller): outlined in red, they are not seen in the rack
 	var outside = 0;
-	m.settings.items.forEach(function(it){
+	list.forEach(function(it){
 		var b = CS.box( it );
 		if(b.x + b.w > 4 && b.y + b.h > 4 && b.x < size[0] - 4 && b.y < size[1] - 4) return;
 		outside++;
 		c.strokeStyle = "#ff4a3a"; c.lineWidth = 2 / k; c.setLineDash([ 4 / k, 3 / k ]); c.strokeRect( b.x, b.y, b.w, b.h ); c.setLineDash([]);
 	});
 	if(outside != ed.outside) { ed.outside = outside; if(outside) hint( outside + " item" + (outside > 1 ? "s are" : " is") + " outside the panel (outlined in red): drag them in, or make the panel bigger" ); }
-	// the selection, the item under the mouse, the resize corner
+	// the selection, the item under the mouse, the handles
 	var sel = ed.sel && ed.sel.type == "item" ? byId( ed.sel.id ) : null;
+	if(sel && list.indexOf( sel ) < 0) sel = null;
 	if(ed.hover && ed.hover !== sel) { var hb = CS.box( ed.hover ); c.strokeStyle = "rgba(255,255,255,0.35)"; c.lineWidth = 1 / k; c.strokeRect( hb.x, hb.y, hb.w, hb.h ); }
 	if(sel)
 	{
-		var b = CS.box( sel );
+		var b = CS.box( sel ), hs = 10 / k;
 		c.strokeStyle = "#e2574c"; c.lineWidth = 2 / k; c.setLineDash([ 6 / k, 4 / k ]); c.strokeRect( b.x - 2, b.y - 2, b.w + 4, b.h + 4 ); c.setLineDash([]);
-		if(resizable( sel )) { var hs = 10 / k; c.fillStyle = "#e2574c"; c.fillRect( b.x + b.w + 2 - hs / 2, b.y + b.h + 2 - hs / 2, hs, hs ); }
+		c.fillStyle = "#e2574c";
+		handles( sel ).forEach(function(h){ c.fillRect( h.x - hs / 2, h.y - hs / 2, hs, hs ); });
 	}
 }
 
-function resizable( it ) { return it.kind == "section" || it.kind == "slider" || it.kind == "button" || it.kind == "toggle"; }
+function resizable( it ) { return ["section", "rect", "vents", "slider", "button", "toggle"].indexOf( it.kind ) >= 0; }
+// the handles of an item: its corner (resize) or the ends of a line
+function handles( it )
+{
+	if(it.kind == "line") return [ { x: it.x, y: it.y, end: 1 }, { x: it.x2, y: it.y2, end: 2 } ];
+	if(!resizable( it )) return [];
+	var b = CS.box( it );
+	return [ { x: b.x + b.w + 2, y: b.y + b.h + 2, end: 0 } ];
+}
 
 function toPanel( e )
 {
@@ -311,27 +469,33 @@ function toPanel( e )
 	return { x: (e.clientX - r.left - f.ox) / f.k, y: (e.clientY - r.top - f.oy) / f.k };
 }
 
-// the item at p: the controls over the sections they are on
-function hitItem( p, any )
+// the item at p: the small ones over the areas they are on
+function hitItem( p, list )
 {
-	var items = S().items, inside = function(it){ var b = CS.box( it ); return p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h; };
-	for(var i = items.length - 1; i >= 0; --i) if(items[i].kind != "section" && inside( items[i] )) return items[i];
-	for(var i = items.length - 1; i >= 0; --i) if(items[i].kind == "section" && inside( items[i] )) return any ? items[i] : items[i];
+	list = list || panelList();
+	var area = function(it){ return it.kind == "section" || it.kind == "vents" || it.kind == "rect"; };
+	var inside = function(it){
+		if(it.kind == "line") { var dx = it.x2 - it.x, dy = it.y2 - it.y, l2 = dx * dx + dy * dy || 1, t = Math.max( 0, Math.min( 1, ((p.x - it.x) * dx + (p.y - it.y) * dy) / l2 ) );
+			var qx = it.x + t * dx - p.x, qy = it.y + t * dy - p.y; return qx * qx + qy * qy < 64; }
+		var b = CS.box( it ); return p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h;
+	};
+	for(var i = list.length - 1; i >= 0; --i) if(!area( list[i] ) && inside( list[i] )) return list[i];
+	for(var i = list.length - 1; i >= 0; --i) if(area( list[i] ) && inside( list[i] )) return list[i];
 	return null;
 }
 
-function frontEvents()
+function panelEvents()
 {
 	var cv = el.front;
 	cv.addEventListener("pointerdown", function(e){
 		if(!ed.fit) return;
-		var p = toPanel( e ), sel = ed.sel && ed.sel.type == "item" ? byId( ed.sel.id ) : null;
-		if(sel && resizable( sel ))
+		var p = toPanel( e ), sel = ed.sel && ed.sel.type == "item" ? byId( ed.sel.id ) : null, hs = 12 / ed.fit.k;
+		if(sel && panelList().indexOf( sel ) >= 0)
 		{
-			var b = CS.box( sel ), hs = 12 / ed.fit.k;
-			if(Math.abs( p.x - (b.x + b.w) ) < hs && Math.abs( p.y - (b.y + b.h) ) < hs)
+			var h = handles( sel ).find(function(h){ return Math.abs( p.x - h.x ) < hs && Math.abs( p.y - h.y ) < hs; });
+			if(h)
 			{
-				ed.drag = { mode: "resize", it: sel, sx: p.x, sy: p.y, w0: sel.w || (sel.kind == "section" ? 200 : 70), h0: sel.h || (sel.kind == "section" ? 120 : sel.kind == "slider" ? 120 : 26) };
+				ed.drag = { mode: "handle", it: sel, end: h.end, sx: p.x, sy: p.y, w0: sel.w || (sel.kind == "slider" ? 120 : 70), h0: sel.h || (sel.kind == "slider" ? 120 : 26) };
 				cv.setPointerCapture( e.pointerId );
 				return;
 			}
@@ -340,7 +504,7 @@ function frontEvents()
 		if(hit)
 		{
 			select({ type: "item", id: hit.id });
-			ed.drag = { mode: "move", it: hit, dx: p.x - hit.x, dy: p.y - hit.y };
+			ed.drag = { mode: "move", it: hit, px: p.x, py: p.y, x0: hit.x, y0: hit.y, x20: hit.x2, y20: hit.y2 };
 			cv.setPointerCapture( e.pointerId );
 		}
 		else select( null );
@@ -350,60 +514,66 @@ function frontEvents()
 		var p = toPanel( e ), d = ed.drag, f = ed.fit;
 		if(d && d.mode == "move")
 		{
-			d.it.x = Math.max( 0, Math.min( f.w, snap( p.x - d.dx ) ) );
-			d.it.y = Math.max( 0, Math.min( f.h, snap( p.y - d.dy ) ) );
-			delete d.it.ix; delete d.it.iy; // inside, it follows its new place
-		}
-		else if(d && d.mode == "resize")
-		{
 			var it = d.it;
-			if(it.kind == "slider") it.h = Math.max( 40, snap( d.h0 + p.y - d.sy ) );
-			else { it.w = Math.max( 30, snap( d.w0 + p.x - d.sx ) ); it.h = Math.max( 16, snap( d.h0 + p.y - d.sy ) ); }
+			it.x = Math.max( 0, Math.min( f.w, snap( d.x0 + p.x - d.px ) ) );
+			it.y = Math.max( 0, Math.min( f.h, snap( d.y0 + p.y - d.py ) ) );
+			if(d.x20 !== undefined) { it.x2 = d.x20 + it.x - d.x0; it.y2 = d.y20 + it.y - d.y0; }
+			delete it.ix; delete it.iy; // inside, it follows its new place
 		}
-		else { ed.hover = hitItem( p ); cv.style.cursor = ed.hover ? "move" : "default"; }
+		else if(d && d.mode == "handle")
+		{
+			var it2 = d.it;
+			if(d.end == 1) { it2.x = snap( p.x ); it2.y = snap( p.y ); }
+			else if(d.end == 2) { it2.x2 = snap( p.x ); it2.y2 = snap( p.y ); }
+			else if(it2.kind == "slider") it2.h = Math.max( 40, snap( d.h0 + p.y - d.sy ) );
+			else { it2.w = Math.max( 20, snap( d.w0 + p.x - d.sx ) ); it2.h = Math.max( 10, snap( d.h0 + p.y - d.sy ) ); }
+		}
+		else
+		{
+			ed.hover = hitItem( p );
+			var sel = ed.sel && ed.sel.type == "item" ? byId( ed.sel.id ) : null, hs = 12 / f.k;
+			var onHandle = sel && handles( sel ).some(function(h){ return Math.abs( p.x - h.x ) < hs && Math.abs( p.y - h.y ) < hs; });
+			cv.style.cursor = onHandle ? "nwse-resize" : (ed.hover ? "move" : "default");
+		}
 	});
 	var up = function(){ if(ed.drag) { ed.drag = null; renderProps(); } };
 	cv.addEventListener("pointerup", up);
 	cv.addEventListener("pointercancel", up);
 	cv.addEventListener("pointerleave", function(){ ed.hover = null; });
-	cv.addEventListener("dragover", function(e){ e.preventDefault(); e.dataTransfer.dropEffect = "copy"; });
-	cv.addEventListener("drop", function(e){
-		e.preventDefault();
-		var what = e.dataTransfer.getData( "text/plain" );
-		if(what && !CAT.MODULES[ what.split( ":" )[0] ]) add( what, toPanel( e ) );
-	});
 }
 
 // ---------------------------------------------------------------------------
 // INSIDE: nodes and wires
 
-var OUT_KIND = { gate: "gate", on: "gate", pitch: "pitch", cv: "pitch", vel: "cv", value: "cv", env: "cv", out: "cv" };
 function wireColor( src, out )
 {
 	var k = src ? src.kind : "";
 	if(out == "gate" || out == "on") return "#e8c547";
 	if(out == "pitch" || k == "quant" || (k == "seq" && out == "cv")) return "#4fa3e0";
-	if(["osc", "noise", "filter", "vca", "mix", "drive", "delay"].indexOf( k ) >= 0) return "#e05a47";
+	if(["osc", "noise", "filter", "vca", "mix", "drive", "delay", "ain"].indexOf( k ) >= 0) return "#e05a47";
 	return "#6cc070";
 }
 
 function innerPos( x )
 {
 	if(CAT.MODULES[ x.kind ]) return { x: x.x, y: x.y };
-	return { x: x.ix !== undefined ? x.ix : snap( x.x * SPREAD ), y: x.iy !== undefined ? x.iy : snap( x.y * SPREAD ) };
+	if(x.ix !== undefined) return { x: x.ix, y: x.iy };
+	// the back's sockets below everything else
+	if(isBackItem( x )) return { x: snap( x.x * SPREAD ), y: snap( 1000 + x.y * 0.6 ) };
+	return { x: snap( x.x * SPREAD ), y: snap( x.y * SPREAD ) };
 }
 
 function wiredInto( id, key ) { return S().wires.find(function(w){ return w.to[0] == id && w.to[1] == key; }); }
+function portItems() { var s = S(); return s.items.concat( s.back ).filter(function(i){ var sp = CAT.specOf( i.kind ); return sp && !sp.deco; }); }
 
 function renderInside()
 {
 	var s = S();
 	el.nodes.innerHTML = "";
 	ed.ports = {}; ed.leds = [];
-	var all = s.items.filter(function(i){ var sp = CAT.specOf( i.kind ); return sp && !sp.deco; }).concat( s.nodes );
-	all.forEach(function(x){
+	portItems().concat( s.nodes ).forEach(function(x){
 		var sp = CAT.specOf( x.kind ), isCtl = !CAT.MODULES[ x.kind ], p = innerPos( x );
-		var n = $e( "div", "se-node" + (isCtl ? " ctl" : "") );
+		var n = $e( "div", "se-node" + (isCtl ? " ctl" : "") + (isBackItem( x ) ? " rear" : "") );
 		n.setAttribute( "data-id", x.id );
 		n.style.left = p.x + "px"; n.style.top = p.y + "px";
 		var head = $e( "div", "se-head", esc( sp.title ) + (isCtl && nameOf( x ) != sp.title ? '<small>' + esc( nameOf( x ) ) + '</small>' : '') );
@@ -416,7 +586,7 @@ function renderInside()
 			dot.title = inp[1] + (w ? "" : ": " + CAT.fmt( { min: inp[2], max: inp[3], unit: inp[5] }, constOf( x, inp ) ));
 			row.appendChild( dot );
 			row.appendChild( document.createTextNode( inp[1] ) );
-			if(!w && inp[5] != "audio" && inp[5] != "gate") { var c = $e( "i", "", esc( CAT.fmt( { min: inp[2], max: inp[3], unit: inp[5] }, constOf( x, inp ) ) ) ); row.appendChild( c ); }
+			if(!w && inp[5] != "audio" && inp[5] != "gate") row.appendChild( $e( "i", "", esc( CAT.fmt( { min: inp[2], max: inp[3], unit: inp[5] }, constOf( x, inp ) ) ) ) );
 			ci.appendChild( row );
 			ed.ports[ x.id + "|in|" + inp[0] ] = dot;
 		});
@@ -499,7 +669,7 @@ function toWorld( e )
 function fitInside()
 {
 	var s = S(), xs = [], ys = [];
-	s.items.concat( s.nodes ).forEach(function(x){ var sp = CAT.specOf( x.kind ); if(!sp || sp.deco) return; var p = innerPos( x ); xs.push( p.x, p.x + 170 ); ys.push( p.y, p.y + 40 + 20 * Math.max( sp.ins.length, sp.outs.length ) ); });
+	portItems().concat( s.nodes ).forEach(function(x){ var sp = CAT.specOf( x.kind ), p = innerPos( x ); xs.push( p.x, p.x + 170 ); ys.push( p.y, p.y + 40 + 20 * Math.max( sp.ins.length, sp.outs.length ) ); });
 	if(!xs.length) return;
 	var r = el.stage.getBoundingClientRect(), x0 = Math.min.apply( null, xs ), x1 = Math.max.apply( null, xs ), y0 = Math.min.apply( null, ys ), y1 = Math.max.apply( null, ys );
 	ed.zoom = Math.max( 0.25, Math.min( 1, (r.width - 60) / (x1 - x0), (r.height - 60) / (y1 - y0) ) );
@@ -607,12 +777,6 @@ function insideEvents()
 		ed.pan.x = mx - (mx - ed.pan.x) * z / ed.zoom; ed.pan.y = my - (my - ed.pan.y) * z / ed.zoom; ed.zoom = z;
 		applyWorld();
 	}, { passive: false });
-	ins.addEventListener("dragover", function(e){ e.preventDefault(); e.dataTransfer.dropEffect = "copy"; });
-	ins.addEventListener("drop", function(e){
-		e.preventDefault();
-		var what = e.dataTransfer.getData( "text/plain" );
-		if(what && CAT.MODULES[ what ]) { var p = toWorld( e ); add( what, { x: p.x + 84, y: p.y + 20 } ); }
-	});
 }
 
 // ---------------------------------------------------------------------------
@@ -620,9 +784,11 @@ function insideEvents()
 
 function field( label, input ) { var l = $e( "label", "se-field" ); l.appendChild( document.createTextNode( label ) ); l.appendChild( input ); return l; }
 function textIn( v, fn ) { var i = $e( "input" ); i.value = v || ""; i.addEventListener("input", function(){ fn( i.value ); }); return i; }
-function numIn( v, fn, min, max ) { var i = $e( "input" ); i.type = "number"; i.value = v; if(min !== undefined) i.min = min; if(max !== undefined) i.max = max; i.addEventListener("change", function(){ var n = +i.value; if(isFinite( n )) fn( n ); }); return i; }
+function numIn( v, fn, min, max ) { var i = $e( "input" ); i.type = "number"; i.value = Math.round( v * 100 ) / 100; if(min !== undefined) i.min = min; if(max !== undefined) i.max = max; i.addEventListener("change", function(){ var n = +i.value; if(isFinite( n )) fn( n ); }); return i; }
 function selIn( v, opts, fn ) { var s = $e( "select" ); opts.forEach(function(o){ var op = $e( "option" ); op.value = o[0]; op.textContent = o[1]; s.appendChild( op ); }); s.value = v; s.addEventListener("change", function(){ fn( s.value ); }); return s; }
+function check( label, v, fn ) { var c = $e( "input" ); c.type = "checkbox"; c.checked = !!v; c.addEventListener("change", function(){ fn( c.checked ); }); var l = field( label, c ); l.classList.add( "check" ); return l; }
 function btn( label, fn, cls ) { var b = $e( "button", cls || "" ); b.textContent = label; b.addEventListener("click", fn); return b; }
+function paintOpts() { return Object.keys( CS.PAINT ).map(function(k){ return [ k, CS.PAINT[k][0] == "#" ? k.charAt( 0 ).toUpperCase() + k.substr( 1 ) : CS.PAINT[k] ]; }); }
 
 function renderProps()
 {
@@ -648,7 +814,7 @@ function renderProps()
 	var refreshInside = function(){ if(ed.view == "inside") renderInside(); };
 	if(!isMod)
 	{
-		if("label" in x || ["knob", "slider", "button", "toggle", "jackin", "jackout", "led"].indexOf( x.kind ) >= 0)
+		if(["knob", "slider", "button", "toggle", "jackin", "jackout", "led", "ain", "aout", "mainl", "mainr"].indexOf( x.kind ) >= 0)
 			p.appendChild( field( "Label", textIn( x.label, function(v){ x.label = v.toUpperCase().substr( 0, 20 ); refreshInside(); } ) ) );
 		switch(x.kind)
 		{
@@ -668,27 +834,51 @@ function renderProps()
 			case "led":
 				p.appendChild( field( "Colour", selIn( x.color || "red", Object.keys( CS.LED_COLORS ).map(function(k){ return [ k, k ]; }), function(v){ x.color = v; } ) ) );
 				break;
-			case "jackin": case "jackout":
-				var used = s.items.filter(function(i){ return i.kind == x.kind && i !== x; }).map(function(i){ return i.slot; });
-				var opts = []; for(var k = 1; k <= CAT.SLOTS; ++k) if(used.indexOf( k ) < 0) opts.push([ String( k ), "Socket " + k ]);
+			case "jackin": case "jackout": case "ain": case "aout":
+				var list = isBackItem( x ) ? s.back : s.items, max = x.kind == "ain" || x.kind == "aout" ? CAT.ASLOTS : CAT.SLOTS;
+				var used = list.filter(function(i){ return i.kind == x.kind && i !== x; }).map(function(i){ return i.slot; });
+				var opts = []; for(var k = 1; k <= max; ++k) if(used.indexOf( k ) < 0) opts.push([ String( k ), "Socket " + k ]);
 				p.appendChild( field( "Socket", selIn( String( x.slot ), opts, function(v){ x.slot = +v; } ) ) );
-				p.appendChild( field( "Signal", selIn( x.mode || "cv", [["cv", "CV / audio: ±5 V ↔ ±1"], ["pitch", "Pitch: 1 V / octave"], ["gate", "Gate: 5 V ↔ 1"]], function(v){ x.mode = v; } ) ) );
+				if(x.kind == "jackin" || x.kind == "jackout")
+					p.appendChild( field( "Signal", selIn( x.mode || "cv", [["cv", "CV / audio: ±5 V ↔ ±1"], ["pitch", "Pitch: 1 V / octave"], ["gate", "Gate: 5 V ↔ 1"]], function(v){ x.mode = v; } ) ) );
+				else p.appendChild( $e( "p", "", "Line level audio, -1..1, on the back (Tab in the rack)." ) );
+				break;
+			case "mainl": case "mainr": case "midiin":
+				p.appendChild( $e( "p", "", x.kind == "midiin" ? "The synth's MIDI input, with its channel switches. It is always on the back: move it where you like." :
+					"Where the AUDIO OUT module's sound leaves (cabled to the speakers when the synth is added). Always on the back." ) );
 				break;
 			case "label":
 				p.appendChild( field( "Text", textIn( x.text, function(v){ x.text = v; } ) ) );
 				p.appendChild( field( "Size", numIn( x.size || 16, function(v){ x.size = Math.max( 8, Math.min( 80, v ) ); }, 8, 80 ) ) );
-				var dim = $e( "input" ); dim.type = "checkbox"; dim.checked = !!x.dim; dim.addEventListener("change", function(){ x.dim = dim.checked; });
-				var dl = field( "Dim", dim ); dl.classList.add( "check" ); p.appendChild( dl );
+				p.appendChild( field( "Colour", selIn( x.color || (x.dim ? "dim" : "ink"), paintOpts(), function(v){ x.color = v; delete x.dim; } ) ) );
+				p.appendChild( check( "Bold", x.bold !== false, function(v){ x.bold = v; } ) );
 				break;
 			case "section":
 				p.appendChild( field( "Title", textIn( x.title, function(v){ x.title = v.toUpperCase(); } ) ) );
 				p.appendChild( field( "Width", numIn( x.w || 200, function(v){ x.w = Math.max( 40, v ); }, 40, 1600 ) ) );
 				p.appendChild( field( "Height", numIn( x.h || 120, function(v){ x.h = Math.max( 30, v ); }, 30, 700 ) ) );
 				break;
+			case "rect":
+				p.appendChild( field( "Colour", selIn( x.color || "ink", paintOpts(), function(v){ x.color = v; } ) ) );
+				p.appendChild( check( "Filled", x.fill, function(v){ x.fill = v; renderProps(); } ) );
+				if(!x.fill) p.appendChild( field( "Line width", numIn( x.width || 2, function(v){ x.width = Math.max( 0.5, Math.min( 20, v ) ); }, 0.5, 20 ) ) );
+				p.appendChild( field( "Corner radius", numIn( x.radius || 0, function(v){ x.radius = Math.max( 0, Math.min( 100, v ) ); }, 0, 100 ) ) );
+				p.appendChild( field( "Width", numIn( x.w || 200, function(v){ x.w = Math.max( 4, v ); }, 4, 1600 ) ) );
+				p.appendChild( field( "Height", numIn( x.h || 100, function(v){ x.h = Math.max( 4, v ); }, 4, 700 ) ) );
+				break;
+			case "line":
+				p.appendChild( field( "Colour", selIn( x.color || "ink", paintOpts(), function(v){ x.color = v; } ) ) );
+				p.appendChild( field( "Width", numIn( x.width || 2, function(v){ x.width = Math.max( 0.5, Math.min( 20, v ) ); }, 0.5, 20 ) ) );
+				p.appendChild( $e( "p", "", "Drag its ends to change it, or the line itself to move it." ) );
+				break;
+			case "vents":
+				p.appendChild( field( "Width", numIn( x.w || 200, function(v){ x.w = Math.max( 26, v ); }, 26, 1600 ) ) );
+				p.appendChild( field( "Height", numIn( x.h || 100, function(v){ x.h = Math.max( 16, v ); }, 16, 700 ) ) );
+				break;
 		}
 	}
 	// the inputs: their wire, or their constant
-	if(sp.ins.length && (isMod || x.kind == "led" || x.kind == "jackout"))
+	if(sp.ins.length && (isMod || x.kind == "led" || x.kind == "jackout" || x.kind == "aout"))
 	{
 		p.appendChild( $e( "h4", "", "INPUTS" ) );
 		sp.ins.forEach(function(inp){
@@ -714,7 +904,7 @@ function renderProps()
 	if(sp.outs.length)
 		p.appendChild( $e( "p", "", outs.length ? "Wired to: " + outs.map(function(w){ return esc( nameOf( byId( w.to[0] ) ) + " " + w.to[1].toUpperCase() ); }).join( ", " ) : "Its output is not wired yet: see INSIDE." ) );
 	var b = $e( "div", "se-btns" );
-	if(x.kind != "out") { b.appendChild( btn( "Duplicate", function(){ duplicate( x.id ); } ) ); b.appendChild( btn( "Delete", function(){ remove( sel ); }, "se-danger" ) ); }
+	if(x.kind != "out" && !sp.fixed) { b.appendChild( btn( "Duplicate", function(){ duplicate( x.id ); } ) ); b.appendChild( btn( "Delete", function(){ remove( sel ); }, "se-danger" ) ); }
 	p.appendChild( b );
 }
 
@@ -722,9 +912,7 @@ function renderProps()
 function rangeFields( p, x )
 {
 	var s = S(), r = CAT.controlRange( s, x ), auto = !(x.range && x.range.min !== undefined);
-	var cb = $e( "input" ); cb.type = "checkbox"; cb.checked = auto;
-	cb.addEventListener("change", function(){ if(cb.checked) delete x.range; else x.range = { min: r.min, max: r.max, def: r.def, unit: r.unit }; renderProps(); });
-	var l = field( "Automatic range (from its wire)", cb ); l.classList.add( "check" ); p.appendChild( l );
+	p.appendChild( check( "Automatic range (from its wire)", auto, function(v){ if(v) delete x.range; else x.range = { min: r.min, max: r.max, def: r.def, unit: r.unit }; renderProps(); } ) );
 	if(auto) p.appendChild( $e( "p", "", "Range: " + esc( CAT.fmt( r, r.min ) ) + " to " + esc( CAT.fmt( r, r.max ) ) ) );
 	else
 	{
@@ -736,18 +924,19 @@ function rangeFields( p, x )
 	}
 }
 
-// nothing selected: the design, My synths
+// nothing selected: the design, start again, My synths
 function renderDesignInfo( p )
 {
 	var s = S();
 	p.appendChild( $e( "h3", "", esc( s.name || "CUSTOM SYNTH" ) ) );
-	p.appendChild( $e( "p", "", s.items.length + " panel items, " + s.nodes.length + " modules, " + s.wires.length + " wires. Select something to edit it." ) );
+	p.appendChild( $e( "p", "", s.items.length + " front panel items, " + s.back.length + " on the back, " + s.nodes.length + " modules, " + s.wires.length + " wires. Select something to edit it." ) );
 	p.appendChild( $e( "p", "", "Every module has inputs on its left and outputs on its right. An input with no wire uses its own value (set it here when the module is selected). Audio is -1..1, gates 0 or 1, pitch in octaves from C4." ) );
 	// start again: an empty panel (MIDI IN and AUDIO OUT inside), or the example synth; a second click confirms
 	p.appendChild( $e( "h4", "", "START AGAIN" ) );
 	var row0 = $e( "div", "se-btns" );
-	[ ["Empty panel", function(){ var d = CS.defaults(); applyDesign({ name: "NEW SYNTH", height: S().height, color: S().color, knob_skin: S().knob_skin, wood: S().wood, width: mod().type == "custom_half" ? "half" : "full",
-			items: [], nodes: [ { id: "midi", kind: "midi", x: 0, y: 300 }, { id: "out", kind: "out", x: 700, y: 300 } ], wires: [], next: 1 }); hint( "An empty panel: add items on the FRONT PANEL, modules INSIDE" ); } ],
+	[ ["Empty panel", function(){ applyDesign({ name: "NEW SYNTH", height: s.height, color: s.color, knob_skin: s.knob_skin, wood: s.wood, width: mod().type == "custom_half" ? "half" : "full",
+			items: [], back: CS.defaultBack( "NEW SYNTH" ), nodes: [ { id: "midi", kind: "midi", x: 0, y: 300 }, { id: "out", kind: "out", x: 700, y: 300 } ], wires: [], next: 1 });
+			hint( "An empty panel: add items on the FRONT PANEL, modules INSIDE" ); } ],
 	  ["Example synth", function(){ var d = CS.defaults(); d.width = mod().type == "custom_half" ? "half" : "full"; applyDesign( d ); hint( "The example synth: MIDI, oscillator, filter, envelope, VCA" ); } ] ].forEach(function(o){
 		var b = btn( o[0], function(){
 			if(b.getAttribute( "data-sure" )) o[1]();
@@ -780,10 +969,10 @@ function onKey( e )
 	if((e.key == "Delete" || e.key == "Backspace") && ed.sel) { remove( ed.sel ); e.stopImmediatePropagation(); e.preventDefault(); return; }
 	if((e.ctrlKey || e.metaKey) && e.code == "KeyD" && ed.sel && ed.sel.id) { duplicate( ed.sel.id ); e.stopImmediatePropagation(); e.preventDefault(); return; }
 	var arrows = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
-	if(arrows[ e.key ] && ed.view == "front" && ed.sel && ed.sel.type == "item")
+	if(arrows[ e.key ] && ed.view != "inside" && ed.sel && ed.sel.type == "item")
 	{
-		var it = byId( ed.sel.id ), st = e.shiftKey ? 10 : 1;
-		it.x += arrows[ e.key ][0] * st; it.y += arrows[ e.key ][1] * st; delete it.ix; delete it.iy;
+		var it = byId( ed.sel.id ), st = e.shiftKey ? 10 : 1, dx = arrows[ e.key ][0] * st, dy = arrows[ e.key ][1] * st;
+		it.x += dx; it.y += dy; if(it.x2 !== undefined) { it.x2 += dx; it.y2 += dy; } delete it.ix; delete it.iy;
 		e.stopImmediatePropagation(); e.preventDefault();
 	}
 	// other keys go on to the rack: the computer keyboard plays the synth while it is built
@@ -816,7 +1005,13 @@ function saveToLibrary()
 // a design into this synth (keeps its MIDI settings)
 function applyDesign( d )
 {
-	var m = mod(), s = m.settings, keep = { midi_channel: s.midi_channel, midi_master: s.midi_master };
+	applyDesignTo( mod(), d );
+	ed.sel = null; ed.fitted = false;
+	refreshTop(); setView( ed.view );
+}
+function applyDesignTo( m, d )
+{
+	var s = m.settings, keep = { midi_channel: s.midi_channel, midi_master: s.midi_master };
 	Object.keys( s ).forEach(function(k){ delete s[k]; });
 	var c = JSON.parse( JSON.stringify( d ) );
 	m.type = c.width == "half" ? "custom_half" : "custom";
@@ -824,8 +1019,6 @@ function applyDesign( d )
 	Object.keys( c ).forEach(function(k){ s[k] = c[k]; });
 	Object.keys( keep ).forEach(function(k){ if(keep[k] !== undefined) s[k] = keep[k]; });
 	WR.types[ m.type ].validate( s, s );
-	ed.sel = null; ed.fitted = false;
-	refreshTop(); setView( ed.view ); renderProps();
 }
 
 // ADD DEVICE: My synths as cards in the Custom category
@@ -851,18 +1044,9 @@ WR.onAddPanelCard = function( card )
 	try { m = addDevice( d.width == "half" ? "custom_half" : "custom" ); }
 	finally { ed.suppress = false; }
 	if(!m) return;
-	var keep = ed.mid; ed.mid = m.id;
 	applyDesignTo( m, d );
-	ed.mid = keep;
 	setStatus( "Added " + name + " (" + m.id + ") at the bottom of the rack" );
 };
-function applyDesignTo( m, d )
-{
-	var s = m.settings, c = JSON.parse( JSON.stringify( d ) );
-	m.type = c.width == "half" ? "custom_half" : "custom"; delete c.width;
-	Object.keys( c ).forEach(function(k){ s[k] = c[k]; });
-	WR.types[ m.type ].validate( s, s );
-}
 
 window.SynthEditor = { open: open, close: close, add: add, connect: connect, select: select, remove: remove, setView: setView, applyDesign: applyDesign,
 	state: function(){ return ed; }, isOpen: function(){ return !!el.root && !el.root.hidden; } };

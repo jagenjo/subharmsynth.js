@@ -12,10 +12,12 @@
 (function(){
 
 const C4 = 261.6255653005986;
-const SLOTS = 8;
+const SLOTS = 8, ASLOTS = 4;
+// front: in1..8, out1..8 (CV); back: AUDIO L / R (the AUDIO OUT module), ain1..4, aout1..4
 const IN_IDS = [], OUT_IDS = [];
 for (let i = 1; i <= SLOTS; i++) { IN_IDS.push("in" + i); OUT_IDS.push("out" + i); }
 OUT_IDS.push("audio_l", "audio_r");
+for (let i = 1; i <= ASLOTS; i++) { IN_IDS.push("ain" + i); OUT_IDS.push("aout" + i); }
 
 // an input: [key, label, min, max, default, unit]
 // units: oct (pitch, octaves from C4), hz / s / bpm (exponential), lvl (0..1), bi (-1..1), audio, gate, int, x
@@ -58,7 +60,16 @@ const CONTROLS = {
 	jackout: { title: "JACK OUT", outs: [], ins: [["in", "IN", -1, 1, 0, "bi"]] },
 	label:   { title: "LABEL", outs: [], ins: [], deco: true },
 	section: { title: "SECTION", outs: [], ins: [], deco: true },
-	screw:   { title: "SCREW", outs: [], ins: [], deco: true }
+	rect:    { title: "RECTANGLE", outs: [], ins: [], deco: true },
+	line:    { title: "LINE", outs: [], ins: [], deco: true },
+	screw:   { title: "SCREW", outs: [], ins: [], deco: true },
+	// the back panel
+	ain:     { title: "AUDIO IN", outs: ["audio"], ins: [], about: "Audio from the rack (a socket on the back)" },
+	aout:    { title: "AUDIO OUT", outs: [], ins: [["in", "IN", -1, 1, 0, "audio"]], about: "Audio to the rack (a socket on the back)" },
+	mainl:   { title: "MAIN OUT L", outs: [], ins: [], deco: true, fixed: true },
+	mainr:   { title: "MAIN OUT R", outs: [], ins: [], deco: true, fixed: true },
+	midiin:  { title: "MIDI IN", outs: [], ins: [], deco: true, fixed: true },
+	vents:   { title: "VENTS", outs: [], ins: [], deco: true }
 };
 
 function specOf(kind) { return MODULES[kind] || CONTROLS[kind] || null; }
@@ -77,13 +88,14 @@ function controlRange(design, item) {
 	if (item.range && item.range.min !== undefined) return item.range;
 	const w = (design.wires || []).find(function(w){ return w.from[0] === item.id; });
 	if (w) {
-		const to = (design.items || []).find(function(x){ return x.id === w.to[0]; }) || (design.nodes || []).find(function(x){ return x.id === w.to[0]; });
+		const to = findItem(design, w.to[0]);
 		const spec = to && specOf(to.kind);
 		const inp = spec && spec.ins.find(function(i){ return i[0] === w.to[1]; });
 		if (inp && inp[5] !== "gate") return { min: inp[2], max: inp[3], def: inp[4], unit: inp[5] };
 	}
 	return { min: 0, max: 1, def: 0.5, unit: "lvl" };
 }
+function findItem(design, id) { return (design.items || []).find(function(x){ return x.id === id; }) || (design.back || []).find(function(x){ return x.id === id; }) || (design.nodes || []).find(function(x){ return x.id === id; }); }
 function fromN(r, n) { n = clamp(n, 0, 1); const v = isExp(r.unit) ? r.min * Math.pow(r.max / r.min, n) : r.min + (r.max - r.min) * n; return r.unit === "int" ? Math.round(v) : v; }
 function toN(r, v) { return clamp(isExp(r.unit) ? Math.log(v / r.min) / Math.log(r.max / r.min) : (v - r.min) / (r.max - r.min), 0, 1); }
 const NOTE_N = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
@@ -115,6 +127,8 @@ RUN.jackout = function(n, v, e) {
 	const x = I(n, v, 0), m = n.mode;
 	e.outs[n.slot] = m === "pitch" ? x : (m === "gate" ? (x > 0.5 ? 5 : 0) : clamp(x * 5, -10, 10));
 };
+RUN.ain = function(n, v, e) { v[n.o] = e.ins[SLOTS + n.slot] || 0; };
+RUN.aout = function(n, v, e) { e.outs[SLOTS + 2 + n.slot] = fastTanh(I(n, v, 0)); };
 RUN.midi = function(n, v, e) {
 	v[n.o] = e.pitch;
 	let g = e.gate ? 1 : 0;
@@ -209,7 +223,7 @@ class CustomDSP {
 
 	setSettings(s) {
 		this.s = s;
-		const sig = JSON.stringify([ (s.items || []).map(function(i){ return [i.id, i.kind, i.slot, i.mode, i.range]; }), (s.nodes || []).map(function(n){ return [n.id, n.kind]; }), s.wires ]);
+		const sig = JSON.stringify([ (s.items || []).concat(s.back || []).map(function(i){ return [i.id, i.kind, i.slot, i.mode, i.range]; }), (s.nodes || []).map(function(n){ return [n.id, n.kind]; }), s.wires ]);
 		if (sig !== this.sig) { this.sig = sig; this.compile(s); }
 		this.update(s);
 	}
@@ -240,9 +254,10 @@ class CustomDSP {
 			n.cur = n.target = 0;
 			if (kind === "delay") { n.buf = new Float32Array(Math.round(this.sr * 2.05)); n.pos = 0; }
 			if (kind === "jackin" || kind === "jackout") { n.slot = clamp((item.slot | 0) - 1, 0, SLOTS - 1); n.mode = item.mode || "cv"; }
+			if (kind === "ain" || kind === "aout") n.slot = clamp((item.slot | 0) - 1, 0, ASLOTS - 1);
 			nodes.push(n); byId[n.id] = n;
 		};
-		(s.items || []).forEach((it) => add(it, it.kind, it));
+		(s.items || []).concat(s.back || []).forEach((it) => add(it, it.kind, it));
 		(s.nodes || []).forEach((nd) => add(nd, nd.kind, null));
 		let o = 0;
 		for (const n of nodes) { n.o = o; o += Math.max(1, n.spec.outs.length); }
@@ -270,7 +285,7 @@ class CustomDSP {
 	// values that need no recompile: the controls, the inputs' constants
 	update(s) {
 		const items = {};
-		(s.items || []).forEach((i) => items[i.id] = i);
+		(s.items || []).concat(s.back || []).forEach((i) => items[i.id] = i);
 		const consts = {};
 		(s.nodes || []).forEach((nd) => consts[nd.id] = nd.consts || {});
 		for (const n of this.nodes) {
@@ -304,7 +319,7 @@ class CustomDSP {
 CustomDSP.IN_IDS = IN_IDS;
 CustomDSP.OUT_IDS = OUT_IDS;
 CustomDSP.MIDI_IN = "midi_in";
-CustomDSP.CATALOG = { MODULES, CONTROLS, SLOTS, specOf, controlRange, fromN, toN, fmt, isExp };
+CustomDSP.CATALOG = { MODULES, CONTROLS, SLOTS, ASLOTS, specOf, controlRange, fromN, toN, fmt, isExp, findItem };
 
 globalThis.WR_DSP = globalThis.WR_DSP || {};
 globalThis.WR_DSP.custom = CustomDSP;
