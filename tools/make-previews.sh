@@ -1,13 +1,13 @@
 #!/bin/bash
 # tools/make-previews.sh
-# Takes a picture of every device for the ADD DEVICE panel: opens index.html?preview=<type> in
+# Takes a picture of every device for the ADD DEVICE panel: opens app/index.html?preview=<type> in
 # headless Chrome (which draws only that device, on magenta), trims the magenta and saves
-# previews/<type>.jpg, 640 px wide. Run it from anywhere after changing a panel:
+# app/previews/<type>.jpg, 640 px wide. Run it from anywhere after changing a panel:
 #   tools/make-previews.sh [type ...]        (no types: all of them)
 # CHROME=/path/to/chrome overrides the browser; it looks for Chrome / Chromium otherwise.
 
 set -e
-DIR="$(cd "$(dirname "$0")/.." && pwd)"
+DIR="$(cd "$(dirname "$0")/../app" && pwd)"
 OUT="$DIR/previews"
 mkdir -p "$OUT"
 

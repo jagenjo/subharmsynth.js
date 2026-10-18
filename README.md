@@ -8,39 +8,42 @@ Needs a browser with AudioWorklet support, served over `https://` or `localhost`
 
 ## Files
 
+The repository has three parts: the app in `app/` (open `app/index.html`), the home page in `home/`, and `index.html` at the root, which sends visitors to the home page. `tools/` has the scripts.
+
 | file | what |
 |---|---|
-| `index.html` | page and toolbar |
-| `webrack.js` | the rack controller: synth registry, settings and patches, audio graph, post FX, Scala parser, Web MIDI, keys |
-| `rack-worklet.js` | the audio processor: hosts the synths' DSP, routes the cables, runs the keys outputs, LFOs, compressor and scope |
-| `sequencer.js` | the song sequencer in the bottom bar: tracks, piano roll, transport, recording, scheduling |
-| `sessions.js` | sessions: the rack autosaved in the browser, the Sessions panel |
-| `code.js` | the rack UI: canvas widgets (knobs, buttons, switches, jacks), cables, shared devices, scrolling and zoom, toolbar, keyboard shortcuts |
-| `devices/subharm.js`, `devices/subharm-worklet.js` | the Subharm: panel, jacks and settings; DSP |
-| `devices/dram.js`, `devices/dram-worklet.js` | the DRAM |
-| `devices/b32.js`, `devices/b32-worklet.js` | the Brother-32 |
-| `devices/maze.js`, `devices/maze-worklet.js` | the Maze |
-| `devices/mystic.js`, `devices/mystic-worklet.js` | the Mystic (polyphonic) |
-| `devices/llmdram.js`, `devices/llmdram-worklet.js` | the LLM Dram drum machine |
-| `devices/lunar.js`, `devices/lunar-worklet.js` | the Lunar 21 drone machine |
-| `previews/`, `tools/make-previews.sh` | the devices' pictures for ADD DEVICE, and the script that makes them |
-| `devices/mixer.js`, `devices/mixer-worklet.js` | the 6 channel mixer |
-| `devices/lfo.js`, `devices/lfo-worklet.js` | the dual LFO |
-| `devices/comp.js`, `devices/comp-worklet.js` | the stereo compressor and its scope |
-| `devices/delay.js`, `devices/delay-worklet.js` | the stereo / ping-pong delay |
-| `devices/universe.js`, `devices/universe-worklet.js` | Universe, the granular / looper effect |
-| `devices/hyper.js`, `devices/hyper-worklet.js` | Hyper, the distortion / bit crusher |
-| `devices/cosmos.js`, `devices/cosmos-worklet.js` | Cosmos, the 12 algorithm reverb |
-| `devices/pollyd.js`, `devices/pollyd-worklet.js` | Para D, the four-voice paraphonic synthesizer |
-| `devices/grid.js`, `devices/grid-worklet.js` | Grid 32, the note matrix sequencer |
-| `devices/mount.js`, `devices/mount-worklet.js` | Mount, the eight voice polyphonic synthesizer |
-| `devices/reroute.js`, `devices/reroute-worklet.js` | Reroute, front to back and back again |
-| `devices/reverb.js`, `devices/reverb-worklet.js` | the convolution reverb: native nodes, bridged through a send / return slot |
-| `data/patches.json` | factory patches |
+| `index.html` | sends the project's address to the home page |
+| `app/index.html` | the app: page and toolbar |
+| `app/webrack.js` | the rack controller: synth registry, settings and patches, audio graph, post FX, Scala parser, Web MIDI, keys |
+| `app/rack-worklet.js` | the audio processor: hosts the synths' DSP, routes the cables, runs the keys outputs, LFOs, compressor and scope |
+| `app/sequencer.js` | the song sequencer in the bottom bar: tracks, piano roll, transport, recording, scheduling |
+| `app/sessions.js` | sessions: the rack autosaved in the browser, the Sessions panel |
+| `app/code.js` | the rack UI: canvas widgets (knobs, buttons, switches, jacks), cables, shared devices, scrolling and zoom, toolbar, keyboard shortcuts |
+| `app/devices/subharm.js`, `app/devices/subharm-worklet.js` | the Subharm: panel, jacks and settings; DSP |
+| `app/devices/dram.js`, `app/devices/dram-worklet.js` | the DRAM |
+| `app/devices/b32.js`, `app/devices/b32-worklet.js` | the Brother-32 |
+| `app/devices/maze.js`, `app/devices/maze-worklet.js` | the Maze |
+| `app/devices/mystic.js`, `app/devices/mystic-worklet.js` | the Mystic (polyphonic) |
+| `app/devices/llmdram.js`, `app/devices/llmdram-worklet.js` | the LLM Dram drum machine |
+| `app/devices/lunar.js`, `app/devices/lunar-worklet.js` | the Lunar 21 drone machine |
+| `app/previews/`, `tools/make-previews.sh` | the devices' pictures for ADD DEVICE, and the script that makes them |
+| `app/devices/mixer.js`, `app/devices/mixer-worklet.js` | the 6 channel mixer |
+| `app/devices/lfo.js`, `app/devices/lfo-worklet.js` | the dual LFO |
+| `app/devices/comp.js`, `app/devices/comp-worklet.js` | the stereo compressor and its scope |
+| `app/devices/delay.js`, `app/devices/delay-worklet.js` | the stereo / ping-pong delay |
+| `app/devices/universe.js`, `app/devices/universe-worklet.js` | Universe, the granular / looper effect |
+| `app/devices/hyper.js`, `app/devices/hyper-worklet.js` | Hyper, the distortion / bit crusher |
+| `app/devices/cosmos.js`, `app/devices/cosmos-worklet.js` | Cosmos, the 12 algorithm reverb |
+| `app/devices/pollyd.js`, `app/devices/pollyd-worklet.js` | Para D, the four-voice paraphonic synthesizer |
+| `app/devices/grid.js`, `app/devices/grid-worklet.js` | Grid 32, the note matrix sequencer |
+| `app/devices/mount.js`, `app/devices/mount-worklet.js` | Mount, the eight voice polyphonic synthesizer |
+| `app/devices/reroute.js`, `app/devices/reroute-worklet.js` | Reroute, front to back and back again |
+| `app/devices/reverb.js`, `app/devices/reverb-worklet.js` | the convolution reverb: native nodes, bridged through a send / return slot |
+| `app/data/patches.json` | factory patches |
 | `home/` | the project's home page: features, screenshots (`home/img/`), every device, and a button to launch the app |
 | `old/` | the first version of this project, as in the first commit |
-| `data/impulses/` | free reverb impulse responses, redistributed unaltered under their `license.txt` |
-| `data/scales/` | Scala `.scl` scales, plus `index.json` used by the scale picker |
+| `app/data/impulses/` | free reverb impulse responses, redistributed unaltered under their `license.txt` |
+| `app/data/scales/` | Scala `.scl` scales, plus `index.json` used by the scale picker |
 
 ## The rack
 
