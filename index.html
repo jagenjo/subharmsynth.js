@@ -3,20 +3,20 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>SYNTHS</title>
+<title>GASFREE</title>
 <meta name="description" content="A rack of semi-modular synthesizers in the browser, built with the WebAudio API: the SUBHARM, DRAM, BROTHER-32 and MAZE synthesizers, a mixer, LFOs, compressors, reverbs and delays, patchable front and back." />
 <!-- link previews (Open Graph / Twitter); image URLs must be absolute -->
 <meta property="og:type" content="website" />
-<meta property="og:title" content="SYNTHS: a modular synth rack in the browser" />
+<meta property="og:title" content="GASFREE: a modular synth rack in the browser" />
 <meta property="og:description" content="A rack of semi-modular synthesizers in the browser, built with the WebAudio API: the SUBHARM, DRAM, BROTHER-32 and MAZE synthesizers, a mixer, LFOs, compressors, reverbs and delays, patchable front and back." />
 <meta property="og:url" content="https://tamats.com/projects/synth/" />
 <meta property="og:image" content="https://tamats.com/projects/synth/preview.jpg" />
 <meta property="og:image:type" content="image/jpeg" />
 <meta property="og:image:width" content="1600" />
 <meta property="og:image:height" content="962" />
-<meta property="og:image:alt" content="The SYNTHS rack: synthesizer panels with knobs, sequencers and patch cables" />
+<meta property="og:image:alt" content="The GASFREE rack: synthesizer panels with knobs, sequencers and patch cables" />
 <meta name="twitter:card" content="summary_large_image" />
-<meta name="twitter:title" content="SYNTHS: a modular synth rack in the browser" />
+<meta name="twitter:title" content="GASFREE: a modular synth rack in the browser" />
 <meta name="twitter:description" content="A rack of semi-modular synthesizers in the browser, built with the WebAudio API: the SUBHARM, DRAM, BROTHER-32 and MAZE synthesizers, a mixer, LFOs, compressors, reverbs and delays, patchable front and back." />
 <meta name="twitter:image" content="https://tamats.com/projects/synth/preview.jpg" />
 <link rel="preconnect" href="https://fonts.gstatic.com">
@@ -107,7 +107,7 @@
 </head>
 <body>
 <header>
-	<span class="title">SYNTHS</span>
+	<span class="title">GASFREE</span>
 	<div class="group">
 		<button id="power" title="Start / suspend the audio engine">Audio off</button>
 	</div>
@@ -159,7 +159,7 @@
 	<div id="help-wrap">
 		<button id="help-btn" title="How to use the rack">Help</button>
 		<div id="help-panel" hidden>
-			<p class="help-about"><a href="home/" target="_blank">About SYNTHS: the devices and screenshots</a></p>
+			<p class="help-about"><a href="home/" target="_blank">About GASFREE: the devices and screenshots</a></p>
 			<h3>Mouse</h3>
 			<ul>
 				<li><b>Knobs, sliders:</b> drag up / down (Shift: fine). Double-click: the default. The wheel over a knob turns it (Options can turn that off).</li>
@@ -193,29 +193,29 @@
 </header>
 <canvas id="panel"></canvas>
 <canvas id="seq"></canvas>
-<script src="webrack.js?v=20261018h"></script>
+<script src="webrack.js?v=20261018i"></script>
 <!-- synths: each registers itself in the rack (panel here, DSP in its -worklet.js) -->
-<script src="devices/subharm.js?v=20261018h"></script>
-<script src="devices/dram.js?v=20261018h"></script>
-<script src="devices/b32.js?v=20261018h"></script>
-<script src="devices/maze.js?v=20261018h"></script>
-<script src="devices/mystic.js?v=20261018h"></script>
-<script src="devices/llmdram.js?v=20261018h"></script>
-<script src="devices/lunar.js?v=20261018h"></script>
-<script src="devices/mixer.js?v=20261018h"></script>
-<script src="devices/lfo.js?v=20261018h"></script>
-<script src="devices/comp.js?v=20261018h"></script>
-<script src="devices/reverb.js?v=20261018h"></script>
-<script src="devices/delay.js?v=20261018h"></script>
-<script src="devices/universe.js?v=20261018h"></script>
-<script src="devices/hyper.js?v=20261018h"></script>
-<script src="devices/cosmos.js?v=20261018h"></script>
-<script src="devices/pollyd.js?v=20261018h"></script>
-<script src="devices/grid.js?v=20261018h"></script>
-<script src="devices/mount.js?v=20261018h"></script>
-<script src="devices/reroute.js?v=20261018h"></script>
-<script src="code.js?v=20261018h"></script>
-<script src="sequencer.js?v=20261018h"></script>
-<script src="sessions.js?v=20261018h"></script>
+<script src="devices/subharm.js?v=20261018i"></script>
+<script src="devices/dram.js?v=20261018i"></script>
+<script src="devices/b32.js?v=20261018i"></script>
+<script src="devices/maze.js?v=20261018i"></script>
+<script src="devices/mystic.js?v=20261018i"></script>
+<script src="devices/llmdram.js?v=20261018i"></script>
+<script src="devices/lunar.js?v=20261018i"></script>
+<script src="devices/mixer.js?v=20261018i"></script>
+<script src="devices/lfo.js?v=20261018i"></script>
+<script src="devices/comp.js?v=20261018i"></script>
+<script src="devices/reverb.js?v=20261018i"></script>
+<script src="devices/delay.js?v=20261018i"></script>
+<script src="devices/universe.js?v=20261018i"></script>
+<script src="devices/hyper.js?v=20261018i"></script>
+<script src="devices/cosmos.js?v=20261018i"></script>
+<script src="devices/pollyd.js?v=20261018i"></script>
+<script src="devices/grid.js?v=20261018i"></script>
+<script src="devices/mount.js?v=20261018i"></script>
+<script src="devices/reroute.js?v=20261018i"></script>
+<script src="code.js?v=20261018i"></script>
+<script src="sequencer.js?v=20261018i"></script>
+<script src="sessions.js?v=20261018i"></script>
 </body>
 </html>

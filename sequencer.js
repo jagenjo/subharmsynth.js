@@ -1119,7 +1119,7 @@ function detach()
 	var links = Array.prototype.map.call( document.querySelectorAll( "link[rel=stylesheet], link[rel=preconnect]" ), function(l){ return l.outerHTML; } ).join( "" );
 	var d = w.document;
 	d.open();
-	d.write( '<!doctype html><html><head><meta charset="utf-8"><title>SYNTHS \u00b7 SEQUENCER</title>' + links +
+	d.write( '<!doctype html><html><head><meta charset="utf-8"><title>GASFREE \u00b7 SEQUENCER</title>' + links +
 		'<style>html, body { margin: 0; height: 100%; background: #111110; overflow: hidden; } canvas { display: block; width: 100%; }</style></head><body></body></html>' );
 	d.close();
 	pop = { win: w, parent: cv.parentNode, next: cv.nextSibling, open: view.open };
