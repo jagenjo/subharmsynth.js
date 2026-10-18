@@ -33,6 +33,11 @@ try {
 
 var play = { on: false, rec: false, t0: 0, beat0: 0, sched: 0, sounding: [], pending: {}, last_beat: 0 };
 
+// DETACHED: the sequencer's canvas in a window of its own (see detach()); its window and document
+var pop = null;
+function W() { return pop ? pop.win : window; }
+function D() { return pop ? pop.win.document : document; }
+
 function song() { return rack.settings.song; }
 function track() { var s = song(); return s.tracks[ s.sel ]; }
 function loopBeats() { return song().bars * 4; }
@@ -217,7 +222,7 @@ function scheduler()
 	}
 	play.sounding = play.sounding.filter(function(n){ return n.off > now - 0.5; });
 }
-setInterval( scheduler, TICK );
+var sched_timer = setInterval( scheduler, TICK );
 
 function start()
 {
@@ -310,10 +315,10 @@ function finishWav()
 		if(!res.L.length) { setStatus( "Nothing recorded" ); return; }
 		var blob = new Blob([ WR.encodeWav( res.L, res.R, res.sampleRate ) ], { type: "audio/wav" });
 		var d = new Date(), p2 = function(v){ return (v < 10 ? "0" : "") + v; };
-		var a = document.createElement( "a" );
+		var a = D().createElement( "a" );
 		a.href = URL.createObjectURL( blob );
 		a.download = "song " + d.getFullYear() + "-" + p2( d.getMonth() + 1 ) + "-" + p2( d.getDate() ) + " " + p2( d.getHours() ) + "-" + p2( d.getMinutes() ) + ".wav";
-		document.body.appendChild( a ); a.click(); a.remove();
+		D().body.appendChild( a ); a.click(); a.remove();
 		setTimeout(function(){ URL.revokeObjectURL( a.href ); }, 2000);
 		var db = res.peak > 0 ? 20 * Math.log10( res.peak ) : -Infinity;
 		setStatus( a.download + ": " + (res.L.length / res.sampleRate).toFixed( 1 ) + " s, peak " + (isFinite( db ) ? db.toFixed( 1 ) + " dB" : "silent") + (res.peak >= 1 ? " (clipped: turn MASTER down)" : "") );
@@ -401,8 +406,11 @@ function drawBar( w )
 	rect( 0, 0, w, BAR_H, "#1a1a19" );
 	rect( 0, 0, w, 1, "#2c2c2a" );
 	var x = 10;
-	btn( x, 5, 118, 20, (view.open ? "▼" : "▲") + " SEQUENCER", view.open, function(){ view.open = !view.open; if(view.open) fitView(); save(); },
-		view.open ? "Lower the sequencer" : "Raise the sequencer: tracks and piano roll" );
+	if(pop)
+		btn( x, 5, 118, 20, "⇲ ATTACH", false, attach, "Put the sequencer back in the main window" );
+	else
+		btn( x, 5, 118, 20, (view.open ? "▼" : "▲") + " SEQUENCER", view.open, function(){ view.open = !view.open; if(view.open) fitView(); save(); },
+			view.open ? "Lower the sequencer" : "Raise the sequencer: tracks and piano roll" );
 	x += 128;
 	btn( x, 5, 54, 20, play.on ? "■ STOP" : "▶ PLAY", play.on, function(){ play.on ? stop() : start(); }, "Play / stop the song", "#2f6b3a" );
 	btn( x + 60, 5, 46, 20, "● REC", play.rec, function(){ play.rec = !play.rec; if(!play.rec) finishRecording(); },
@@ -432,6 +440,11 @@ function drawBar( w )
 	btn( x, 5, 96, 20, wav ? "■ WAV " + wavSeconds() : "EXPORT WAV", !!wav, exportWav,
 		wav ? "Recording the song: click to stop and save now" : "Play the song once from the start and save it as a WAV file", "#8a2a7a" );
 	x += 106;
+	if(!pop)
+	{
+		btn( x, 5, 80, 20, "⇱ WINDOW", false, detach, "The sequencer in a window of its own (closing it brings it back)" );
+		x += 90;
+	}
 	if(view.hot_tip)
 		text( view.hot_tip, Math.max( x, w - 10 ), 15, 11, "#8c8a84", "right" );
 }
@@ -496,7 +509,7 @@ function drawTracks( y0, h )
 	}, view.cvlearn ? "Now turn a knob in the rack (click again: cancel)" : "A CV track for a knob: click, then turn the knob", "#5a3f86" );
 	btn( 114, by, 48, 20, "CLEAR", false, function(){
 		var t = track(), n = isCv( t ) ? t.points.length : t.notes.length;
-		if(n && window.confirm( "Clear the " + n + (isCv( t ) ? " points" : " notes") + " of " + t.name + "?" )) { t.notes = []; if(isCv( t )) t.points = []; view.sel = []; reschedule(); }
+		if(n && W().confirm( "Clear the " + n + (isCv( t ) ? " points" : " notes") + " of " + t.name + "?" )) { t.notes = []; if(isCv( t )) t.points = []; view.sel = []; reschedule(); }
 	}, "Remove the notes (or CV points) of the selected track" );
 	btn( 166, by, 76, 20, "MIDI FILE", false, function(){ midiFileInput().click(); },
 		"Load a standard MIDI file (.mid): its tracks replace the song's" );
@@ -518,7 +531,7 @@ function drawMenu( H )
 		} ],
 		[ "DELETE", true, function(){
 			var t = s.tracks[ m.i ];
-			if(t.notes.length && !window.confirm( "Delete " + t.name + " and its " + t.notes.length + " notes?" ))
+			if(t.notes.length && !W().confirm( "Delete " + t.name + " and its " + t.notes.length + " notes?" ))
 				return;
 			s.tracks.splice( m.i, 1 );
 			if(!s.tracks.length) s.tracks.push({ name: "TRACK 1", channel: 1, mute: false, solo: false, notes: [] });
@@ -551,7 +564,7 @@ function moveTrack( i, d )
 // double-click a track's name: edit it in place (Enter or a click elsewhere keeps it, Escape does not)
 function renameTrack( i, x, y )
 {
-	var t = song().tracks[i], r = cv.getBoundingClientRect(), inp = document.createElement( "input" );
+	var t = song().tracks[i], r = cv.getBoundingClientRect(), inp = D().createElement( "input" );
 	inp.value = t.name; inp.maxLength = 24; inp.spellcheck = false;
 	inp.style.cssText = "position:fixed;z-index:50;left:" + (r.left + x) + "px;top:" + (r.top + y) + "px;width:100px;height:22px;box-sizing:border-box;" +
 		"font:bold 13px " + FONT + ";text-transform:uppercase;background:#0e0e0d;color:#fff;border:1px solid #b6f06a;border-radius:3px;padding:0 4px;outline:none";
@@ -571,7 +584,7 @@ function renameTrack( i, x, y )
 		else if(e.key == "Escape") finish( false );
 	});
 	inp.addEventListener("blur", function(){ finish( true ); });
-	document.body.appendChild( inp );
+	D().body.appendChild( inp );
 	inp.focus(); inp.select();
 }
 
@@ -656,23 +669,24 @@ function loadMidiFile( buf )
 var midi_input = null;
 function midiFileInput()
 {
-	if(midi_input)
+	if(midi_input && midi_input.ownerDocument === D())
 		return midi_input;
-	midi_input = document.createElement( "input" );
+	if(midi_input && midi_input.parentNode) midi_input.parentNode.removeChild( midi_input );
+	midi_input = D().createElement( "input" );
 	midi_input.type = "file"; midi_input.accept = ".mid,.midi,audio/midi"; midi_input.style.display = "none";
 	midi_input.addEventListener("change", function(){
 		var f = midi_input.files && midi_input.files[0];
 		midi_input.value = "";
 		if(!f) return;
 		var notes = song().tracks.reduce(function(a, t){ return a + t.notes.length; }, 0);
-		if(notes && !window.confirm( "Replace the song (" + notes + " notes) with " + f.name + "?" ))
+		if(notes && !W().confirm( "Replace the song (" + notes + " notes) with " + f.name + "?" ))
 			return;
 		f.arrayBuffer().then(function(buf){
 			var sg = loadMidiFile( buf );
 			if(window.setStatus) setStatus( f.name + ": " + sg.tracks.length + " tracks, " + sg.bars + " bars at " + Math.round( sg.bpm ) + " BPM" );
-		}).catch(function(err){ window.alert( "Could not load " + f.name + ": " + err.message ); });
+		}).catch(function(err){ W().alert( "Could not load " + f.name + ": " + err.message ); });
 	});
-	document.body.appendChild( midi_input );
+	D().body.appendChild( midi_input );
 	return midi_input;
 }
 
@@ -807,13 +821,21 @@ function drawRoll( x0, y0, w, h )
 	view.roll = r;
 }
 
+// the drawing loop, on the frames of the sequencer's window (a new token stops the old loop)
+var loop_token = 0;
+function loop( token )
+{
+	if(token !== loop_token) return;
+	(pop ? pop.win.requestAnimationFrame.bind( pop.win ) : requestAnimationFrame)(function(){ loop( token ); });
+	draw();
+}
+
 function draw()
 {
-	requestAnimationFrame( draw );
-	var w = cv.clientWidth, h = view.open ? view.h : BAR_H;
+	var w = cv.clientWidth, h = pop ? pop.win.innerHeight : (view.open ? view.h : BAR_H);
 	if(parseInt( cv.style.height ) != h)
 		cv.style.height = h + "px";
-	var dpr = window.devicePixelRatio || 1;
+	var dpr = (pop ? pop.win.devicePixelRatio : window.devicePixelRatio) || 1;
 	if(cv.width != Math.round( w * dpr ) || cv.height != Math.round( h * dpr ))
 	{
 		cv.width = Math.round( w * dpr );
@@ -837,7 +859,7 @@ function draw()
 		drawMenu( h );
 	// the cursor: resize grip on the top edge, a note's end, a note, dragging
 	var cur = "default", r = view.roll, d = view.drag;
-	if(view.resize || (view.open && view.py < 4 && !view.menu)) cur = "ns-resize";
+	if(view.resize || (view.open && view.py < 4 && !view.menu && !pop)) cur = "ns-resize";
 	else if(d) cur = d.mode == "length" ? "ew-resize" : (d.mode == "move" ? "grabbing" : "crosshair");
 	else if(view.open && r && !view.menu && view.px > r.x && view.py > r.y && isCv( track() ))
 		cur = cvPointAt( r, view.px, view.py ) ? "move" : "crosshair";
@@ -898,7 +920,7 @@ cv.addEventListener("pointerdown", function(e){
 	last_click = now;
 	if(view.rename)
 		view.rename.finish( true );
-	if(view.open && view.py < 4 && !view.menu)
+	if(view.open && view.py < 4 && !view.menu && !pop)
 	{
 		view.resize = { y: e.clientY, h: view.h };
 		cv.setPointerCapture( e.pointerId );
@@ -1084,6 +1106,57 @@ window.addEventListener("keydown", function(e){
 	}
 });
 
+// ---------------------------------------------------------------------------
+// DETACH: the canvas moves into a window of its own (same page: the code, its handlers and the audio
+// stay here). Its keys are passed on to this window (QWERTY notes, Delete...). The scheduler runs on
+// that window's timers, so this one can be hidden. Closing it puts the sequencer back
+
+function detach()
+{
+	if(pop) return;
+	var w = window.open( "", "synths_sequencer", "popup,width=" + Math.max( 900, Math.round( cv.clientWidth * 0.85 ) ) + ",height=" + Math.max( 360, view.h ) );
+	if(!w) { if(window.setStatus) setStatus( "The browser blocked the window: allow pop-ups for this page" ); return; }
+	var links = Array.prototype.map.call( document.querySelectorAll( "link[rel=stylesheet], link[rel=preconnect]" ), function(l){ return l.outerHTML; } ).join( "" );
+	var d = w.document;
+	d.open();
+	d.write( '<!doctype html><html><head><meta charset="utf-8"><title>SYNTHS \u00b7 SEQUENCER</title>' + links +
+		'<style>html, body { margin: 0; height: 100%; background: #111110; overflow: hidden; } canvas { display: block; width: 100%; }</style></head><body></body></html>' );
+	d.close();
+	pop = { win: w, parent: cv.parentNode, next: cv.nextSibling, open: view.open };
+	view.open = true;
+	d.body.appendChild( d.adoptNode ? d.adoptNode( cv ) : cv );
+	["keydown", "keyup"].forEach(function(type){
+		w.addEventListener( type, function(e){
+			if(isTextField( e.target )) return; // renaming a track
+			if(e.code == "Backspace" || e.code == "Space" || (e.code == "KeyA" && (e.ctrlKey || e.metaKey))) e.preventDefault();
+			window.dispatchEvent( new KeyboardEvent( type, { key: e.key, code: e.code, shiftKey: e.shiftKey, ctrlKey: e.ctrlKey, metaKey: e.metaKey, altKey: e.altKey, repeat: e.repeat } ) );
+		});
+	});
+	w.addEventListener( "pagehide", attach ); // closed (or reloaded): back home
+	clearInterval( sched_timer );
+	sched_timer = w.setInterval( scheduler, TICK );
+	loop( ++loop_token );
+	window.dispatchEvent( new Event( "resize" ) ); // the rack takes the room
+	w.focus();
+}
+
+function attach()
+{
+	if(!pop) return;
+	var p = pop;
+	pop = null;
+	if(view.rename) view.rename.finish( true );
+	view.open = p.open;
+	view.menu = null;
+	p.parent.insertBefore( document.adoptNode ? document.adoptNode( cv ) : cv, p.next && p.next.parentNode === p.parent ? p.next : null );
+	if(!p.win.closed) { try { p.win.clearInterval( sched_timer ); } catch(err) {} }
+	sched_timer = setInterval( scheduler, TICK );
+	loop( ++loop_token );
+	if(!p.win.closed) p.win.close();
+	window.dispatchEvent( new Event( "resize" ) );
+}
+window.addEventListener( "pagehide", function(){ if(pop && !pop.win.closed) pop.win.close(); } );
+
 // a patch loaded while playing: start over with its song
 var last_song = null;
 setInterval(function(){
@@ -1096,9 +1169,9 @@ setInterval(function(){
 	}
 }, 100);
 
-draw();
+loop( loop_token );
 
 // for the tests
-window.SEQ = { view: view, play: play, applyCv: applyCv, cvValue: cvValue, exportWav: exportWav, wavTick: wavTick, wav: function(){ return wav; }, parseMidi: parseMidi, loadMidiFile: loadMidiFile, start: start, stop: stop, scheduleRange: scheduleRange, position: position, roll: function(){ return view.roll; } };
+window.SEQ = { view: view, play: play, detach: detach, attach: attach, detached: function(){ return !!pop; }, applyCv: applyCv, cvValue: cvValue, exportWav: exportWav, wavTick: wavTick, wav: function(){ return wav; }, parseMidi: parseMidi, loadMidiFile: loadMidiFile, start: start, stop: stop, scheduleRange: scheduleRange, position: position, roll: function(){ return view.roll; } };
 
 })();

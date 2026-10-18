@@ -425,6 +425,10 @@ The bar at the bottom of the page: **▲ SEQUENCER** raises it into a multitrack
   - The keys on the left play the note. The mouse wheel scrolls the notes.
 - **Recording:** with REC on while playing, notes from the on-screen keys, the QWERTY keys and a MIDI device go into the selected track, snapped to the grid.
 - **Timing:** notes are scheduled ahead into the audio engine with their sample position, so they don't depend on the page's frame rate.
+- **⇱ WINDOW** detaches the sequencer into a window of its own, for a second screen. The rack gets the room back.
+  - The window fills with the tracks and the piano roll. Keys pressed there still play the synths and edit the notes.
+  - Closing it, or **⇲ ATTACH**, puts the sequencer back in the main window. Closing the main window closes it too.
+  - The browser must allow pop-ups for the page.
 - **CV tracks** record knob movements over the song:
   - **Recording:** with REC on while the song plays, turn any knob or fader in the rack. Its movements go into a CV track for that knob, made then if it has none. Turning it again later re-records just that stretch.
   - **Playback:** while the song plays, each CV track turns its knob, unless your hand is on it. **M** mutes a CV track, leaving the knob alone.
