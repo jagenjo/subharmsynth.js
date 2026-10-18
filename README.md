@@ -59,7 +59,7 @@ One patch bay spans all of them: any output can be cabled to any input of any de
 
 - **Add device** (toolbar) opens a panel with every device, grouped into synths, modulation, mixing and effects. Each card shows the device's picture, what it is, and whether it is full or half width, takes MIDI, is an insert effect, or is already in the rack.
   - Type in the search box to filter (Enter adds the first match); click a card to add that device at the bottom of the rack, which scrolls to it. `index.html#add` opens the panel.
-  - The pictures are in `previews/`, made by `tools/make-previews.sh` (headless Chrome and ImageMagick). It opens `index.html?preview=<type>`, which draws only that device, then trims and saves the picture. Run it again after changing a panel; give it device types to redo only those.
+  - The pictures are in `app/previews/`, made by `tools/make-previews.sh` (headless Chrome and ImageMagick). It opens `app/index.html?preview=<type>`, which draws only that device, then trims and saves the picture. Run it again after changing a panel; give it device types to redo only those.
   - You can have several of the same kind (`dram`, `dram2`, …). Reverbs are limited to 8, one per send / return slot of the audio engine.
   - A new LFO, compressor, reverb or delay arrives unpatched: patch its audio on the back (Tab).
   - A new Universe, Hyper or Cosmos goes in just before the speakers (between the last device and MAIN IN), so you hear it right away.
