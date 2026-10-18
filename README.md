@@ -31,7 +31,7 @@ Needs a browser with AudioWorklet support, served over `https://` or `localhost`
 | `devices/universe.js`, `devices/universe-worklet.js` | Universe, the granular / looper effect |
 | `devices/hyper.js`, `devices/hyper-worklet.js` | Hyper, the distortion / bit crusher |
 | `devices/cosmos.js`, `devices/cosmos-worklet.js` | Cosmos, the 12 algorithm reverb |
-| `devices/pollyd.js`, `devices/pollyd-worklet.js` | Polly D, the four-voice Minimoog |
+| `devices/pollyd.js`, `devices/pollyd-worklet.js` | Para D, the four-voice Minimoog |
 | `devices/grid.js`, `devices/grid-worklet.js` | Grid 32, the note matrix sequencer |
 | `devices/mount.js`, `devices/mount-worklet.js` | Mount, the eight voice polyphonic synthesizer |
 | `devices/reroute.js`, `devices/reroute-worklet.js` | Reroute, front to back and back again |
@@ -151,11 +151,11 @@ A pattern sequencer on a 32 × 32 LED matrix, half a rack wide like the effects.
   - **KEY 2 / GATE 2**: the highest note.
   - **TRIG** on every new note, **CLOCK OUT** on every step, **EOC** at the start of each cycle.
 - **Inputs:** CLOCK IN (a step a pulse), RESET, TRANSPOSE (1 V/oct) and RUN (plays while the gate is high). On the back, MIDI IN: it follows MIDI clock (start and stop too), and with **KBD** the keys transpose it (C4: as written).
-- **MIDI:** with it on (CH 1–16: click again for the next channel, Shift+click turns it off), the notes also go into the rack's MIDI on that channel, as the keys device's would. Every note of a step plays, so the polyphonic synths (MYSTIC, POLLY D) play its chords.
+- **MIDI:** with it on (CH 1–16: click again for the next channel, Shift+click turns it off), the notes also go into the rack's MIDI on that channel, as the keys device's would. Every note of a step plays, so the polyphonic synths (MYSTIC, PARA D) play its chords.
 
-## Polly D
+## Para D
 
-A replica of the Behringer Poly D: a Minimoog with four oscillators, played as one voice or as four. Its panel is laid out as the original's: black with white print, Moog knobs with numbered scales, blue, orange and white rocker switches, and wooden sides. Below the panel, on the keyboard deck, are the wheels, the sequencer and the sockets of the back panel.
+A replica of the Behringer Poly D (its type in saved racks is still `pollyd`): a Minimoog with four oscillators, played as one voice or as four. Its panel is laid out as the original's: black with white print, Moog knobs with numbered scales, blue, orange and white rocker switches, and wooden sides. Below the panel, on the keyboard deck, are the wheels, the sequencer and the sockets of the back panel.
 
 - **Controllers:**
   - TUNE, GLIDE (with its ON switch on the deck), MODULATION MIX.
@@ -515,7 +515,7 @@ As on the hardware, MIDI reaches the synth only through its MIDI IN jack, so the
   - The panel lists the sessions, newest first, with their devices and song, to **Load**, rename (✎) or delete (×). **New session** starts a fresh rack and keeps the current one.
   - The 30 most recent are kept; when the browser's storage is full, the oldest go first.
 - **Patches**: a patch is the whole rack, meaning its synths, all their settings, the shared devices and the cables.
-  - The toolbar menu has 41 factory patches (in `data/patches.json`), grouped as SUBHARM, DRAM, BROTHER-32, MAZE, MYSTIC, LLM DRAM, LUNAR 21, POLLY D, MOUNT (at least three for every synth) and RACK (several devices together), plus your own.
+  - The toolbar menu has 41 factory patches (in `data/patches.json`), grouped as SUBHARM, DRAM, BROTHER-32, MAZE, MYSTIC, LLM DRAM, LUNAR 21, PARA D, MOUNT (at least three for every synth) and RACK (several devices together), plus your own.
   - *Save as…* stores the rack under a name in the browser.
   - *Export* / *Import* write and read `.json` files, so patches can be shared or added to the repo.
   - Patches saved before the rack existed load as a rack with one Subharm.
@@ -546,7 +546,7 @@ As on the hardware, MIDI reaches the synth only through its MIDI IN jack, so the
 Some details are educated guesses, not measurements of the hardware:
 
 - Mount: the oscillators (no FPGA here), what SHAPE does to the sine, triangle and saw, the 8 wavetables (made for it), the filter and envelope curves, the effects' algorithms, and the matrix (6 slots, not 16)
-- Polly D: the curves and ranges of the knobs, the modulation depths, how UNISON spreads the oscillators, the chorus and distortion circuits, the arpeggiator modes, and the layout of the sequencer's buttons on the deck
+- Para D: the curves and ranges of the knobs, the modulation depths, how UNISON spreads the oscillators, the chorus and distortion circuits, the arpeggiator modes, and the layout of the sequencer's buttons on the deck
 - Maze: how much CORRUPT changes per pass, the ranges of the amounts, the wavefolder and filter curves, the scales after the ones the manual lists, how notes are handled over MIDI, and the panel layout (an arrangement of the manual's controls, not a copy of the panel)
 - Brother-32: the placement of the patch bay jacks within the 4 × 8 grid, the ranges of the knobs, the ASSIGN choices, and the step editing (a step grid instead of the button modes)
 - DRAM: the order of the patch bay jacks within their rows, the envelope curves and ranges, the FM depth and the HP filter (a 4-pole high pass from the same ladder)

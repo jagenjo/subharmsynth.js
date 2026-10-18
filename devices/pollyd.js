@@ -1,5 +1,5 @@
 // devices/pollyd.js
-// POLLY D module, a replica of the Behringer Poly D (a four-oscillator, four-voice Minimoog). Its
+// PARA D module, a replica of the Behringer Poly D (a four-oscillator, four-voice Minimoog). Its
 // panel is laid out as the original's tilted front: CONTROLLERS, OSCILLATOR BANK, MIXER, MODIFIERS and
 // OUTPUT (with the chorus and the distortion), black with white print, black Moog knobs with numbered
 // scales, blue and orange rocker switches. Below, on the keyboard deck: the pitch and mod wheels, glide,
@@ -425,7 +425,7 @@ function drawDeck()
 	ctx.font = "bold 34px " + FONT;
 	if(ctx.letterSpacing !== undefined) ctx.letterSpacing = "4px";
 	ctx.fillStyle = INK; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
-	ctx.fillText( "POLLY D", 412, 548 );
+	ctx.fillText( "PARA D", 412, 548 );
 	if(ctx.letterSpacing !== undefined) ctx.letterSpacing = "0px";
 	T( "4-VOICE PARAPHONIC ANALOG SYNTHESIZER", 412, 566, 9, DIM, "left", false );
 
@@ -591,8 +591,8 @@ function onState( m, state )
 }
 
 WR.registerSynth( "pollyd", {
-	title: "POLLY D",
-	description: "POLLY D: 4-voice paraphonic analog synthesizer (Minimoog style), chorus, distortion, arpeggiator and sequencer",
+	title: "PARA D",
+	description: "PARA D: 4-voice paraphonic analog synthesizer (Minimoog style), chorus, distortion, arpeggiator and sequencer",
 	about: "After the Behringer Poly D: a Minimoog with four oscillators, played mono, in unison or as four voices through the ladder filter, with a stereo chorus, a distortion, an arpeggiator and a 32-step sequencer.",
 	// keys: 3 played / triggered, 2 often, 1 sometimes, 0 no key (code.js: keyAssign)
 	key_prio: [["^step\\d$", 3], ["^(play|rec|arp|hold|reset)$", 3], ["^(pattern|shift|page)$", 2], ["^(glide_on|osc_mod|filter_mod|chorus_on|dist_on|osc\\d_on|noise_on)$", 1], ["", 0]],

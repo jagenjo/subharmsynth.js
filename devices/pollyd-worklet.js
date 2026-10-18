@@ -1,5 +1,5 @@
 // devices/pollyd-worklet.js
-// POLLY D DSP, after the Behringer Poly D (a Minimoog with four oscillators): four VCOs (6 ranges, 6
+// PARA D DSP, after the Behringer Poly D (a Minimoog with four oscillators): four VCOs (6 ranges, 6
 // waves), played as one voice (MONO, UNISON: the four on the last note) or as four (POLY: an
 // oscillator a note, through the same filter and contours: paraphonic, AUTO DAMP silencing the keys let
 // go), the mixer (OSC 1-4, NOISE white / pink, EXT IN), the 24 dB ladder filter (low / high pass,
@@ -51,7 +51,7 @@ function wave(w, t, dt, four) {
 
 function newVoice() { return { note: 60, gate: false, age: 0, pitch: 0, target: 0, amp: 0, ampT: 1, vel: 1, seq: false }; }
 
-class PollyDSP {
+class ParaDSP {
 	constructor() {
 		this.s = null;
 		this.host = null;
@@ -494,12 +494,12 @@ class PollyDSP {
 		};
 	}
 }
-PollyDSP.OUT_IDS = OUT_IDS;
-PollyDSP.IN_IDS = IN_IDS;
-PollyDSP.MIDI_IN = "midi_in";
-PollyDSP.POLY = true; // gets the raw MIDI notes and plays them on its own oscillators
+ParaDSP.OUT_IDS = OUT_IDS;
+ParaDSP.IN_IDS = IN_IDS;
+ParaDSP.MIDI_IN = "midi_in";
+ParaDSP.POLY = true; // gets the raw MIDI notes and plays them on its own oscillators
 
 globalThis.WR_DSP = globalThis.WR_DSP || {};
-globalThis.WR_DSP.pollyd = PollyDSP;
+globalThis.WR_DSP.pollyd = ParaDSP;
 
 })();
