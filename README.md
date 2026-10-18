@@ -33,6 +33,7 @@ Needs a browser with AudioWorklet support, served over `https://` or `localhost`
 | `devices/cosmos.js`, `devices/cosmos-worklet.js` | Cosmos, the 12 algorithm reverb |
 | `devices/pollyd.js`, `devices/pollyd-worklet.js` | Polly D, the four-voice Minimoog |
 | `devices/grid.js`, `devices/grid-worklet.js` | Grid 32, the note matrix sequencer |
+| `devices/mount.js`, `devices/mount-worklet.js` | Mount, the eight voice polyphonic synthesizer |
 | `devices/reroute.js`, `devices/reroute-worklet.js` | Reroute, front to back and back again |
 | `devices/reverb.js`, `devices/reverb-worklet.js` | the convolution reverb: native nodes, bridged through a send / return slot |
 | `data/patches.json` | factory patches |
@@ -112,6 +113,29 @@ A 6 channel line mixer in the same panel style as the synths. Insert it from *Ad
 - **Front:** LEVEL CV 1–6 inputs act as a VCA on each channel (5 V = the fader's level), and a MIX output carries the mono mix at ±5 V, e.g. for the scope.
 - **Back:** IN 1–6, AUX SEND, AUX RET L / R, MAIN L / R.
 - **Reverb on an aux:** patch AUX SEND → REVERB IN L, REVERB OUT L / R → AUX RET L / R, and turn the reverb's **DRY** button off so it returns only the effect. The delay has the same DRY button. The *Mixer & Aux Reverb* factory patch is set up this way.
+
+## Mount
+
+A replica of the Novation Peak: eight voices of three oscillators, laid out as the Peak's panel. PATCH, LFO 1 and 2, GLIDE, ARP, the MENU with its OLED, ANIMATE and MASTER are along the top; the three OSCILLATOR rows, MIXER, FILTER, the envelope sliders and EFFECTS are below. The buttons light up red, and LED columns show the stepped choices.
+
+- **Patch:** the PATCH encoder and PATCH − / + step through 12 factory patches and 16 user slots. SAVE stores the sound in a user slot (the patch's own, or the first empty one). INITIALISE loads the init patch. COMPARE, held, plays the patch as saved. AUDITION plays middle C.
+- **Oscillators** (three alike):
+  - RANGE (16', 8', 4', 2'), COARSE (±1 octave), FINE (±100 cents).
+  - WAVE: sine, triangle, sawtooth, pulse, or MORE, one of 8 wavetables (BRIGHT, VOCAL, ORGAN, ODD, PULSE SWEEP, DIGITAL, HOLLOW, SYNC), chosen in the OSC menu.
+  - MOD ENV 2 and LFO 2 depths for the pitch.
+  - SOURCE and SHAPE AMOUNT: the shape's manual amount, and its MOD ENV 1 and LFO 1 depths. SOURCE picks which one the knob sets, and the lit LEDs show the ones in use. For pulse, the shape is the width; for the wavetables, the position in the table.
+- **LFO 1 and 2:** TYPE (triangle, saw, square, S&H), FADE TIME, RANGE (HIGH, LOW, SYNC to the arp tempo or MIDI clock), RATE. LFO 1 moves the shapes and the filter; LFO 2 moves the pitch.
+- **Mixer:** OSC 1–3, RING 1*2, NOISE, VCA GAIN.
+- **Filter:** SHAPE (LP, BP, HP), SLOPE (12 or 24 dB), FREQUENCY, RESONANCE, OVERDRIVE, KEY TRACKING, ENV DEPTH (from MOD ENV 1, the AMP ENV or both: SOURCE), LFO 1 DEPTH, OSC 3 FILTER MOD.
+- **Envelopes:** four sliders for the AMP ENVELOPE, and four for the MOD ENVELOPES (SELECT: MOD 1 or MOD 2). Hold and velocity are in the ENV menu.
+- **Glide** (TIME, ON) and **Arp** (ON, KEY LATCH, GATE). Its tempo, pattern (up, down, up/down, random, played), octaves and swing are in the ARP/CLOCK menu.
+- **Effects:** DISTORTION, then DELAY (TIME, SYNC, FEEDBACK, LEVEL), REVERB (TIME, TYPE 1–3, LEVEL) and CHORUS (RATE, TYPE 1–3, LEVEL). BYPASS takes out the three time effects.
+- **Menu:** the 4 × 20 OLED shows the patch, or the control being turned. Its nine buttons open PATCH, OSC, ENV, LFO, ARP/CLOCK, MOD, VOICE, FX and SETTINGS. Press a menu again (or PAGE ◀ ▶) for its next page, use a row button to pick a row, and turn the PARAMETER encoder (or VALUE − / +) to change it.
+  - **MOD:** a 6 slot matrix. Sources: LFO 1–2, MOD ENV 1–2, AMP ENV, velocity, mod wheel, key, CV MOD IN, ANIMATE 1–2. Destinations: pitch (all or each oscillator), shape, filter, resonance, VCA, noise, pan, the LFO rates, distortion.
+  - **VOICE:** POLY, MONO or MONO LEGATO; unison 2 or 4 with DETUNE; bend range, tune, amp velocity.
+- **Animate:** ANIMATE 1 and 2, held, switch on their matrix slots (by default: the filter opens; set them in SETTINGS or the MOD menu). HOLD keeps them on.
+- **Master:** VOLUME, and the **CV MOD IN** socket (±5 V), a source of the matrix. OUT L / OUT R are on the back.
+- **Not here:** the mod and pitch wheels (MIDI pitch bend works), the 60 wavetables (8 here), LFOs 3 and 4, the tuning tables, and the pedals.
 
 ## Grid 32
 
@@ -491,7 +515,7 @@ As on the hardware, MIDI reaches the synth only through its MIDI IN jack, so the
   - The panel lists the sessions, newest first, with their devices and song, to **Load**, rename (✎) or delete (×). **New session** starts a fresh rack and keeps the current one.
   - The 30 most recent are kept; when the browser's storage is full, the oldest go first.
 - **Patches**: a patch is the whole rack, meaning its synths, all their settings, the shared devices and the cables.
-  - The toolbar menu has 38 factory patches (in `data/patches.json`), grouped as SUBHARM, DRAM, BROTHER-32, MAZE, MYSTIC, LLM DRAM, LUNAR 21, POLLY D (at least three for every synth) and RACK (several devices together), plus your own.
+  - The toolbar menu has 41 factory patches (in `data/patches.json`), grouped as SUBHARM, DRAM, BROTHER-32, MAZE, MYSTIC, LLM DRAM, LUNAR 21, POLLY D, MOUNT (at least three for every synth) and RACK (several devices together), plus your own.
   - *Save as…* stores the rack under a name in the browser.
   - *Export* / *Import* write and read `.json` files, so patches can be shared or added to the repo.
   - Patches saved before the rack existed load as a rack with one Subharm.
@@ -521,6 +545,7 @@ As on the hardware, MIDI reaches the synth only through its MIDI IN jack, so the
 
 Some details are educated guesses, not measurements of the hardware:
 
+- Mount: the oscillators (no FPGA here), what SHAPE does to the sine, triangle and saw, the 8 wavetables (made for it), the filter and envelope curves, the effects' algorithms, and the matrix (6 slots, not 16)
 - Polly D: the curves and ranges of the knobs, the modulation depths, how UNISON spreads the oscillators, the chorus and distortion circuits, the arpeggiator modes, and the layout of the sequencer's buttons on the deck
 - Maze: how much CORRUPT changes per pass, the ranges of the amounts, the wavefolder and filter curves, the scales after the ones the manual lists, how notes are handled over MIDI, and the panel layout (an arrangement of the manual's controls, not a copy of the panel)
 - Brother-32: the placement of the patch bay jacks within the 4 × 8 grid, the ranges of the knobs, the ASSIGN choices, and the step editing (a step grid instead of the button modes)
