@@ -34,7 +34,7 @@ GASFREE (from GAS, Gear Acquisition Syndrome, and FREE: all the gear, none of th
 | `app/previews/<type>.jpg` | the pictures in ADD DEVICE, made by `tools/make-previews.sh` |
 | `tools/` | `make-previews.sh` (headless Chrome + ImageMagick), `make-logo.py` |
 | `old/` | the first version of the project, kept as it was. Don't edit it |
-| `claudisms.md` | the user's catalogue of wording to avoid (see *Writing*) |
+| `.claude/skills/claudisms/SKILL.md` | the user's catalogue of wording to avoid, as the `claudisms` skill (see *Writing*) |
 
 ## Architecture
 
@@ -128,7 +128,7 @@ nginx serves `/srv/www/gasfree.app/public_html`: a copy of `home/` at its root, 
 The app, README and home page use plain, short, factual sentences: what a control does, its range, what happens. Labels on panels are UPPERCASE. In replies and docs:
 
 - No em dashes, no emojis (the PR attribution line above is the exception).
-- Avoid the phrases catalogued in `claudisms.md` (e.g. "real", "honest", "worth...", "load-bearing", "the whole X", "lives", "shape" as metaphors).
+- Avoid the phrases catalogued in the `claudisms` skill, `.claude/skills/claudisms/SKILL.md` (e.g. "real", "honest", "worth...", "load-bearing", "the whole X", "lives", "shape" as metaphors).
 - Describe what changed and what was verified; say plainly what failed or wasn't tested.
 
 ## Devices at a glance

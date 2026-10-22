@@ -1,3 +1,8 @@
+---
+name: claudisms
+description: The catalogue of wording to avoid (AI-writing tells). Use before writing or editing any prose for this project: README, Help panel, home page, panel labels, comments, commit messages, PR descriptions and replies to the user.
+---
+
 # Claudisms
 
 AI models overuse the same words. This is a running catalog of them: the phrases, verbs and sentence shapes that give machine-written text away, each with a short note on why it fails and what to write instead.
