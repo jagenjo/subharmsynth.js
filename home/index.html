@@ -105,12 +105,6 @@
 	.dev p { margin: 0; color: var(--dim); font-size: 14.5px; }
 	.tag { display: inline-block; margin-top: 10px; font: 500 12px var(--head); letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim); border: 1px solid #3a3a37; border-radius: 3px; padding: 1px 7px; }
 
-	/* getting started */
-	.steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; counter-reset: s; }
-	.step { position: relative; padding: 22px 22px 22px 70px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; color: var(--dim); font-size: 15px; }
-	.step::before { counter-increment: s; content: counter(s); position: absolute; left: 22px; top: 16px; font: 700 34px var(--head); color: var(--accent); }
-	.step b { color: var(--ink); display: block; font: 700 19px var(--head); letter-spacing: 0.05em; margin-bottom: 4px; }
-
 	.final { text-align: center; padding: 88px 0; border-top: 1px solid var(--line); background: radial-gradient(900px 400px at 50% 120%, rgba(226,87,76,0.18), transparent 70%); }
 	.final h2 { font-size: clamp(32px, 5vw, 48px); margin-bottom: 18px; }
 	.final p { color: var(--dim); margin: 0 auto 30px; max-width: 560px; }
@@ -140,7 +134,6 @@
 			<a href="#features">Features</a>
 			<a href="#screenshots">Screenshots</a>
 			<a href="#devices">Devices</a>
-			<a href="#start">Start</a>
 		</nav>
 		<a class="btn small" href="../app/" onclick="gfTrack('launch',{from:'header'})">Launch</a>
 	</div>
@@ -164,17 +157,18 @@
 <section id="features">
 	<div class="wrap">
 		<h2>What's inside</h2>
-		<p class="intro">Every sound is made live, sample by sample, in one audio engine, so the cables between devices behave like real patch cables: audio, control voltages, gates and clocks can go anywhere.</p>
+		<p class="intro">Every device runs sample by sample in one audio engine, so a cable can take audio, control voltages, gates or clocks from any output to any input, as on a modular synth.</p>
 		<div class="feats">
 			<div class="feat"><h3><i></i>Patch anything</h3><p>Drag cables from any output to any input on the front, and route the audio on the back of the rack (Tab turns it around).</p></div>
-			<div class="feat"><h3><i></i>19 devices</h3><p>Synths with up to 8 voices, drum machines, a drone machine, a note grid, LFOs, a mixer, a compressor and five effects. Add as many as you like.</p></div>
+			<div class="feat"><h3><i></i>20 devices</h3><p>Synths with up to 8 voices, drum machines, a drone machine, a note grid, LFOs, a mixer, a compressor and six effects. Add as many as you like.</p></div>
+			<div class="feat"><h3><i></i>Synth Editor</h3><p>Design your own synth: lay out its front and back panels, then wire oscillators, filters, envelopes and sequencers behind the knobs. It plays while you build it.</p></div>
 			<div class="feat"><h3><i></i>Song sequencer</h3><p>Tracks on MIDI channels, a piano roll with selection and editing, recording, loops, MIDI file import, and export of the song as a WAV file.</p></div>
 			<div class="feat"><h3><i></i>Automation</h3><p>Turn any knob while recording and it is written into a CV track, played back with the song and editable as a curve.</p></div>
 			<div class="feat"><h3><i></i>MIDI and keyboard</h3><p>Play from a MIDI controller or the computer keyboard, map controllers to knobs with MIDI learn, and sync to MIDI clock.</p></div>
 			<div class="feat"><h3><i></i>Sessions and patches</h3><p>Dozens of factory patches, your own patches and sessions saved in the browser, and export or import as files.</p></div>
-			<div class="feat"><h3><i></i>Over 5000 tunings</h3><p>Retune the whole rack to historical, just and microtonal scales from a large archive of tunings.</p></div>
+			<div class="feat"><h3><i></i>Over 5000 tunings</h3><p>Retune the synths to historical, just and microtonal scales from a large archive of tunings.</p></div>
 			<div class="feat"><h3><i></i>Detachable sequencer</h3><p>Move the sequencer into a window of its own, on a second screen, and it comes back when you close it.</p></div>
-			<div class="feat"><h3><i></i>Made for the hands</h3><p>Every button can be pressed from the computer keyboard; hold Shift to see which key does what.</p></div>
+			<div class="feat"><h3><i></i>Keyboard control</h3><p>Every button can be pressed from the computer keyboard; hold Shift to see which key does what.</p></div>
 		</div>
 	</div>
 </section>
@@ -188,6 +182,8 @@
 			<figure><img src="img/seq.jpg" data-full="img/seq.jpg" alt="The song sequencer under a polyphonic synthesizer" loading="lazy" /><figcaption><b>Song sequencer</b>Tracks, a piano roll, and CV tracks that move the knobs over the song.</figcaption></figure>
 			<figure><img src="img/rear.jpg" data-full="img/rear.jpg" alt="The back of the rack with audio cables" loading="lazy" /><figcaption><b>The back of the rack</b>Audio routing between synths, effects and the mixer.</figcaption></figure>
 			<figure><img src="img/add.jpg" data-full="img/add.jpg" alt="The add device panel" loading="lazy" /><figcaption><b>Add device</b>Pick from every instrument, effect and utility, each with its picture.</figcaption></figure>
+			<figure><img src="img/editor.jpg" data-full="img/editor.jpg" alt="The Synth Editor: a synth's front panel and the palette of knobs, sliders, buttons and jacks" loading="lazy" /><figcaption><b>Synth Editor: the panel</b>Drag knobs, sliders, buttons, LEDs and jacks onto the panel, and choose its size, colour and knob style.</figcaption></figure>
+			<figure><img src="img/editor-inside.jpg" data-full="img/editor-inside.jpg" alt="The Synth Editor's inside view: the panel's knobs wired to an oscillator, a filter, an envelope and a VCA" loading="lazy" /><figcaption><b>Synth Editor: inside</b>Each control on the panel is a node. Wire them to oscillators, filters, envelopes, VCAs and the audio out.</figcaption></figure>
 		</div>
 	</div>
 </section>
@@ -198,15 +194,16 @@
 		<p class="intro">Original instruments inspired by classic designs, each with its own panel, sound engine and patch sockets.</p>
 		<h3 class="cat">Synthesizers and drum machines</h3>
 		<div class="devs">
-				<article class="dev"><img src="../app/previews/subharm.jpg" alt="SUBHARM panel" loading="lazy" /><div class="dev-body"><h4>SUBHARM</h4><p>A polyrhythmic synthesizer: 2 VCOs with 4 subharmonics, 2 four-step sequencers and 4 polyrhythmic clock dividers. Polyrhythms that lock together.</p></div></article>
+				<article class="dev"><img src="../app/previews/subharm.jpg" alt="SUBHARM panel" loading="lazy" /><div class="dev-body"><h4>SUBHARM</h4><p>A polyrhythmic synthesizer: 2 VCOs with 4 subharmonics, 2 four-step sequencers and 4 polyrhythmic clock dividers.</p></div></article>
 				<article class="dev"><img src="../app/previews/dram.jpg" alt="DRAM panel" loading="lazy" /><div class="dev-body"><h4>DRAM</h4><p>An 8-step analog percussion voice, 2 VCOs, noise, a ladder filter and decays per step. Kicks, toms, clanks.</p></div></article>
 				<article class="dev"><img src="../app/previews/brother32.jpg" alt="BROTHER-32 panel" loading="lazy" /><div class="dev-body"><h4>BROTHER-32</h4><p>A mono semi-modular synth with a 32-step sequencer, ladder filter, envelope and a compact keyboard.</p></div></article>
 				<article class="dev"><img src="../app/previews/maze.jpg" alt="MAZE panel" loading="lazy" /><div class="dev-body"><h4>MAZE</h4><p>Two parallel bit-shift sequencers, two VCOs, a wavefolder and a state-variable filter. Generative patterns.</p></div></article>
 				<article class="dev"><img src="../app/previews/mystic.jpg" alt="MYSTIC panel" loading="lazy" /><div class="dev-body"><h4>MYSTIC</h4><p>8 voices, wave-scanning oscillators with mutants, two filters, three envelopes, an arpeggiator. Edit pages around an OLED.</p></div></article>
 				<article class="dev"><img src="../app/previews/llmdram.jpg" alt="LLM DRAM panel" loading="lazy" /><div class="dev-body"><h4>LLM DRAM</h4><p>An early 80s style drum machine: 24 gritty 8/12-bit sounds on 16 pads, a mixer, tuning, wave designer, filter and a 64-step sequencer.</p></div></article>
-				<article class="dev"><img src="../app/previews/lunar.jpg" alt="LUNAR 21 panel" loading="lazy" /><div class="dev-body"><h4>LUNAR 21</h4><p>An ambient drone machine: six drone voices, two VCOs on touch plates, aggressive resonant filters and a dual effector with cartridges. Ambient machine.</p></div></article>
+				<article class="dev"><img src="../app/previews/lunar.jpg" alt="LUNAR 21 panel" loading="lazy" /><div class="dev-body"><h4>LUNAR 21</h4><p>An ambient drone machine: six drone voices, two VCOs on touch plates, aggressive resonant filters and a dual effector with cartridges.</p></div></article>
 				<article class="dev"><img src="../app/previews/pollyd.jpg" alt="PARA D panel" loading="lazy" /><div class="dev-body"><h4>PARA D</h4><p>A classic analog monosynth design with four oscillators, played mono, in unison or as four voices through the ladder filter, with a stereo chorus, a distortion, an arpeggiator and a 32-step sequencer.</p></div></article>
 				<article class="dev"><img src="../app/previews/mount.jpg" alt="MOUNT panel" loading="lazy" /><div class="dev-body"><h4>MOUNT</h4><p>8 voices of 3 oscillators (with wavetables), a multimode filter, three envelopes, two LFOs, a mod matrix with ANIMATE buttons, an arpeggiator, and distortion, chorus, delay and reverb.</p></div></article>
+				<article class="dev"><img src="img/custom.jpg" alt="A CUSTOM SYNTH panel made in the Synth Editor" loading="lazy" /><div class="dev-body"><h4>CUSTOM SYNTH</h4><p>A synth you design in the Synth Editor: full or half width, 1 to 5 units high, one voice. Save a design in the browser and add it again from ADD DEVICE.</p></div></article>
 		</div>
 		<h3 class="cat">Sequencing and modulation</h3>
 		<div class="devs">
@@ -234,23 +231,10 @@
 	</div>
 </section>
 
-<section id="start">
-	<div class="wrap">
-		<h2>Getting started</h2>
-		<p class="intro">You can make sound in a few seconds.</p>
-		<div class="steps">
-			<div class="step"><b>Launch</b>Open the app and click <i>Audio on</i>: browsers need a click before they play sound.</div>
-			<div class="step"><b>Play</b>Press Space to start the sequencers, or play notes on the on-screen keys, the computer keyboard or a MIDI controller.</div>
-			<div class="step"><b>Patch</b>Drag from one jack to another to connect them; drag a cable off an input to move it. Tab shows the back.</div>
-			<div class="step"><b>Explore</b>Load a factory patch from the toolbar, add devices, open the sequencer, and press Help for everything else.</div>
-		</div>
-	</div>
-</section>
-
 <div class="final">
 	<div class="wrap">
-		<h2>Ready to make some noise?</h2>
-		<p>The whole studio opens in a browser tab.</p>
+		<h2>Open the rack</h2>
+		<p>Click <i>Audio on</i> and press Space to play the patch. Help in the toolbar explains the rest.</p>
 		<a class="btn" href="../app/" onclick="gfTrack('launch',{from:'bottom'})"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>Launch the app</a>
 	</div>
 </div>
